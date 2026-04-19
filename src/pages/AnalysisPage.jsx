@@ -13,14 +13,18 @@ import {
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
 const STATUS_STEPS = [
-  { key: "pending",              label: "ממתין להתחלה",       icon: "⏳" },
-  { key: "running_integrity",    label: "בודק שלמות נתונים",  icon: "🔍" },
-  { key: "running_fetch",        label: "שולף נתונים",          icon: "📡" },
-  { key: "running_calculations", label: "מחשב מדדים",           icon: "🔢" },
-  { key: "running_analysis",     label: "מנתח תוצאות",          icon: "🧠" },
-  { key: "completed",            label: "הניתוח הושלם!",        icon: "✅" },
-  { key: "failed",               label: "שגיאה בניתוח",         icon: "❌" },
-  { key: "error",                label: "שגיאה בניתוח",         icon: "❌" },
+  { key: "pending",              label: "ממתין להתחלה",            icon: "⏳" },
+  { key: "running_integrity",    label: "בודק שלמות נתונים",       icon: "🔍" },
+  { key: "running_fetch",        label: "שולף נתונים",              icon: "📡" },
+  { key: "running_numbers",      label: "מחשב מספרים ודיבייט",     icon: "🔢" },
+  { key: "running_calculations", label: "מחשב מדדים",               icon: "📊" },
+  { key: "running_moderator",    label: "מנחה: מזהה אנומליות",     icon: "🎯" },
+  { key: "running_ecosystem",    label: "מנתח אקו-סיסטם חיצוני",  icon: "🌐" },
+  { key: "running_analysis",     label: "מנתח תוצאות",              icon: "🧠" },
+  { key: "running_synthesis",    label: "מסנתז מסקנות",             icon: "🧩" },
+  { key: "completed",            label: "הניתוח הושלם!",            icon: "✅" },
+  { key: "failed",               label: "שגיאה בניתוח",             icon: "❌" },
+  { key: "error",                label: "שגיאה בניתוח",             icon: "❌" },
 ];
 
 function statusLabel(status) {
@@ -277,9 +281,13 @@ export default function AnalysisPage() {
   async function loadRuns() {
     try {
       const data = await listRuns();
-      setRuns(data.runs || []);
-      // ⚠️ לא מגדירים runId ולא resumedRun כאן —
-      // ה-ProgressTracker מוצג רק לאחר לחיצה אקטיבית של המשתמש על כפתור הרץ
+      const allRuns = data.runs || [];
+      setRuns(allRuns);
+      // אם יש ריצה פעילה ואין runId בסשן הנוכחי — resume אוטומטי
+      const activeRun = allRuns.find((r) => r.status?.startsWith("running_"));
+      if (activeRun && !runId) {
+        setRunId(activeRun.id);
+      }
     } catch {
       // non-critical
     } finally {
