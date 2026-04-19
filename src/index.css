@@ -1,0 +1,68 @@
+/* ─── Tailwind v4 ───────────────────────────────────────────────────────────── */
+@import "tailwindcss";
+
+/* ─── Global reset & base ──────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; padding: 0; }
+
+/* ─── Responsive content wrapper ───────────────────────────────────────────── */
+.page-content {
+  padding: 24px 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+@media (max-width: 768px) {
+  .page-content { padding: 16px 12px; }
+}
+@media (max-width: 480px) {
+  .page-content { padding: 12px 8px; }
+}
+
+/* ─── Header subtitle — hide on small screens ───────────────────────────────  */
+@media (max-width: 480px) {
+  .header-subtitle { display: none !important; }
+  .header-logo     { max-width: 100px !important; }
+}
+
+/* ─── Secondary nav — always scrollable, no wrap ────────────────────────────  */
+.secondary-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* IE/Edge */
+  white-space: nowrap;
+}
+.secondary-nav::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+
+/* ─── Responsive grid helpers ───────────────────────────────────────────────  */
+.grid-responsive-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+@media (max-width: 640px) {
+  .grid-responsive-2 { grid-template-columns: 1fr; }
+}
+
+.grid-responsive-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .grid-responsive-3 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+  .grid-responsive-3 { grid-template-columns: 1fr; }
+}
+
+/* ─── Tailwind-adjacent utilities used in AnalysisPage / ReportsPage ────────  */
+.space-y-8 > * + * { margin-top: 2rem; }
+.space-y-6 > * + * { margin-top: 1.5rem; }
+.space-y-4 > * + * { margin-top: 1rem; }
+.space-y-3 > * + * { margin-top: 0.75rem; }
+.space-y-2 > * + * { margin-top: 0.5rem; }
