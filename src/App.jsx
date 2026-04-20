@@ -8,6 +8,7 @@ import AnalysisPage from "./pages/AnalysisPage.jsx";
 import ReportsPage from "./pages/ReportsPage.jsx";
 import GoalsPage from "./pages/GoalsPage.jsx";
 import EcosystemPage from "./pages/EcosystemPage.jsx";
+import MediaReportsPage from "./pages/MediaReportsPage.jsx";
 
 export default function App() {
   return (
@@ -27,6 +28,9 @@ export default function App() {
           <Route path="reports"    element={<ReportsPage />} />
           <Route path="goals"      element={<GoalsPage />} />
         </Route>
+
+        {/* Media department — phase A: only the reports page */}
+        <Route path="/media-reports" element={<MediaReportsPage />} />
 
         {/* Legacy redirects — keep old bookmarks working */}
         <Route path="/dashboard" element={<Navigate to="/analytics/dashboard" replace />} />

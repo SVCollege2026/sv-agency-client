@@ -21,8 +21,9 @@ const DEPARTMENTS = [
     id:     "media",
     icon:   "📣",
     label:  "מחלקת מדיה",
-    desc:   "קמפיינים · תקציב · Meta · Google · TikTok",
-    active: false,
+    desc:   "דוחות יומיים/שבועיים · Meta · Google · לידים מ-Fireberry",
+    path:   "/media-reports",
+    active: true,
   },
   {
     id:     "creative",

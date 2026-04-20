@@ -136,3 +136,52 @@ export async function updateGoal(id, goal) {
 export async function deleteGoal(id) {
   return request("DELETE", `/api/goals/${id}`);
 }
+
+// ─── Media Reports ────────────────────────────────────────────────────────────
+
+export async function getMediaPlatforms() {
+  return request("GET", "/api/media-reports/platforms");
+}
+
+export async function getMediaDaily(date) {
+  return request("GET", `/api/media-reports/daily?date=${encodeURIComponent(date)}`);
+}
+
+export async function getMediaWeekly(weekStart, weekEnd) {
+  const params = new URLSearchParams();
+  if (weekStart) params.set("week_start", weekStart);
+  if (weekEnd)   params.set("week_end",   weekEnd);
+  const qs = params.toString();
+  return request("GET", `/api/media-reports/weekly${qs ? "?" + qs : ""}`);
+}
+
+export async function getMediaRange(start, end) {
+  return request(
+    "GET",
+    `/api/media-reports/range?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
+  );
+}
+
+export async function getMediaRuns(limit = 50) {
+  return request("GET", `/api/media-reports/runs?limit=${limit}`);
+}
+
+export async function getMediaWeeklyRuns(limit = 20) {
+  return request("GET", `/api/media-reports/weekly-runs?limit=${limit}`);
+}
+
+export async function runMediaDaily({ day = null, send_email = false } = {}) {
+  return request("POST", "/api/media-reports/run-daily", { day, send_email });
+}
+
+export async function runMediaWeekly({ week_start = null, week_end = null, send_email = false } = {}) {
+  return request("POST", "/api/media-reports/run-weekly", { week_start, week_end, send_email });
+}
+
+export async function sendMediaDailyEmail(day) {
+  return request("POST", "/api/media-reports/send-email/daily", { day });
+}
+
+export async function sendMediaWeeklyEmail(week_start, week_end) {
+  return request("POST", "/api/media-reports/send-email/weekly", { week_start, week_end });
+}
