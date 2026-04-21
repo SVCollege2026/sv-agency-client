@@ -63,11 +63,28 @@ function fmtPct(v) {
 
 function csvEscape(v) {
   if (v === null || v === undefined) return "";
-  const s = String(v);
+  let s;
+  if (typeof v === "object") {
+    // leads_by_channel וכו' — JSONB map → "פייסבוק: 3; אינסטגרם: 4"
+    s = Object.entries(v)
+      .filter(([, n]) => n > 0)
+      .map(([k, n]) => `${k}: ${n}`)
+      .join("; ");
+  } else {
+    s = String(v);
+  }
   if (s.includes(",") || s.includes('"') || s.includes("\n")) {
     return `"${s.replace(/"/g, '""')}"`;
   }
   return s;
+}
+
+// פורמט JSONB map של פירוט ערוצים לתצוגה: "פייסבוק 3 · אינסטגרם 4"
+function fmtChannelSplit(v) {
+  if (!v || typeof v !== "object") return "—";
+  const entries = Object.entries(v).filter(([, n]) => n > 0);
+  if (!entries.length) return "—";
+  return entries.map(([k, n]) => `${k} ${n}`).join(" · ");
 }
 
 // ─── Column definitions ─────────────────────────────────────────────────────
@@ -81,7 +98,14 @@ const ALL_COLUMNS = [
   { key: "impressions",     label: "חשיפות",     default: true,  fmt: (v) => fmtNum(v) },
   { key: "clicks",          label: "קליקים",     default: true,  fmt: (v) => fmtNum(v) },
   { key: "ctr_pct",         label: "CTR",         default: true,  fmt: fmtPct },
-  { key: "leads_count",     label: "לידים",       default: true,  fmt: (v) => fmtNum(v) },
+  // לידים — שלושה מספרים: סה"כ הגשות / חדשים / חוזרים (re-engagement).
+  // leads_count ≈ new_leads_count + returning_leads_count.
+  { key: "leads_count",           label: "לידים (סה״כ)",  default: true,  fmt: (v) => fmtNum(v) },
+  { key: "new_leads_count",       label: "חדשים",          default: true,  fmt: (v) => fmtNum(v) },
+  { key: "returning_leads_count", label: "חוזרים",         default: true,  fmt: (v) => fmtNum(v) },
+  // פירוט ערוצים — default hidden, ניתן להדליק בבחירת עמודות.
+  { key: "leads_by_channel",      label: "פירוט ערוצים (סה״כ)",  default: false, fmt: fmtChannelSplit },
+  { key: "new_leads_by_channel",  label: "פירוט ערוצים (חדשים)", default: false, fmt: fmtChannelSplit },
   { key: "cpl",             label: "עלות לליד",  default: true,  fmt: fmtMoney },
 ];
 
