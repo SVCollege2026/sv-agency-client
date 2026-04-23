@@ -64,8 +64,8 @@ export async function deleteQuestion(id) {
 
 // ─── Analysis ─────────────────────────────────────────────────────────────────
 
-export async function runAnalysis(questions = null) {
-  return request("POST", "/api/analysis/run", { questions });
+export async function runAnalysis({ questions = null, base_run_id = null } = {}) {
+  return request("POST", "/api/analysis/run", { questions, base_run_id });
 }
 
 export async function getAnalysisStatus(runId) {

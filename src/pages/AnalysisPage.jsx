@@ -260,6 +260,7 @@ export default function AnalysisPage() {
   const [dragOver, setDragOver] = useState(false);
   const [notification, setNotification] = useState(null);
   const [pendingFile, setPendingFile] = useState(null);   // file waiting for replace/append decision
+  const [showRunModal, setShowRunModal] = useState(false); // modal for full vs incremental
   const fileInputRef = useRef(null);
 
   function notify(msg, type = "success") {
@@ -382,17 +383,28 @@ export default function AnalysisPage() {
     }
   }
 
-  async function handleRunAnalysis() {
+  const lastCompletedRun = runs.find((r) => r.status === "completed");
+
+  async function doRunAnalysis(baseRunId = null) {
+    setShowRunModal(false);
     setButtonLoading(true);
     try {
-      const result = await runAnalysis();
+      const result = await runAnalysis({ base_run_id: baseRunId });
       setRunId(result.run_id);
-      notify("הניתוח הופעל ברקע");
+      notify(baseRunId ? "ניתוח מצטבר הופעל ברקע" : "ניתוח מלא הופעל ברקע");
       await loadRuns();
     } catch (err) {
       notify(`שגיאה בהפעלת ניתוח: ${err.message}`, "error");
     } finally {
       setButtonLoading(false);
+    }
+  }
+
+  function handleRunAnalysis() {
+    if (lastCompletedRun) {
+      setShowRunModal(true);
+    } else {
+      doRunAnalysis(null);
     }
   }
 
@@ -457,6 +469,66 @@ export default function AnalysisPage() {
 
             <button
               onClick={() => { setPendingFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+              className="w-full text-slate-400 hover:text-slate-600 text-sm py-1 transition-colors"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Run mode modal — full vs incremental */}
+      {showRunModal && lastCompletedRun && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <span className="text-3xl">🚀</span>
+              <div>
+                <h3 className="font-semibold text-slate-800 text-base">הפעלת ניתוח</h3>
+                <p className="text-slate-500 text-sm mt-1">
+                  קיים ניתוח מושלם מ-
+                  <strong className="text-slate-700">
+                    {new Date(lastCompletedRun.started_at).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })}
+                  </strong>
+                  . כיצד להמשיך?
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                onClick={() => doRunAnalysis(lastCompletedRun.id)}
+                className="w-full flex items-start gap-3 border-2 border-blue-200 hover:border-blue-400 hover:bg-blue-50 rounded-xl p-3 text-right transition-colors group"
+              >
+                <span className="text-xl mt-0.5">➕</span>
+                <div>
+                  <p className="font-semibold text-slate-800 text-sm group-hover:text-blue-700">
+                    הוסף שאלות לניתוח הקיים
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    מריץ רק סינתזה מחדש עם השאלות החדשות. הנתונים נלקחים מהניתוח הקודם — מהיר.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => doRunAnalysis(null)}
+                className="w-full flex items-start gap-3 border-2 border-slate-200 hover:border-slate-400 hover:bg-slate-50 rounded-xl p-3 text-right transition-colors group"
+              >
+                <span className="text-xl mt-0.5">🔄</span>
+                <div>
+                  <p className="font-semibold text-slate-800 text-sm group-hover:text-slate-700">
+                    ניתוח מלא מחדש
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    שולף נתונים עדכניים, מריץ את כל השלבים מהתחלה. אורך כ-20-40 דקות.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowRunModal(false)}
               className="w-full text-slate-400 hover:text-slate-600 text-sm py-1 transition-colors"
             >
               ביטול
@@ -638,10 +710,13 @@ export default function AnalysisPage() {
                           {statusLabel(run.status)}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-slate-400 flex items-center gap-2">
                         {run.started_at
                           ? new Date(run.started_at).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })
                           : "—"}
+                        {run.run_metadata?.mode === "incremental" && (
+                          <span className="text-purple-500 font-medium">• מצטבר</span>
+                        )}
                       </p>
                       {run.status === "completed" && (
                         <p className="text-xs text-blue-400 mt-1">לחץ לצפייה בדוח</p>
