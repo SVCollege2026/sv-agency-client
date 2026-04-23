@@ -64,8 +64,8 @@ export async function deleteQuestion(id) {
 
 // ─── Analysis ─────────────────────────────────────────────────────────────────
 
-export async function runAnalysis({ questions = null, base_run_id = null } = {}) {
-  return request("POST", "/api/analysis/run", { questions, base_run_id });
+export async function runAnalysis({ questions = null, base_run_id = null, instructions = null } = {}) {
+  return request("POST", "/api/analysis/run", { questions, base_run_id, instructions });
 }
 
 export async function getAnalysisStatus(runId) {
@@ -135,6 +135,24 @@ export async function updateGoal(id, goal) {
 
 export async function deleteGoal(id) {
   return request("DELETE", `/api/goals/${id}`);
+}
+
+// ─── Clarifications ───────────────────────────────────────────────────────────
+
+export async function getClarifications() {
+  return request("GET", "/api/clarifications/");
+}
+
+export async function addClarification(question) {
+  return request("POST", "/api/clarifications/", { question });
+}
+
+export async function answerClarification(id, answer) {
+  return request("PATCH", `/api/clarifications/${id}`, { answer });
+}
+
+export async function deleteClarification(id) {
+  return request("DELETE", `/api/clarifications/${id}`);
 }
 
 // ─── Media Reports ────────────────────────────────────────────────────────────

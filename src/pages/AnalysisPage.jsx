@@ -9,6 +9,10 @@ import {
   getAnalysisStatus,
   getRunResults,
   listRuns,
+  getClarifications,
+  addClarification,
+  answerClarification,
+  deleteClarification,
 } from "../api.js";
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
@@ -290,8 +294,13 @@ export default function AnalysisPage() {
   const [loadingResults, setLoadingResults] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [notification, setNotification] = useState(null);
-  const [pendingFile, setPendingFile] = useState(null);   // file waiting for replace/append decision
-  const [showRunModal, setShowRunModal] = useState(false); // modal for full vs incremental
+  const [pendingFile, setPendingFile] = useState(null);
+  const [showRunModal, setShowRunModal] = useState(false);
+  const [clarifications, setClarifications] = useState([]);
+  const [newClarQ, setNewClarQ] = useState("");
+  const [addingClar, setAddingClar] = useState(false);
+  const [answeringId, setAnsweringId] = useState(null);
+  const [answerDraft, setAnswerDraft] = useState("");
   const fileInputRef = useRef(null);
 
   function notify(msg, type = "success") {
@@ -307,6 +316,49 @@ export default function AnalysisPage() {
       notify(`שגיאה בטעינת שאלות: ${err.message}`, "error");
     } finally {
       setLoadingQ(false);
+    }
+  }
+
+  async function loadClarifications() {
+    try {
+      const data = await getClarifications();
+      setClarifications(data.clarifications || []);
+    } catch { /* non-critical */ }
+  }
+
+  async function handleAddClar(e) {
+    e.preventDefault();
+    if (!newClarQ.trim()) return;
+    setAddingClar(true);
+    try {
+      await addClarification(newClarQ.trim());
+      setNewClarQ("");
+      await loadClarifications();
+    } catch (err) {
+      notify(`שגיאה: ${err.message}`, "error");
+    } finally {
+      setAddingClar(false);
+    }
+  }
+
+  async function handleAnswerClar(id) {
+    if (!answerDraft.trim()) return;
+    try {
+      await answerClarification(id, answerDraft.trim());
+      setAnsweringId(null);
+      setAnswerDraft("");
+      await loadClarifications();
+    } catch (err) {
+      notify(`שגיאה: ${err.message}`, "error");
+    }
+  }
+
+  async function handleDeleteClar(id) {
+    try {
+      await deleteClarification(id);
+      await loadClarifications();
+    } catch (err) {
+      notify(`שגיאה: ${err.message}`, "error");
     }
   }
 
@@ -330,6 +382,7 @@ export default function AnalysisPage() {
   useEffect(() => {
     loadQuestions();
     loadRuns();
+    loadClarifications();
   }, []);
 
   async function doUpload(file, mode) {
@@ -690,10 +743,87 @@ export default function AnalysisPage() {
             </div>
           </div>
 
-          {/* Section 3 — הנחיות לאנליסטים */}
+          {/* Section 3 — שאלות הבהרה */}
+          {(() => {
+            const openClar = clarifications.filter(c => c.status === "open");
+            return (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-semibold text-slate-700">3. שאלות הבהרה לפני ניתוח</h2>
+                    {openClar.length > 0 && (
+                      <span className="text-xs bg-amber-100 text-amber-700 border border-amber-300 px-2 py-0.5 rounded-full font-medium">
+                        {openClar.length} פתוחות
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-slate-400">אנליסט שואל ← לקוח עונה</span>
+                </div>
+                <div className="p-5 space-y-4">
+                  {/* רשימת שאלות */}
+                  {clarifications.length === 0 ? (
+                    <p className="text-sm text-slate-400 text-center py-2">אין שאלות הבהרה</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {clarifications.map(c => (
+                        <div key={c.id} className={`rounded-lg border p-3 space-y-2 ${c.status === "open" ? "border-amber-300 bg-amber-50" : "border-green-200 bg-green-50"}`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm font-medium text-slate-800 text-right flex-1">{c.question}</p>
+                            <button onClick={() => handleDeleteClar(c.id)} className="text-slate-300 hover:text-red-400 text-xs shrink-0">✕</button>
+                          </div>
+                          {c.status === "answered" ? (
+                            <p className="text-sm text-green-800 text-right bg-white rounded px-2 py-1 border border-green-200">
+                              ✓ {c.answer}
+                            </p>
+                          ) : answeringId === c.id ? (
+                            <div className="flex gap-2">
+                              <button onClick={() => { setAnsweringId(null); setAnswerDraft(""); }} className="text-xs text-slate-400 hover:text-slate-600 shrink-0">ביטול</button>
+                              <button onClick={() => handleAnswerClar(c.id)} disabled={!answerDraft.trim()} className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg disabled:opacity-40 shrink-0">שמור</button>
+                              <input
+                                autoFocus
+                                className="flex-1 border border-slate-300 rounded-lg px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                dir="rtl"
+                                placeholder="תשובה..."
+                                value={answerDraft}
+                                onChange={e => setAnswerDraft(e.target.value)}
+                                onKeyDown={e => e.key === "Enter" && handleAnswerClar(c.id)}
+                              />
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => { setAnsweringId(c.id); setAnswerDraft(""); }}
+                              className="text-xs text-amber-700 hover:text-amber-900 underline text-right w-full"
+                            >
+                              לחצי לענות →
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* הוספת שאלה חדשה */}
+                  <form onSubmit={handleAddClar} className="flex gap-2 pt-1 border-t border-slate-100">
+                    <button type="submit" disabled={addingClar || !newClarQ.trim()} className="text-sm bg-slate-700 text-white px-4 py-2 rounded-lg disabled:opacity-40 shrink-0">
+                      {addingClar ? "..." : "הוסף שאלה"}
+                    </button>
+                    <input
+                      className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      dir="rtl"
+                      placeholder="שאלת הבהרה לפני הרצת הניתוח..."
+                      value={newClarQ}
+                      onChange={e => setNewClarQ(e.target.value)}
+                    />
+                  </form>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Section 4 — הנחיות לאנליסטים */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 flex items-center justify-between">
-              <h2 className="font-semibold text-slate-700">3. הנחיות לאנליסטים</h2>
+              <h2 className="font-semibold text-slate-700">4. הנחיות לאנליסטים</h2>
               <span className="text-xs text-slate-400">אופציונלי — מוזרק ל-context של הדיבייט</span>
             </div>
             <div className="p-5 space-y-3">
@@ -722,7 +852,7 @@ export default function AnalysisPage() {
 
           {/* Section 4 — Run button */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-            <h2 className="font-semibold text-slate-700 mb-4">4. הפעלת ניתוח</h2>
+            <h2 className="font-semibold text-slate-700 mb-4">5. הפעלת ניתוח</h2>
             <button
               onClick={handleRunAnalysis}
               disabled={buttonLoading}
