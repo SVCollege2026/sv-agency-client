@@ -89,7 +89,8 @@ function fmtChannelSplit(v) {
 
 // ─── Column definitions ─────────────────────────────────────────────────────
 
-const ALL_COLUMNS = [
+// עמודות לתצוגת "פירוט לפי מדיה" — per-campaign (ad sets / קמפיינים), רק ממומנים.
+const DETAIL_COLUMNS = [
   { key: "platform",        label: "פלטפורמה",   default: true  },
   { key: "campaign_name",   label: "קמפיין",     default: true  },
   { key: "budget",          label: "תקציב",      default: true,  fmt: fmtMoney },
@@ -98,16 +99,43 @@ const ALL_COLUMNS = [
   { key: "impressions",     label: "חשיפות",     default: true,  fmt: (v) => fmtNum(v) },
   { key: "clicks",          label: "קליקים",     default: true,  fmt: (v) => fmtNum(v) },
   { key: "ctr_pct",         label: "CTR",         default: true,  fmt: fmtPct },
-  // לידים — שלושה מספרים: סה"כ הגשות / חדשים / חוזרים (re-engagement).
-  // leads_count ≈ new_leads_count + returning_leads_count.
   { key: "leads_count",           label: "לידים (סה״כ)",  default: true,  fmt: (v) => fmtNum(v) },
   { key: "new_leads_count",       label: "חדשים",          default: true,  fmt: (v) => fmtNum(v) },
   { key: "returning_leads_count", label: "חוזרים",         default: true,  fmt: (v) => fmtNum(v) },
-  // פירוט ערוצים — default hidden, ניתן להדליק בבחירת עמודות.
   { key: "leads_by_channel",      label: "פירוט ערוצים (סה״כ)",  default: false, fmt: fmtChannelSplit },
   { key: "new_leads_by_channel",  label: "פירוט ערוצים (חדשים)", default: false, fmt: fmtChannelSplit },
   { key: "cpl",             label: "עלות לליד",  default: true,  fmt: fmtMoney },
 ];
+
+// עמודות לטבלה ראשית — שורה אחת לכל מדיה.
+// לא-ממומנים (ספקי לידים / אתר הבית / וכו׳) מציגים רק לידים; שאר השדות ריקים.
+const MASTER_COLUMNS = [
+  { key: "source_name",     label: "מדיה / מקור",   default: true },
+  { key: "source_kind_he",  label: "סוג",           default: true },
+  { key: "campaigns_count", label: "קמפיינים",      default: true,  fmt: (v) => fmtNum(v) },
+  { key: "spend",           label: "הוצאה",         default: true,  fmt: fmtMoney },
+  { key: "impressions",     label: "חשיפות",        default: true,  fmt: (v) => fmtNum(v) },
+  { key: "clicks",          label: "קליקים",        default: true,  fmt: (v) => fmtNum(v) },
+  { key: "ctr_pct",         label: "CTR",           default: true,  fmt: fmtPct },
+  { key: "leads_count",           label: "לידים (סה״כ)", default: true, fmt: (v) => fmtNum(v) },
+  { key: "new_leads_count",       label: "חדשים",        default: true, fmt: (v) => fmtNum(v) },
+  { key: "returning_leads_count", label: "חוזרים",       default: true, fmt: (v) => fmtNum(v) },
+  { key: "cpl",             label: "עלות לליד",     default: true,  fmt: fmtMoney },
+];
+
+// לאחור-תאימות — טווח/שבועי עדיין משתמשים ב-ALL_COLUMNS.
+const ALL_COLUMNS = DETAIL_COLUMNS;
+
+const DAILY_VIEWS = [
+  { id: "master",     label: "🏁 ראשית (לפי מדיה)" },
+  { id: "detail",     label: "🔎 פירוט לפי מדיה"   },
+  { id: "sub_status", label: "📊 תת-סטטוס"         },
+  { id: "analytics",  label: "🌐 אנליטיקס"         },
+];
+
+function hebSourceKind(k) {
+  return { paid: "ממומן", non_paid: "לא-ממומן" }[k] || "—";
+}
 
 // ─── Filter bar ──────────────────────────────────────────────────────────────
 
@@ -123,6 +151,7 @@ export default function MediaReportsPage() {
   const navigate = useNavigate();
 
   const [mode, setMode]           = useState("daily");
+  const [dailyView, setDailyView] = useState("master");  // master | detail | sub_status | analytics
   const [day, setDay]             = useState(yesterday());
   const [weekStart, setWeekStart] = useState(lastSunSat()[0]);
   const [weekEnd, setWeekEnd]     = useState(lastSunSat()[1]);
@@ -146,6 +175,23 @@ export default function MediaReportsPage() {
   const [visibleCols, setVisibleCols] = useState(
     () => Object.fromEntries(ALL_COLUMNS.map((c) => [c.key, c.default]))
   );
+
+  // עמודות פעילות לפי תת-תצוגת daily.
+  const activeColumns = useMemo(() => {
+    if (mode === "daily" && dailyView === "master") return MASTER_COLUMNS;
+    return DETAIL_COLUMNS;
+  }, [mode, dailyView]);
+
+  // סנכרון visibleCols כש-activeColumns משתנה — להדליק דיפולטים של הסט החדש.
+  useEffect(() => {
+    setVisibleCols((prev) => {
+      const next = { ...prev };
+      for (const c of activeColumns) {
+        if (next[c.key] === undefined) next[c.key] = c.default;
+      }
+      return next;
+    });
+  }, [activeColumns]);
 
   // Load platforms once
   useEffect(() => {
@@ -233,21 +279,29 @@ export default function MediaReportsPage() {
   const tableRows = useMemo(() => {
     if (!data) return [];
     if (mode === "daily") {
-      const rows = data.rows || [];
-      const summaries = (data.platform_summaries || []);
-      const filtered = platformFilter === "all"
-        ? [...rows, ...summaries]
-        : [...rows.filter(r => r.platform === platformFilter),
-           ...summaries.filter(s => s.platform === platformFilter)];
-      // sort: non-summary by platform+name, then summaries at end of each platform
-      return filtered.sort((a, b) => {
-        if (a.platform === b.platform) {
-          if (a.is_summary && !b.is_summary) return 1;
-          if (!a.is_summary && b.is_summary) return -1;
-          return (a.campaign_name || "").localeCompare(b.campaign_name || "");
-        }
-        return (a.platform || "").localeCompare(b.platform || "");
-      });
+      // master = שורה לכל מדיה (ממומנות + לא-ממומנות)
+      if (dailyView === "master") {
+        const master = (data.master_rows || []).map((r) => ({
+          ...r,
+          source_kind_he: hebSourceKind(r.source_kind),
+        }));
+        return master;
+      }
+      // detail = per-campaign, ממומנים בלבד. platform filter קובע באיזו מדיה לדרול
+      if (dailyView === "detail") {
+        const rows = data.detail_rows || data.rows || [];
+        const filtered = platformFilter === "all"
+          ? rows
+          : rows.filter(r => r.platform === platformFilter);
+        return filtered.sort((a, b) => {
+          if (a.platform === b.platform) {
+            return (a.campaign_name || "").localeCompare(b.campaign_name || "");
+          }
+          return (a.platform || "").localeCompare(b.platform || "");
+        });
+      }
+      // sub_status / analytics — מטופלים ברינדור ישירות (לא דרך tableRows)
+      return [];
     }
     if (mode === "weekly") {
       const rows = data.weekly_summary || [];
@@ -265,12 +319,12 @@ export default function MediaReportsPage() {
     return platformFilter === "all"
       ? rows
       : rows.filter(r => r.platform === platformFilter);
-  }, [data, mode, platformFilter]);
+  }, [data, mode, dailyView, platformFilter]);
 
   // ── CSV export ─────────────────────────────────────────────────────────────
   function exportCsv() {
     if (!tableRows.length) return;
-    const cols = ALL_COLUMNS.filter((c) => visibleCols[c.key]);
+    const cols = activeColumns.filter((c) => visibleCols[c.key]);
     const header = cols.map((c) => csvEscape(c.label)).join(",");
     const lines = tableRows.map((r) =>
       cols.map((c) => csvEscape(r[c.key] ?? "")).join(",")
@@ -288,7 +342,7 @@ export default function MediaReportsPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
   const totals = data?.totals || data?.lead_totals;
   const run    = data?.run;
-  const visibleColList = ALL_COLUMNS.filter((c) => visibleCols[c.key]);
+  const visibleColList = activeColumns.filter((c) => visibleCols[c.key]);
 
   return (
     <div
@@ -500,22 +554,46 @@ export default function MediaReportsPage() {
           </div>
         )}
 
-        {/* ── Column picker ── */}
-        <details style={{
-          background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10,
-          padding: "10px 14px", marginBottom: 14, fontSize: 13,
-        }}>
-          <summary style={{ cursor: "pointer", color: "#94a3b8", fontWeight: 600 }}>⚙ בחר עמודות</summary>
-          <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 14 }}>
-            {ALL_COLUMNS.map((c) => (
-              <label key={c.key} style={{ display: "flex", alignItems: "center", gap: 6, color: "#cbd5e1", cursor: "pointer" }}>
-                <input type="checkbox" checked={visibleCols[c.key]}
-                  onChange={(e) => setVisibleCols({ ...visibleCols, [c.key]: e.target.checked })} />
-                {c.label}
-              </label>
+        {/* ── Daily sub-tabs ── */}
+        {mode === "daily" && (
+          <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+            {DAILY_VIEWS.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => setDailyView(v.id)}
+                style={{
+                  padding: "7px 14px", fontSize: 12, fontWeight: 600,
+                  borderRadius: 8, cursor: "pointer",
+                  background: dailyView === v.id ? "#1e3a5f" : "#0d1626",
+                  color:      dailyView === v.id ? "#e2e8f0" : "#64748b",
+                  border: `1px solid ${dailyView === v.id ? "#3b82f6" : "#1e293b"}`,
+                }}
+              >
+                {v.label}
+              </button>
             ))}
           </div>
-        </details>
+        )}
+
+        {/* ── Column picker (רק בטבלאות עם עמודות) ── */}
+        {!(mode === "daily" && (dailyView === "sub_status" || dailyView === "analytics")) && (
+          <details style={{
+            background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10,
+            padding: "10px 14px", marginBottom: 14, fontSize: 13,
+          }}>
+            <summary style={{ cursor: "pointer", color: "#94a3b8", fontWeight: 600 }}>⚙ בחר עמודות</summary>
+            <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 14 }}>
+              {activeColumns.map((c) => (
+                <label key={c.key} style={{ display: "flex", alignItems: "center", gap: 6, color: "#cbd5e1", cursor: "pointer" }}>
+                  <input type="checkbox" checked={!!visibleCols[c.key]}
+                    onChange={(e) => setVisibleCols({ ...visibleCols, [c.key]: e.target.checked })} />
+                  {c.label}
+                </label>
+              ))}
+            </div>
+          </details>
+        )}
 
         {/* ── Error ── */}
         {error && (
@@ -524,42 +602,48 @@ export default function MediaReportsPage() {
           </div>
         )}
 
-        {/* ── Table ── */}
-        <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, overflow: "hidden" }}>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead style={{ background: "#0d1626" }}>
-                <tr>
-                  {visibleColList.map((c) => (
-                    <th key={c.key} style={thStyle}>{c.label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {loading && (
-                  <tr><td colSpan={visibleColList.length} style={{ textAlign: "center", color: "#64748b", padding: "36px 0" }}>טוען…</td></tr>
-                )}
-                {!loading && tableRows.length === 0 && (
-                  <tr><td colSpan={visibleColList.length} style={{ textAlign: "center", color: "#64748b", padding: "36px 0" }}>אין שורות להצגה</td></tr>
-                )}
-                {!loading && tableRows.map((r, i) => (
-                  <tr key={i} style={{
-                    background: r.is_summary ? "#111d33" : "transparent",
-                    borderTop: "1px solid #101a2c",
-                    fontWeight: r.is_summary ? 600 : 400,
-                    color:      r.is_summary ? "#93c5fd" : "#cbd5e1",
-                  }}>
+        {/* ── Main content: table / sub_status / analytics ── */}
+        {mode === "daily" && dailyView === "sub_status" ? (
+          <SubStatusTable rows={data?.sub_status || []} loading={loading} />
+        ) : mode === "daily" && dailyView === "analytics" ? (
+          <AnalyticsPanel analytics={data?.analytics} loading={loading} />
+        ) : (
+          <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, overflow: "hidden" }}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead style={{ background: "#0d1626" }}>
+                  <tr>
                     {visibleColList.map((c) => (
-                      <td key={c.key} style={tdStyle}>
-                        {c.fmt ? c.fmt(r[c.key]) : (r[c.key] ?? "—")}
-                      </td>
+                      <th key={c.key} style={thStyle}>{c.label}</th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {loading && (
+                    <tr><td colSpan={visibleColList.length} style={{ textAlign: "center", color: "#64748b", padding: "36px 0" }}>טוען…</td></tr>
+                  )}
+                  {!loading && tableRows.length === 0 && (
+                    <tr><td colSpan={visibleColList.length} style={{ textAlign: "center", color: "#64748b", padding: "36px 0" }}>אין שורות להצגה</td></tr>
+                  )}
+                  {!loading && tableRows.map((r, i) => (
+                    <tr key={i} style={{
+                      background: r.is_summary ? "#111d33" : "transparent",
+                      borderTop: "1px solid #101a2c",
+                      fontWeight: r.is_summary ? 600 : 400,
+                      color:      r.source_kind === "non_paid" ? "#a7f3d0" : (r.is_summary ? "#93c5fd" : "#cbd5e1"),
+                    }}>
+                      {visibleColList.map((c) => (
+                        <td key={c.key} style={tdStyle}>
+                          {c.fmt ? c.fmt(r[c.key]) : (r[c.key] ?? "—")}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ── Runs history panel ── */}
         {showRuns && (
@@ -601,6 +685,193 @@ export default function MediaReportsPage() {
         <p style={{ marginTop: 20, fontSize: 11, color: "#334155", textAlign: "center" }}>
           שלב א' — נתונים יבשים בלבד. ניתוח והמלצות יגיעו בשלבים הבאים.
         </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sub-status table ───────────────────────────────────────────────────────
+
+function SubStatusTable({ rows, loading }) {
+  const total = rows.reduce((s, r) => s + (r.leads_count || 0), 0);
+  return (
+    <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ padding: "10px 14px", color: "#64748b", fontSize: 12, borderBottom: "1px solid #1e293b" }}>
+        פירוט תת-סטטוס — רק על לידים שנוצרו היום ({fmtNum(total)} לידים)
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead style={{ background: "#0d1626" }}>
+            <tr>
+              <th style={thStyle}>תת-סטטוס</th>
+              <th style={thStyle}>כמות לידים</th>
+              <th style={thStyle}>% מסה״כ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && <tr><td colSpan={3} style={{ textAlign: "center", color: "#64748b", padding: "36px 0" }}>טוען…</td></tr>}
+            {!loading && !rows.length && <tr><td colSpan={3} style={{ textAlign: "center", color: "#64748b", padding: "36px 0" }}>אין נתונים</td></tr>}
+            {!loading && rows.map((r, i) => {
+              const pct = total ? (r.leads_count / total * 100) : 0;
+              return (
+                <tr key={i} style={{ borderTop: "1px solid #101a2c", color: "#cbd5e1" }}>
+                  <td style={tdStyle}>{r.sub_status_name}</td>
+                  <td style={tdStyle}>{fmtNum(r.leads_count)}</td>
+                  <td style={tdStyle}>{fmtPct(pct)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Analytics panel ────────────────────────────────────────────────────────
+
+function AnalyticsPanel({ analytics, loading }) {
+  if (loading) {
+    return <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, padding: 36, textAlign: "center", color: "#64748b" }}>טוען…</div>;
+  }
+  if (!analytics) {
+    return (
+      <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, padding: 36, textAlign: "center", color: "#64748b", fontSize: 13 }}>
+        עדיין אין נתוני אנליטיקס ליום זה. הרץ את הדוח היומי מחדש — סוכני GA4/GSC ייאספו אוטומטית.
+      </div>
+    );
+  }
+
+  const ga4 = analytics.ga4_data;
+  const gsc = analytics.gsc_data;
+  const ok  = analytics.retrievers_ok || [];
+  const err = analytics.retrievers_err || {};
+
+  return (
+    <div style={{ display: "grid", gap: 14 }}>
+      {/* סטטוס שולפים */}
+      <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#64748b" }}>
+        <strong style={{ color: "#93c5fd" }}>סוכני שולפים:</strong>
+        {ok.length > 0 && <span style={{ color: "#86efac", marginInlineStart: 8 }}>✓ {ok.join(", ")}</span>}
+        {Object.keys(err).length > 0 && <span style={{ color: "#fca5a5", marginInlineStart: 8 }}>✗ {Object.keys(err).join(", ")}</span>}
+      </div>
+
+      {/* GA4 */}
+      {ga4 && (
+        <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, padding: 16 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#93c5fd", margin: "0 0 12px" }}>🌐 Google Analytics 4</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 14 }}>
+            <MiniStat label="Sessions" value={fmtNum(ga4.sessions)} />
+            <MiniStat label="Users" value={fmtNum(ga4.total_users)} />
+            <MiniStat label="New users" value={fmtNum(ga4.new_users)} />
+            <MiniStat label="Engaged sessions" value={fmtNum(ga4.engaged_sessions)} />
+            <MiniStat label="Engagement rate" value={ga4.engagement_rate !== undefined ? fmtPct(ga4.engagement_rate * 100) : "—"} />
+            <MiniStat label="Page views" value={fmtNum(ga4.page_views)} />
+            <MiniStat label="Avg session (s)" value={fmtNum(ga4.avg_session_duration_sec, 1)} />
+          </div>
+
+          <SimpleTable
+            title="תעבורה לפי Channel Group"
+            cols={[{ k: "channel", l: "ערוץ" }, { k: "sessions", l: "Sessions", num: true }, { k: "users", l: "Users", num: true }]}
+            rows={ga4.traffic_by_channel || []}
+          />
+          <SimpleTable
+            title="Top 10 Landing Pages"
+            cols={[{ k: "page", l: "דף" }, { k: "sessions", l: "Sessions", num: true }, { k: "engaged_sessions", l: "Engaged", num: true }, { k: "users", l: "Users", num: true }]}
+            rows={ga4.top_landing_pages || []}
+          />
+          <SimpleTable
+            title="Top Events (scroll / form / clicks...)"
+            cols={[{ k: "event_name", l: "אירוע" }, { k: "count", l: "כמות", num: true }, { k: "users", l: "Users", num: true }]}
+            rows={ga4.events || []}
+          />
+          <SimpleTable
+            title="מכשיר"
+            cols={[{ k: "device", l: "מכשיר" }, { k: "sessions", l: "Sessions", num: true }, { k: "users", l: "Users", num: true }]}
+            rows={ga4.device_split || []}
+          />
+          <SimpleTable
+            title="Top ערים"
+            cols={[{ k: "city", l: "עיר" }, { k: "sessions", l: "Sessions", num: true }]}
+            rows={ga4.top_cities || []}
+          />
+        </div>
+      )}
+
+      {/* GSC */}
+      {gsc && (
+        <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, padding: 16 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#93c5fd", margin: "0 0 12px" }}>🔍 Google Search Console</h3>
+          {!gsc.properties?.length && (
+            <div style={{ color: "#64748b", fontSize: 12 }}>
+              אין נתוני GSC להיום. ייתכן ש-GSC עדיין לא עיבד את היום (עיכוב ~2-3 ימים) או שה-service account לא הוזמן כ-User ב-Search Console.
+            </div>
+          )}
+          {(gsc.properties || []).map((p, i) => (
+            <div key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: i < gsc.properties.length - 1 ? "1px solid #1e293b" : "none" }}>
+              <div style={{ color: "#cbd5e1", fontWeight: 600, marginBottom: 8 }}>{p.site_url}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8, marginBottom: 10 }}>
+                <MiniStat label="Clicks" value={fmtNum(p.clicks)} />
+                <MiniStat label="Impressions" value={fmtNum(p.impressions)} />
+                <MiniStat label="CTR" value={fmtPct((p.ctr || 0) * 100)} />
+                <MiniStat label="Avg position" value={fmtNum(p.avg_position, 2)} />
+              </div>
+              <SimpleTable
+                title="Top Queries"
+                cols={[{ k: "query", l: "מילת חיפוש" }, { k: "clicks", l: "Clicks", num: true }, { k: "impressions", l: "Impr", num: true }, { k: "position", l: "מיקום", num: true }]}
+                rows={p.top_queries || []}
+              />
+              <SimpleTable
+                title="Top Pages"
+                cols={[{ k: "page", l: "דף" }, { k: "clicks", l: "Clicks", num: true }, { k: "impressions", l: "Impr", num: true }, { k: "position", l: "מיקום", num: true }]}
+                rows={p.top_pages || []}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Placeholder: סושיאל אורגני */}
+      {(analytics.meta_page_data || analytics.ig_organic_data || analytics.tiktok_data) && (
+        <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, padding: 16, fontSize: 12, color: "#64748b" }}>
+          <strong>📱 סושיאל אורגני:</strong> placeholders לעתיד — יחובר כשהפעילות האורגנית תתחיל.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MiniStat({ label, value }) {
+  return (
+    <div style={{ background: "#060d1a", borderRadius: 8, padding: "8px 10px", border: "1px solid #1e293b" }}>
+      <div style={{ fontSize: 10, color: "#64748b", marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: "#e2e8f0" }}>{value}</div>
+    </div>
+  );
+}
+
+function SimpleTable({ title, cols, rows }) {
+  if (!rows || !rows.length) return null;
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ color: "#94a3b8", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{title}</div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead style={{ background: "#0d1626" }}>
+            <tr>{cols.map((c) => <th key={c.k} style={thStyle}>{c.l}</th>)}</tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} style={{ borderTop: "1px solid #101a2c", color: "#cbd5e1" }}>
+                {cols.map((c) => (
+                  <td key={c.k} style={{ ...tdStyle, maxWidth: c.k === "page" || c.k === "query" ? 280 : "auto", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {c.num ? fmtNum(r[c.k], c.k === "position" || c.k === "avg_position" ? 2 : 0) : (r[c.k] ?? "—")}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
