@@ -5,6 +5,7 @@ import {
   getQuestions,
   deleteQuestion,
   runAnalysis,
+  cancelRun,
   getAnalysisStatus,
   getRunResults,
   listRuns,
@@ -73,11 +74,26 @@ function QuestionTag({ question, onDelete, deletable = true }) {
   );
 }
 
-function ProgressTracker({ runId, onComplete }) {
+function ProgressTracker({ runId, onComplete, onCancel }) {
   const [status, setStatus] = useState("pending");
   const [runData, setRunData] = useState(null);
   const [error, setError] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
   const intervalRef = useRef(null);
+
+  async function handleCancel() {
+    setCancelling(true);
+    try {
+      await cancelRun(runId);
+      clearInterval(intervalRef.current);
+      setStatus("failed");
+      if (onCancel) onCancel();
+    } catch {
+      // status will update on next poll
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   useEffect(() => {
     async function poll() {
@@ -158,11 +174,20 @@ function ProgressTracker({ runId, onComplete }) {
         </div>
       )}
 
-      {/* Polling indicator */}
-      {status !== "completed" && status !== "error" && (
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <Spinner small />
-          <span>מתבצע בדיקה כל 5 שניות…</span>
+      {/* Polling indicator + cancel */}
+      {status !== "completed" && status !== "error" && status !== "failed" && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <Spinner small />
+            <span>מתבצע בדיקה כל 5 שניות…</span>
+          </div>
+          <button
+            onClick={handleCancel}
+            disabled={cancelling}
+            className="text-xs text-red-400 hover:text-red-600 border border-red-200 hover:border-red-400 px-3 py-1 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {cancelling ? "מבטל…" : "בטל ניתוח"}
+          </button>
         </div>
       )}
     </div>
@@ -675,6 +700,7 @@ export default function AnalysisPage() {
             <ProgressTracker
               runId={runId}
               onComplete={loadRuns}
+              onCancel={loadRuns}
             />
           )}
         </div>
