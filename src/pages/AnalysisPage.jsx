@@ -270,11 +270,17 @@ function ResultsPanel({ run, onClose }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+const INSTRUCTIONS_KEY = "sv_analyst_instructions";
+
 export default function AnalysisPage() {
   const [questions, setQuestions] = useState([]);
   const [loadingQ, setLoadingQ] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [manualQ, setManualQ] = useState("");
+  const [instructions, setInstructions] = useState(
+    () => localStorage.getItem(INSTRUCTIONS_KEY) || ""
+  );
+  const [instructionsSaved, setInstructionsSaved] = useState(true);
   const [addingQ, setAddingQ] = useState(false);
   const [runs, setRuns] = useState([]);
   const [loadingRuns, setLoadingRuns] = useState(true);
@@ -410,11 +416,19 @@ export default function AnalysisPage() {
 
   const lastCompletedRun = runs.find((r) => r.status === "completed");
 
+  function saveInstructions() {
+    localStorage.setItem(INSTRUCTIONS_KEY, instructions);
+    setInstructionsSaved(true);
+  }
+
   async function doRunAnalysis(baseRunId = null) {
     setShowRunModal(false);
     setButtonLoading(true);
     try {
-      const result = await runAnalysis({ base_run_id: baseRunId });
+      const result = await runAnalysis({
+        base_run_id: baseRunId,
+        instructions: instructions.trim() || null,
+      });
       setRunId(result.run_id);
       notify(baseRunId ? "ניתוח מצטבר הופעל ברקע" : "ניתוח מלא הופעל ברקע");
       await loadRuns();
@@ -676,9 +690,39 @@ export default function AnalysisPage() {
             </div>
           </div>
 
-          {/* Section 3 — Run button */}
+          {/* Section 3 — הנחיות לאנליסטים */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 flex items-center justify-between">
+              <h2 className="font-semibold text-slate-700">3. הנחיות לאנליסטים</h2>
+              <span className="text-xs text-slate-400">אופציונלי — מוזרק ל-context של הדיבייט</span>
+            </div>
+            <div className="p-5 space-y-3">
+              <textarea
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none text-right"
+                dir="rtl"
+                rows={5}
+                placeholder="לדוגמה: התמקד בשינויים שהתרחשו משנת 2024. אל תסיק מסקנות על קורסים עם פחות מ-50 לידים. בכל ניתוח ציין את מקור הנתון..."
+                value={instructions}
+                onChange={(e) => { setInstructions(e.target.value); setInstructionsSaved(false); }}
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400">
+                  {instructionsSaved ? "✓ נשמר" : "לא נשמר"}
+                </span>
+                <button
+                  onClick={saveInstructions}
+                  disabled={instructionsSaved}
+                  className="text-sm bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 px-4 py-1.5 rounded-lg transition-colors"
+                >
+                  שמור הנחיות
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4 — Run button */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-            <h2 className="font-semibold text-slate-700 mb-4">3. הפעלת ניתוח</h2>
+            <h2 className="font-semibold text-slate-700 mb-4">4. הפעלת ניתוח</h2>
             <button
               onClick={handleRunAnalysis}
               disabled={buttonLoading}
