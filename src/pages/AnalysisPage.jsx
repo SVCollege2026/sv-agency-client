@@ -200,12 +200,81 @@ function ProgressTracker({ runId, onComplete, onCancel }) {
 
 // ─── Results Panel ───────────────────────────────────────────────────────────
 
+function StructuredTable({ table }) {
+  if (!table || !Array.isArray(table.columns) || table.columns.length === 0) return null;
+  const cols    = table.columns;
+  const rows    = table.rows || [];
+  const totals  = table.totals;
+
+  return (
+    <div className="my-3">
+      {table.title && (
+        <div className="text-sm font-semibold text-slate-700 mb-2">{table.title}</div>
+      )}
+      <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50">
+            <tr>
+              {cols.map((c, i) => (
+                <th key={i} className="px-3 py-2 text-right font-medium text-slate-600 border-b border-slate-200">
+                  {c}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr key={ri} className="hover:bg-slate-50">
+                {cols.map((c, ci) => (
+                  <td key={ci} className="px-3 py-2 text-slate-700 border-b border-slate-100">
+                    {formatCell(row[c])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            {totals && (
+              <tr className="bg-slate-100 font-semibold">
+                {cols.map((c, ci) => (
+                  <td key={ci} className="px-3 py-2 text-slate-800 border-t-2 border-slate-300">
+                    {formatCell(totals[c])}
+                  </td>
+                ))}
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function formatCell(v) {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "number") {
+    if (Number.isInteger(v) && Math.abs(v) >= 1000) return v.toLocaleString("he-IL");
+    return v;
+  }
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+}
+
 function ResultsPanel({ run, onClose }) {
   const summary = run?.results_summary || {};
-  const synthesis = summary.synthesis || "";
-  const findings = summary.key_findings || [];
 
-  if (!synthesis && findings.length === 0) {
+  // ── חדש: מבנה executive + detailed ─────────────────────────────────────
+  const exec = summary.executive_summary || {};
+  const detailed = Array.isArray(summary.detailed_analysis) ? summary.detailed_analysis : [];
+  const ecosystem = Array.isArray(summary.ecosystem_queries) ? summary.ecosystem_queries : [];
+  const calcsUsed = Array.isArray(summary.calculations_used) ? summary.calculations_used : [];
+
+  // ── ישן: backward-compat לריצות קודמות ───────────────────────────────
+  const legacyFindings = Array.isArray(summary.key_findings) ? summary.key_findings : [];
+  const legacySynthesis = summary.synthesis || summary.executive_summary?.text || "";
+
+  const hasNewStructure  = !!exec.headline || detailed.length > 0;
+  const hasLegacy        = !hasNewStructure && (legacyFindings.length > 0 || legacySynthesis);
+
+  if (!hasNewStructure && !hasLegacy) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 text-center text-slate-400 text-sm">
         אין תוצאות לריצה זו
@@ -213,27 +282,11 @@ function ResultsPanel({ run, onClose }) {
     );
   }
 
-  // render simple markdown: bold (**), headings (#), line breaks
-  function renderMarkdown(text) {
-    return text
-      .split("\n")
-      .map((line, i) => {
-        const trimmed = line.trim();
-        if (!trimmed) return <div key={i} className="h-2" />;
-        if (trimmed.startsWith("## ")) return <h3 key={i} className="font-bold text-slate-800 text-base mt-4 mb-1">{trimmed.slice(3)}</h3>;
-        if (trimmed.startsWith("# "))  return <h2 key={i} className="font-bold text-[#1e3a5f] text-lg mt-5 mb-2">{trimmed.slice(2)}</h2>;
-        // bold spans
-        const parts = trimmed.split(/\*\*(.*?)\*\*/g);
-        const rendered = parts.map((p, j) => j % 2 === 1 ? <strong key={j}>{p}</strong> : p);
-        return <p key={i} className="text-slate-700 text-sm leading-relaxed">{rendered}</p>;
-      });
-  }
-
   return (
     <div className="bg-white rounded-xl border border-blue-200 shadow-sm overflow-hidden">
       <div className="bg-[#1e3a5f] text-white px-5 py-3 flex items-center justify-between">
         <h2 className="font-semibold text-sm">
-          דוח סינתזה — {run.id?.slice(0, 8)}…
+          דוח ניתוח — {run.id?.slice(0, 8)}…
           {run.completed_at && (
             <span className="text-blue-200 font-normal mr-2 text-xs">
               {new Date(run.completed_at).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" })}
@@ -243,21 +296,97 @@ function ResultsPanel({ run, onClose }) {
         <button onClick={onClose} className="text-blue-200 hover:text-white text-xl leading-none">×</button>
       </div>
 
-      <div className="p-5 space-y-6 max-h-[70vh] overflow-y-auto">
-        {/* Synthesis */}
-        {synthesis && (
-          <div>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">דוח מלא</h3>
-            <div className="space-y-1">{renderMarkdown(synthesis)}</div>
+      <div className="p-5 space-y-6 max-h-[80vh] overflow-y-auto">
+
+        {/* ── דוח מנהלים (executive_summary) ─────────────────────────── */}
+        {hasNewStructure && (exec.headline || (exec.key_points || []).length > 0) && (
+          <div className="bg-amber-50 border-r-4 border-amber-400 rounded-lg p-4 space-y-3">
+            <h3 className="text-xs font-bold text-amber-700 uppercase tracking-wider">דוח מנהלים</h3>
+            {exec.headline && (
+              <p className="text-base font-semibold text-slate-800">{exec.headline}</p>
+            )}
+            {Array.isArray(exec.key_points) && exec.key_points.length > 0 && (
+              <ul className="space-y-1.5">
+                {exec.key_points.map((p, i) => (
+                  <li key={i} className="flex gap-2 text-sm text-slate-700">
+                    <span className="text-amber-600 font-bold flex-shrink-0">◆</span>
+                    <span>{p}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {exec.biggest_alert && (
+              <div className="mt-2 bg-red-100 border border-red-200 rounded p-3">
+                <span className="text-xs font-bold text-red-700 ml-2">⚠ דורש תשומת לב:</span>
+                <span className="text-sm text-red-800">{exec.biggest_alert}</span>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Key Findings */}
-        {findings.length > 0 && (
+        {/* ── ניתוח מפורט (detailed_analysis) ────────────────────────── */}
+        {hasNewStructure && detailed.length > 0 && (
+          <div className="space-y-5">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">ניתוח מפורט</h3>
+            {detailed.map((item, i) => (
+              <div key={i} className="border border-slate-200 rounded-lg p-4 bg-slate-50/50">
+                <div className="flex items-baseline gap-2 mb-2">
+                  <span className="text-blue-600 font-bold text-sm">
+                    {item.question_num ? `שאלה ${item.question_num}` : `נושא ${i+1}`}
+                  </span>
+                  <span className="text-slate-700 text-sm font-medium">{item.title}</span>
+                </div>
+                {Array.isArray(item.tables) && item.tables.map((t, ti) => (
+                  <StructuredTable key={ti} table={t} />
+                ))}
+                {item.explanation && (
+                  <div className="mt-3 text-sm text-slate-600 bg-white border border-slate-100 rounded p-3">
+                    <span className="text-xs font-bold text-slate-500 ml-2">פירוש:</span>
+                    {item.explanation}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── הקשר שוק (ecosystem) ───────────────────────────────────── */}
+        {hasNewStructure && ecosystem.length > 0 && (
+          <div>
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">הקשר שוק שנאסף</h3>
+            <ul className="space-y-2">
+              {ecosystem.map((q, i) => (
+                <li key={i} className="bg-purple-50 border border-purple-100 rounded p-3 text-sm">
+                  <div className="font-semibold text-purple-700 mb-1">שאלה: {q.query}</div>
+                  <div className="text-slate-700">{q.answer}</div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* ── רשימת חישובים ──────────────────────────────────────────── */}
+        {hasNewStructure && calcsUsed.length > 0 && (
+          <details className="text-xs text-slate-500">
+            <summary className="cursor-pointer font-semibold">חישובים שבוצעו ({calcsUsed.length})</summary>
+            <ul className="mt-2 list-disc mr-4 space-y-0.5">
+              {calcsUsed.map((c, i) => <li key={i} className="font-mono">{c}</li>)}
+            </ul>
+          </details>
+        )}
+
+        {/* ── Backward-compat למבנה ישן ─────────────────────────────── */}
+        {hasLegacy && legacySynthesis && (
+          <div>
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">דוח</h3>
+            <div className="text-sm text-slate-700 whitespace-pre-wrap">{legacySynthesis}</div>
+          </div>
+        )}
+        {hasLegacy && legacyFindings.length > 0 && (
           <div>
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">ממצאים מרכזיים</h3>
             <ul className="space-y-2">
-              {findings.map((f, i) => (
+              {legacyFindings.map((f, i) => (
                 <li key={i} className="flex gap-2 text-sm text-slate-700">
                   <span className="text-blue-500 font-bold flex-shrink-0">•</span>
                   <span>{f}</span>
