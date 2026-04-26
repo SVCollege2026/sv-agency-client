@@ -359,11 +359,17 @@ export default function Dashboard() {
   const ageRows = objToRows(a.age_distribution).map(r => ({ name:r.name, value:r.value ?? r.count ?? 0 }));
   const genRows = objToRows(a.by_gender).map(r => ({ name:r.name, value:r.value ?? 0 }));
 
-  // Synthesis
-  const summary    = stage0?.results_summary ?? {};
-  const synthesis  = summary.synthesis ?? "";
-  const findings   = summary.key_findings ?? [];
-  const anomalies  = summary.moderator_anomalies ?? [];
+  // Synthesis — תומך גם במבנה החדש (executive_summary + detailed_analysis) וגם במבנה הישן
+  const summary       = stage0?.results_summary ?? {};
+  const exec          = summary.executive_summary ?? {};
+  const headline      = exec.headline ?? "";
+  const keyPoints     = Array.isArray(exec.key_points) ? exec.key_points : [];
+  const biggestAlert  = exec.biggest_alert ?? null;
+  const legacyFindings = Array.isArray(summary.key_findings) ? summary.key_findings : [];
+  const legacySynthesis = summary.synthesis ?? "";
+  const findings   = keyPoints.length > 0 ? keyPoints : legacyFindings;  // עדיפות למבנה חדש
+  const synthesis  = legacySynthesis;  // רק במבנה הישן
+  const anomalies  = summary.moderator_warnings ?? summary.moderator_anomalies ?? [];
 
   const hasMedia = mediaCRM.some(r => r.total_spend > 0) || mediaByMonth.length > 0;
 
@@ -659,8 +665,24 @@ export default function Dashboard() {
         </Section>
 
         {/* ══ 7. ניתוח מנהלים (TEXT ONLY) ═══════════════════════════════════ */}
-        {(synthesis || findings.length > 0) && (
+        {(headline || synthesis || findings.length > 0 || biggestAlert) && (
           <Section title="ניתוח מנהלים" accent={ACCENT.exec} subtitle="סינתזה — ממצאים מרכזיים לקבלת החלטות">
+
+            {/* Headline (new structure) */}
+            {headline && (
+              <div style={{ background:CARD, border:`1px solid ${ACCENT.exec}44`, borderRadius:12, padding:"20px 24px", marginBottom:16 }}>
+                <p style={{ color:ACCENT.exec, fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.06em", margin:"0 0 12px" }}>כותרת מרכזית</p>
+                <p style={{ color:TEXT, fontSize:16, fontWeight:600, lineHeight:1.6, margin:0 }}>{headline}</p>
+              </div>
+            )}
+
+            {/* Biggest alert (new structure) */}
+            {biggestAlert && (
+              <div style={{ background:"#2a0e0a", border:"1px solid #fca5a5", borderRadius:12, padding:"18px 22px", marginBottom:16 }}>
+                <p style={{ color:"#fca5a5", fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.06em", margin:"0 0 8px" }}>⚠ דורש תשומת לב מיידית</p>
+                <p style={{ color:"#fecaca", fontSize:14, lineHeight:1.6, margin:0 }}>{biggestAlert}</p>
+              </div>
+            )}
 
             {/* Key findings */}
             {findings.length > 0 && (
