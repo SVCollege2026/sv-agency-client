@@ -90,6 +90,11 @@ export async function listRuns() {
   return request("GET", "/api/analysis/runs");
 }
 
+export async function quickTable(question_text, instructions = null) {
+  // Single ad-hoc calculation — no debate, no synthesis. Returns a table layout.
+  return request("POST", "/api/analysis/quick-table", { question_text, instructions });
+}
+
 export async function cancelRun(runId) {
   return request("POST", `/api/analysis/cancel/${runId}`);
 }

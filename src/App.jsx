@@ -5,6 +5,7 @@ import AnalyticsLayout from "./components/AnalyticsLayout.jsx";
 import PortalHome from "./pages/PortalHome.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import AnalysisPage from "./pages/AnalysisPage.jsx";
+import QuickTablePage from "./pages/QuickTablePage.jsx";
 import ReportsPage from "./pages/ReportsPage.jsx";
 import GoalsPage from "./pages/GoalsPage.jsx";
 import EcosystemPage from "./pages/EcosystemPage.jsx";
@@ -23,7 +24,8 @@ export default function App() {
         <Route path="/analytics" element={<AnalyticsLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard"  element={<Dashboard />} />
-          <Route path="analysis"   element={<AnalysisPage />} />
+          <Route path="analysis"    element={<AnalysisPage />} />
+          <Route path="quick-table" element={<QuickTablePage />} />
           <Route path="ecosystem"  element={<EcosystemPage />} />
           <Route path="reports"    element={<ReportsPage />} />
           <Route path="goals"      element={<GoalsPage />} />
