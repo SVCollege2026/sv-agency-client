@@ -88,10 +88,19 @@ function DropdownNavItem({ item }) {
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
-      <span
-        style={linkStyle(isActiveBranch)}
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        style={{
+          ...linkStyle(isActiveBranch),
+          background: "none",
+          border: "none",
+          font: "inherit",
+        }}
         onClick={() => {
-          // קליק על הכותרת — פותח/סוגר dropdown ויאפשר ניווט לברירת מחדל אם דרושה
+          // קליק על הכותרת — פותח/סוגר dropdown
+          // קליק שני (כש-open=true) → ניווט לברירת מחדל
           if (open && item.defaultTo) {
             navigate(item.defaultTo);
             setOpen(false);
@@ -103,7 +112,7 @@ function DropdownNavItem({ item }) {
         <span>{item.icon}</span>
         {item.label}
         <span style={{ fontSize: 10, marginRight: 2, opacity: 0.7 }}>▾</span>
-      </span>
+      </button>
 
       {open && (
         <div
