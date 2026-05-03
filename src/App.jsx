@@ -10,6 +10,7 @@ import ReportsPage from "./pages/ReportsPage.jsx";
 import GoalsPage from "./pages/GoalsPage.jsx";
 import EcosystemPage from "./pages/EcosystemPage.jsx";
 import MediaReportsPage from "./pages/MediaReportsPage.jsx";
+import ForecastingPage from "./pages/ForecastingPage.jsx";
 
 export default function App() {
   return (
@@ -33,6 +34,9 @@ export default function App() {
 
         {/* Media department — phase A: only the reports page */}
         <Route path="/media-reports" element={<MediaReportsPage />} />
+
+        {/* Strategy department — Forecasting (Phase 1+2) */}
+        <Route path="/forecasting" element={<ForecastingPage />} />
 
         {/* Legacy redirects — keep old bookmarks working */}
         <Route path="/dashboard" element={<Navigate to="/analytics/dashboard" replace />} />

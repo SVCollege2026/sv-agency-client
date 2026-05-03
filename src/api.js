@@ -228,3 +228,71 @@ export async function getMonthlyCoursesKpi({ year = null, course = null } = {}) 
 export async function runMonthlyKpi(year, month) {
   return request("POST", `/api/media-reports/monthly-kpi/run?year=${year}&month=${month}`);
 }
+
+// ─── Forecasting ──────────────────────────────────────────────────────────────
+
+export async function submitForecast({ department = "manual", question, questionKind = "forecast", requestedBy = null, metadata = null } = {}) {
+  return request("POST", "/api/forecasting/request", {
+    department,
+    question,
+    question_kind: questionKind,
+    requested_by:  requestedBy,
+    metadata,
+  });
+}
+
+export async function getForecastStatus(requestId) {
+  return request("GET", `/api/forecasting/request/${requestId}/status`);
+}
+
+export async function getForecastResult(requestId) {
+  return request("GET", `/api/forecasting/request/${requestId}/result`);
+}
+
+export async function listForecasts({ limit = 50, status = null, department = null } = {}) {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (status)     params.set("status", status);
+  if (department) params.set("department", department);
+  return request("GET", `/api/forecasting/requests?${params.toString()}`);
+}
+
+export async function listPatterns({ kind = null, active = true, minConfidence = null, limit = 50 } = {}) {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (kind)          params.set("kind", kind);
+  if (minConfidence) params.set("min_confidence", minConfidence);
+  params.set("active", active ? "true" : "false");
+  return request("GET", `/api/forecasting/patterns?${params.toString()}`);
+}
+
+export async function getPattern(patternId) {
+  return request("GET", `/api/forecasting/patterns/${patternId}`);
+}
+
+export async function listCandidatePatterns(limit = 200) {
+  return request("GET", `/api/forecasting/candidate-patterns?limit=${limit}`);
+}
+
+export async function triggerStage0(requestedBy = "manual") {
+  return request("POST", "/api/forecasting/stage0/trigger", { requested_by: requestedBy });
+}
+
+export async function getStage0Status() {
+  return request("GET", "/api/forecasting/stage0/status");
+}
+
+export async function getStage0Runs(limit = 10) {
+  return request("GET", `/api/forecasting/stage0/runs?limit=${limit}`);
+}
+
+export async function getForecastingCronStatus() {
+  return request("GET", "/api/forecasting/cron-status");
+}
+
+export async function getRecentSignals({ type = null, limit = 100 } = {}) {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (type) params.set("type", type);
+  return request("GET", `/api/forecasting/signals/recent?${params.toString()}`);
+}

@@ -53,6 +53,14 @@ const DEPARTMENTS = [
     desc:   "תוכנית שנתית · מיתוג · יעדים",
     active: false,
   },
+  {
+    id:     "forecasting",
+    icon:   "🔮",
+    label:  "מחלקת חיזוי",
+    desc:   "תחזיות עתידיות · Pattern Memory · Self-Reflection · Stage 0",
+    path:   "/forecasting",
+    active: true,
+  },
 ];
 
 // ─── Bug Report Modal ─────────────────────────────────────────────────────────
