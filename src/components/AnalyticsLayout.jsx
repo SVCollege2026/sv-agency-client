@@ -1,13 +1,13 @@
 /**
  * AnalyticsLayout.jsx — shell של מחלקת אנליזה
- * Secondary nav: לוח בקרה · ניתוח שלב 0 · ניתוח נקודתי · אקו-סיסטם · דוחות · יעדים
+ * Secondary nav: לוח בקרה · ריצת ניתוח · ניתוח נקודתי · אקו-סיסטם · דוחות · יעדים
  */
 import React from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
 const NAV = [
   { to: "/analytics/dashboard",   icon: "📊", label: "לוח בקרה"      },
-  { to: "/analytics/analysis",    icon: "⚙️",  label: "ניתוח שלב 0"   },
+  { to: "/analytics/analysis",    icon: "⚙️",  label: "ריצת ניתוח"    },
   { to: "/analytics/quick-table", icon: "🎯", label: "ניתוח נקודתי" },
   { to: "/analytics/ecosystem",   icon: "🌐", label: "אקו-סיסטם"    },
   { to: "/analytics/reports",     icon: "📄", label: "דוחות"        },

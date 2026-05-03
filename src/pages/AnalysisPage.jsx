@@ -635,7 +635,7 @@ export default function AnalysisPage() {
     <div className="page-content space-y-8" dir="rtl">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold text-[#1e3a5f]">ניתוח שלב 0</h1>
+        <h1 className="text-2xl font-bold text-[#1e3a5f]">ריצת ניתוח</h1>
         <p className="text-slate-500 text-sm mt-0.5">העלה שאלות מחקר, הפעל ניתוח וצפה בסטטוס</p>
       </div>
 
@@ -990,7 +990,7 @@ export default function AnalysisPage() {
               {buttonLoading ? (
                 <><Spinner small /> מפעיל…</>
               ) : (
-                "🚀 הרץ ניתוח שלב 0"
+                "🚀 הרץ ניתוח"
               )}
             </button>
             <p className="text-xs text-slate-400 mt-2 text-center">
