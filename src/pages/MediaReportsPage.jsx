@@ -20,6 +20,9 @@ import {
   runMediaWeekly,
   sendMediaDailyEmail,
   sendMediaWeeklyEmail,
+  getMonthlySchoolKpi,
+  getMonthlyCoursesKpi,
+  runMonthlyKpi,
 } from "../api.js";
 
 // ─── Utils ───────────────────────────────────────────────────────────────────
@@ -140,10 +143,182 @@ function hebSourceKind(k) {
 // ─── Filter bar ──────────────────────────────────────────────────────────────
 
 const MODES = [
-  { id: "daily",  label: "יומי"   },
-  { id: "weekly", label: "שבועי" },
-  { id: "range",  label: "טווח"   },
+  { id: "daily",   label: "יומי"   },
+  { id: "weekly",  label: "שבועי" },
+  { id: "range",   label: "טווח"   },
+  { id: "monthly", label: "📈 חודשי Y-o-Y" },
 ];
+
+// ─── Monthly KPI sub-component ─────────────────────────────────────────────
+
+function MonthlyKpiView() {
+  const [tab, setTab] = useState("school"); // 'school' | 'courses'
+  const [school, setSchool] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [year, setYear]   = useState(2026);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState(null);
+
+  async function load() {
+    setLoading(true); setError(null);
+    try {
+      if (tab === "school") {
+        const d = await getMonthlySchoolKpi();
+        setSchool(d.rows || []);
+      } else {
+        const d = await getMonthlyCoursesKpi({ year });
+        setCourses(d.rows || []);
+      }
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [tab, year]);
+
+  const tabBtn = (id, label) => (
+    <button key={id} type="button" onClick={() => setTab(id)}
+      style={{
+        padding: "8px 16px", fontSize: 13, fontWeight: 600,
+        borderRadius: 8, cursor: "pointer",
+        background: tab === id ? "#1e3a5f" : "#0d1626",
+        color:      tab === id ? "#e2e8f0" : "#64748b",
+        border: `1px solid ${tab === id ? "#3b82f6" : "#1e293b"}`,
+      }}>{label}</button>
+  );
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 14, alignItems: "center" }}>
+        {tabBtn("school",  "🏫 סה\"כ בית הספר")}
+        {tabBtn("courses", "🎓 לפי קורס YTD")}
+
+        {tab === "courses" && (
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))}
+            style={{
+              marginRight: 12, background: "#0d1626", border: "1px solid #1e3a5f",
+              color: "#cbd5e1", borderRadius: 6, padding: "6px 10px", fontSize: 13,
+            }}>
+            {[2023, 2024, 2025, 2026].map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {error && (
+        <div style={{ background: "#1a0c0c", border: "1px solid #7f1d1d", color: "#fca5a5",
+                      padding: 10, borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
+          ⚠ {error}
+        </div>
+      )}
+
+      {loading && (
+        <div style={{ textAlign: "center", color: "#64748b", padding: 40 }}>טוען…</div>
+      )}
+
+      {!loading && tab === "school" && <SchoolKpiTable rows={school} />}
+      {!loading && tab === "courses" && <CoursesKpiTable rows={courses} year={year} />}
+    </div>
+  );
+}
+
+function SchoolKpiTable({ rows }) {
+  // School-wide KPIs — month rows, key metrics in columns
+  const cols = [
+    { k: "month_ym",          h: "חודש" },
+    { k: "leads_total",       h: "לידים סה\"כ", fmt: (v) => fmtNum(v) },
+    { k: "leads_meta",        h: "Meta",       fmt: (v) => fmtNum(v) },
+    { k: "leads_google",      h: "Google",     fmt: (v) => fmtNum(v) },
+    { k: "leads_organic",     h: "אורגני",     fmt: (v) => fmtNum(v) },
+    { k: "leads_vendor",      h: "ספקי לידים", fmt: (v) => fmtNum(v) },
+    { k: "spend_total",       h: "תקציב סה\"כ", fmt: fmtMoney },
+    { k: "spend_meta",        h: "תקציב Meta", fmt: fmtMoney },
+    { k: "spend_google",      h: "תקציב Google", fmt: fmtMoney },
+    { k: "cpl_meta",          h: "CPL Meta",   fmt: fmtMoney },
+    { k: "cpl_google",        h: "CPL Google", fmt: fmtMoney },
+    { k: "reg_action_total",  h: "נרשמים",     fmt: (v) => fmtNum(v) },
+    { k: "canc_action",       h: "מבטלים",     fmt: (v) => fmtNum(v) },
+    { k: "canc_rate",         h: "% ביטול",    fmt: (v) => v != null ? fmtPct(v * 100) : "—" },
+  ];
+  if (!rows || rows.length === 0) {
+    return <div style={{ color: "#64748b", padding: 40, textAlign: "center" }}>אין נתונים</div>;
+  }
+  return (
+    <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead style={{ background: "#0d1626" }}>
+            <tr>{cols.map((c) => <th key={c.k} style={thStyle}>{c.h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.month_ym} style={{ borderTop: "1px solid #101a2c", color: "#cbd5e1" }}>
+                {cols.map((c) => (
+                  <td key={c.k} style={tdStyle}>{c.fmt ? c.fmt(r[c.k]) : (r[c.k] ?? "—")}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function CoursesKpiTable({ rows, year }) {
+  // Pivot: rows = course_clean, cols = month (1..12)
+  const months = ["ינו", "פבר", "מרץ", "אפר", "מאי", "יוני", "יולי", "אוג", "ספט", "אוק", "נוב", "דצמ"];
+  // Build map: course → month_num → row
+  const byCourse = {};
+  for (const r of rows || []) {
+    const list = byCourse[r.course_clean] || (byCourse[r.course_clean] = {});
+    list[r.month_num] = r;
+  }
+  const courseList = Object.keys(byCourse).sort();
+  if (courseList.length === 0) {
+    return <div style={{ color: "#64748b", padding: 40, textAlign: "center" }}>אין נתונים לשנה {year}</div>;
+  }
+  return (
+    <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead style={{ background: "#0d1626" }}>
+            <tr>
+              <th style={thStyle}>קורס</th>
+              <th style={thStyle}>מדד</th>
+              {months.map((m, i) => <th key={i} style={thStyle}>{m}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {courseList.map((course) => {
+              const monthMap = byCourse[course];
+              const renderRow = (label, key, fmt) => (
+                <tr key={`${course}-${key}`} style={{ borderTop: "1px solid #101a2c", color: "#cbd5e1" }}>
+                  {key === "active_ytd" && (
+                    <td rowSpan={4} style={{ ...tdStyle, fontWeight: 600, color: "#93c5fd",
+                          borderInlineEnd: "1px solid #1e293b" }}>{course}</td>
+                  )}
+                  <td style={{ ...tdStyle, color: "#94a3b8" }}>{label}</td>
+                  {months.map((_, i) => {
+                    const r = monthMap[i + 1];
+                    const v = r ? r[key] : null;
+                    return <td key={i} style={tdStyle}>{v != null ? (fmt ? fmt(v) : v) : "—"}</td>;
+                  })}
+                </tr>
+              );
+              return [
+                renderRow("רשומים פעילים", "active_ytd",     (v) => fmtNum(v)),
+                renderRow("מבטלים",        "canc_ytd",       (v) => fmtNum(v)),
+                renderRow("מקפיאים",       "frozen_ytd",     (v) => fmtNum(v)),
+                renderRow("סה\"כ נרשמו",   "reg_total_ytd",  (v) => fmtNum(v)),
+              ];
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 // ─── Main component ─────────────────────────────────────────────────────────
 
@@ -602,8 +777,10 @@ export default function MediaReportsPage() {
           </div>
         )}
 
-        {/* ── Main content: table / sub_status / analytics ── */}
-        {mode === "daily" && dailyView === "sub_status" ? (
+        {/* ── Main content: table / sub_status / analytics / monthly ── */}
+        {mode === "monthly" ? (
+          <MonthlyKpiView />
+        ) : mode === "daily" && dailyView === "sub_status" ? (
           <SubStatusTable rows={data?.sub_status || []} loading={loading} />
         ) : mode === "daily" && dailyView === "analytics" ? (
           <AnalyticsPanel analytics={data?.analytics} loading={loading} />

@@ -208,3 +208,23 @@ export async function sendMediaDailyEmail(day) {
 export async function sendMediaWeeklyEmail(week_start, week_end) {
   return request("POST", "/api/media-reports/send-email/weekly", { week_start, week_end });
 }
+
+// ─── Monthly KPI Y-o-Y ─────────────────────────────────────────────────────
+// טבלאות public.monthly_school_kpi + public.monthly_course_kpi_ytd
+// מתעדכנות אוטומטית ב-1 לכל חודש דרך scheduler.py
+
+export async function getMonthlySchoolKpi() {
+  return request("GET", "/api/media-reports/monthly-kpi/school");
+}
+
+export async function getMonthlyCoursesKpi({ year = null, course = null } = {}) {
+  const params = new URLSearchParams();
+  if (year)   params.set("year", year);
+  if (course) params.set("course", course);
+  const qs = params.toString();
+  return request("GET", `/api/media-reports/monthly-kpi/courses${qs ? "?" + qs : ""}`);
+}
+
+export async function runMonthlyKpi(year, month) {
+  return request("POST", `/api/media-reports/monthly-kpi/run?year=${year}&month=${month}`);
+}
