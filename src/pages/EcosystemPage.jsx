@@ -66,11 +66,8 @@ export default function EcosystemPage() {
     );
   }
 
-  const briefsByDept = data.briefs_by_dept || {};
-  const deptKeys = [
-    ...DEPT_ORDER.filter((d) => briefsByDept[d]?.length),
-    ...Object.keys(briefsByDept).filter((d) => !DEPT_ORDER.includes(d)),
-  ];
+  // ⚠ issue_briefs ו-validated_findings נשמרים ב-DB אבל לא מוצגים פה —
+  //   זהו ממשק להנהלת בית הספר, לא לאורקסטרציה פנימית.
 
   return (
     <Page>
@@ -156,33 +153,7 @@ export default function EcosystemPage() {
         </Section>
       )}
 
-      {/* ── 7. ממצאים מאוששים מריצות קודמות ── */}
-      {data.validated_findings?.length > 0 && (
-        <Section title="ממצאים מאוששים (מצטברים על פני ריצות)" emoji="✅" tone="neutral">
-          <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px" }}>
-            ממצאים שהאנליסטים אישרו במספר ריצות. ככל שהמספר גדל — הוודאות עולה.
-          </p>
-          <ul style={{ margin: 0, paddingInlineStart: 22, fontSize: 13.5, lineHeight: 1.85 }}>
-            {data.validated_findings.map((f, i) => (
-              <li key={i} style={{ color: "#1e293b", marginBottom: 8 }}>
-                <strong style={{ color: "#1e40af" }}>[{f.topic}]</strong> {f.finding}
-                {f.run_count > 1 && (
-                  <span style={{ color: "#16a34a", fontSize: 11, marginInlineStart: 6 }}>
-                    ({f.run_count}× אומת)
-                  </span>
-                )}
-                {f.evidence && (
-                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-                    {f.evidence}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {/* ── 8. התראה ── */}
+      {/* ── 7. התראה ── */}
       {data.biggest_alert && (
         <Section title="הממצא הכי בולט" emoji="⚠️" tone="alert">
           <p style={{ fontSize: 15, lineHeight: 1.7, color: "#7c2d12", margin: 0 }}>
@@ -191,29 +162,14 @@ export default function EcosystemPage() {
         </Section>
       )}
 
-      {deptKeys.length > 0 && (
-        <Section title="שאלות לחקירה — מועברות למחלקות" emoji="📋" tone="action">
-          <p style={{ color: "#475569", fontSize: 13, margin: "0 0 16px", lineHeight: 1.7 }}>
-            כל קבוצה למטה היא תיק חקירה למחלקה אחת. שלב 0 זיהה את הסוגיה ומציף את השאלות —
-            המחלקה האחראית עונה. כך כולן מתחילות מאותו דף.
-          </p>
-          {deptKeys.map((dept) => (
-            <DeptCard key={dept} name={dept} briefs={briefsByDept[dept]} />
-          ))}
-        </Section>
-      )}
-
       <div style={{
         marginTop: 32, padding: "14px 18px",
         background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10,
         fontSize: 12, color: "#64748b",
       }}>
-        💾 דוח שמור ב-stage0_reports.id={data.report_id}.
-        ניתן להשוות בין דוחות בעמוד <a
-          href="#"
-          onClick={(e) => { e.preventDefault(); navigate("/analytics/reports"); }}
-          style={{ color: "#1e40af" }}
-        >דוחות</a>.
+        💾 דוח שמור · ניתן להשוות בין דוחות בעמוד{" "}
+        <a href="#" onClick={(e) => { e.preventDefault(); navigate("/analytics/reports"); }}
+           style={{ color: "#1e40af" }}>דוחות</a>.
       </div>
     </Page>
   );
@@ -230,12 +186,9 @@ function Page({ children }) {
       fontFamily:  "'Segoe UI', sans-serif",
     }}>
       <div style={{ maxWidth: 1000, margin: "0 auto", padding: "32px 24px 64px" }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 6px", color: "#0f172a" }}>
-          📋 ניתוח מנהלים
+        <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 28px", color: "#0f172a" }}>
+          ניתוח מנהלים
         </h1>
-        <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 28px" }}>
-          סיכום מנוסח לבני אדם של ניתוח שלב 0 — מאקרו, ממצאים, ושאלות חקירה למחלקות.
-        </p>
         {children}
       </div>
     </div>
