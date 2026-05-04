@@ -57,6 +57,25 @@ function pivotByGroup(rows, xKey, groupKey, valueKey) {
   return { data: Object.values(out), seriesKeys: [...groups] };
 }
 
+// Auto-detect chart shape (used when fact.chart_type === "auto" — saved before
+// chart_type was set per fact). Returns null if data shape doesn't fit a chart.
+function pickChartShape(fact) {
+  const cols = fact.columns || [];
+  const rows = fact.rows || [];
+  if (rows.length < 2 || cols.length < 2) return null;
+  const labelKey = cols[0];
+  const sampleLabel = rows[0]?.[labelKey];
+  const numericCols = cols.slice(1).filter((c) => {
+    const v = rows[0]?.[c];
+    return typeof v === "number" || (typeof v === "string" && !isNaN(parseFloat(v)));
+  });
+  if (numericCols.length === 0) return null;
+  if (typeof sampleLabel === "string" && /^\d{4}-\d{2}$/.test(sampleLabel)) {
+    return { type: "line", labelKey, valueKeys: numericCols };
+  }
+  return { type: "bar", labelKey, valueKeys: numericCols };
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
@@ -401,8 +420,11 @@ function ChartsView({ charts }) {
 // ─── Fact Card + Renderers (ported from Dashboard.jsx) ──────────────────────
 
 function FactCard({ fact }) {
-  const isTable = (fact.chart_type === "table");
-  const hasChart = !isTable && fact.chart_type !== "metric" && fact.chart_type !== "auto";
+  const t = fact.chart_type || "auto";
+  const isTable = (t === "table");
+  const hasChart = !isTable && t !== "metric" && (
+    t !== "auto" ? true : !!pickChartShape(fact)
+  );
   const [open, setOpen] = useState(isTable);
 
   return (
@@ -621,5 +643,44 @@ function FactChart({ fact }) {
     );
   }
 
-  return null;
+  // auto fallback (legacy snapshots saved before chart_type was set per fact)
+  const shape = pickChartShape(fact);
+  if (!shape) return null;
+  const { type, labelKey, valueKeys } = shape;
+  const keys = valueKeys.slice(0, 8);
+  if (type === "line") {
+    return (
+      <div style={{ width: "100%", height: 260, marginTop: 4 }}>
+        <ResponsiveContainer>
+          <LineChart data={fact.rows} margin={{ top: 4, right: 18, bottom: 4, left: 18 }}>
+            <CartesianGrid stroke="#f1f5f9" />
+            <XAxis dataKey={labelKey} tick={{ fontSize: 9, fill: "#475569" }} />
+            <YAxis tick={{ fontSize: 10, fill: "#475569" }} />
+            <Tooltip content={<CustomTooltip />} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            {keys.map((k, i) => (
+              <Line key={k} type="monotone" dataKey={k} stroke={PAL[i % PAL.length]}
+                    strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 5 }} />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+  return (
+    <div style={{ width: "100%", height: 260, marginTop: 4 }}>
+      <ResponsiveContainer>
+        <BarChart data={fact.rows} margin={{ top: 4, right: 18, bottom: 4, left: 18 }}>
+          <CartesianGrid stroke="#f1f5f9" />
+          <XAxis dataKey={labelKey} tick={{ fontSize: 10, fill: "#475569" }} />
+          <YAxis tick={{ fontSize: 10, fill: "#475569" }} />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend wrapperStyle={{ fontSize: 11 }} />
+          {keys.map((k, i) => (
+            <Bar key={k} dataKey={k} fill={PAL[i % PAL.length]} radius={[4, 4, 0, 0]} />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
 }
