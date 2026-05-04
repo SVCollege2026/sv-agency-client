@@ -113,6 +113,14 @@ export async function getDashboardSummary() {
   return request("GET", "/api/dashboard/summary");
 }
 
+export async function getExecutiveAnalysis() {
+  return request("GET", "/api/dashboard/executive-analysis");
+}
+
+export async function getStage0History() {
+  return request("GET", "/api/dashboard/stage0-history");
+}
+
 /** All structured analytics — full dashboard data */
 export async function getAnalytics() {
   return request("GET", "/api/dashboard/analytics");

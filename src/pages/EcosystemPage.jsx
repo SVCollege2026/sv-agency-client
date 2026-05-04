@@ -1,292 +1,330 @@
 /**
- * EcosystemPage.jsx — מחלקת אנליזה: אקו-סיסטם
- * מציג: סינתזה + ממצאים מרכזיים + ולידציית מקורות + סיבובי דיבייט
+ * EcosystemPage.jsx — ניתוח מנהלים (לשעבר אקו-סיסטם)
+ *
+ * דוח קריא לבני אדם: מאקרו, ממצאים מרכזיים, התראה, ובסוף
+ * שאלות לחקירה למחלקות אחרות (Google/Meta/Creative/Brand/Retention/...).
+ *
+ * נתונים: GET /api/dashboard/executive-analysis (מ-public.stage0_reports).
  */
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { listRuns } from "../api.js";
+import { getExecutiveAnalysis } from "../api.js";
 
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const DEPT_ORDER = [
+  "מחלקת Google Ads",
+  "מחלקת Meta",
+  "מחלקת מדיה",
+  "מחלקת קריאייטיב",
+  "מחלקת מותג / שיווק אורגני",
+  "מחלקת שימור / מסע לקוח",
+  "מחלקת חיזוי",
+  "מחלקת מטרות-ויעדים",
+];
 
-async function fetchSynthesis() {
-  const res = await fetch(`${BASE}/api/dashboard/synthesis`);
-  if (!res.ok) throw new Error(`שגיאת שרת: ${res.status}`);
-  return res.json();
-}
-
-// ─── Small helpers ────────────────────────────────────────────────────────────
-
-const Section = ({ title, icon, children, defaultOpen = true }) => {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, marginBottom: 16, overflow: "hidden" }}>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen(o => !o)}
-        style={{
-          width: "100%", display: "flex", alignItems: "center", gap: 10,
-          padding: "14px 20px", background: "transparent", border: "none",
-          cursor: "pointer", direction: "rtl", textAlign: "right",
-        }}
-      >
-        <span style={{ fontSize: 18 }}>{icon}</span>
-        <span style={{ flex: 1, color: "#0f172a", fontSize: 15, fontWeight: 600 }}>{title}</span>
-        <span style={{ color: "#64748b", fontSize: 12 }}>{open ? "▲" : "▼"}</span>
-      </button>
-      {open && (
-        <div style={{ padding: "0 20px 20px", borderTop: "1px solid #e2e8f0" }}>
-          {children}
-        </div>
-      )}
-    </div>
-  );
+const DEPT_ICON = {
+  "מחלקת Google Ads":           "🔍",
+  "מחלקת Meta":                 "📱",
+  "מחלקת מדיה":                 "📣",
+  "מחלקת קריאייטיב":             "🎨",
+  "מחלקת מותג / שיווק אורגני":   "🌱",
+  "מחלקת שימור / מסע לקוח":      "🔁",
+  "מחלקת חיזוי":                 "📈",
+  "מחלקת מטרות-ויעדים":          "🎯",
+  "אחר":                         "📌",
 };
 
-const Badge = ({ text, variant = "default" }) => {
-  const styles = {
-    default:  { background: "#e2e8f0", color: "#64748b" },
-    ok:       { background: "#064e3b", color: "#6ee7b7" },
-    warn:     { background: "#431a03", color: "#ca8a04" },
-    danger:   { background: "#450a0a", color: "#dc2626" },
-  };
-  const s = styles[variant] || styles.default;
-  return (
-    <span style={{ ...s, fontSize: 11, borderRadius: 6, padding: "2px 8px", display: "inline-block" }}>
-      {text}
-    </span>
-  );
-};
-
-// ─── Sub-sections ─────────────────────────────────────────────────────────────
-
-function KeyFindings({ findings }) {
-  if (!findings?.length) return <p style={{ color: "#64748b", fontSize: 13 }}>אין ממצאים זמינים.</p>;
-  return (
-    <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
-      {findings.map((f, i) => (
-        <li
-          key={i}
-          style={{
-            display: "flex", gap: 12, alignItems: "flex-start",
-            padding: "10px 0", borderBottom: i < findings.length - 1 ? "1px solid #0f172a" : "none",
-          }}
-        >
-          <span style={{ color: "#3b82f6", fontSize: 16, flexShrink: 0, marginTop: 2 }}>✦</span>
-          <p style={{ margin: 0, color: "#0f172a", fontSize: 13, lineHeight: 1.7 }}>
-            {typeof f === "string" ? f : f.finding ?? JSON.stringify(f)}
-          </p>
-        </li>
-      ))}
-    </ul>
-  );
+function fmtDate(iso) {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" });
+  } catch { return iso; }
 }
-
-function SynthesisText({ text }) {
-  if (!text) return <p style={{ color: "#64748b", fontSize: 13 }}>אין סיכום זמין.</p>;
-  return (
-    <div style={{ color: "#0f172a", fontSize: 13, lineHeight: 1.9, whiteSpace: "pre-wrap" }}>
-      {text}
-    </div>
-  );
-}
-
-function SourcesValidation({ validation = [], urlReport = [] }) {
-  const urlMap = useMemo(() => {
-    const m = {};
-    for (const r of urlReport) m[r.query] = r;
-    return m;
-  }, [urlReport]);
-
-  if (!validation.length) return <p style={{ color: "#64748b", fontSize: 13 }}>אין נתוני ולידציה.</p>;
-  return (
-    <div>
-      {validation.map((v, i) => {
-        const urls = urlMap[v.query] || {};
-        const isApproved = v.status === "approved";
-        return (
-          <div
-            key={i}
-            style={{
-              background: "#f8fafc", border: `1px solid ${isApproved ? "#064e3b" : "#450a0a"}`,
-              borderRadius: 8, padding: "12px 14px", marginBottom: 10,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-              <Badge text={isApproved ? "✓ אושר" : "✗ נדחה"} variant={isApproved ? "ok" : "danger"} />
-              <p style={{ margin: 0, color: "#64748b", fontSize: 12, flex: 1 }}>{v.query}</p>
-            </div>
-            {v.reasoning && (
-              <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>נימוק: {v.reasoning}</p>
-            )}
-            {(urls.valid_urls?.length > 0 || urls.broken_urls?.length > 0) && (
-              <div style={{ marginTop: 6, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {urls.valid_urls?.map(u => (
-                  <a key={u} href={u} target="_blank" rel="noreferrer"
-                    style={{ fontSize: 10, color: "#6ee7b7", background: "#064e3b", borderRadius: 4, padding: "1px 6px", textDecoration: "none" }}>
-                    ✓ {u.slice(0, 40)}…
-                  </a>
-                ))}
-                {urls.broken_urls?.map(u => (
-                  <span key={u} style={{ fontSize: 10, color: "#dc2626", background: "#450a0a", borderRadius: 4, padding: "1px 6px" }}>
-                    ✗ {u.slice(0, 40)}…
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function DebateRounds({ rounds = [] }) {
-  const [openRound, setOpenRound] = useState(null);
-  if (!rounds.length) return <p style={{ color: "#64748b", fontSize: 13 }}>אין סיבובי דיבייט זמינים.</p>;
-  return (
-    <div>
-      <p style={{ color: "#64748b", fontSize: 12, margin: "0 0 12px" }}>
-        {rounds.length} סיבובים · לחץ על סיבוב לפתיחה
-      </p>
-      {rounds.map(r => (
-        <div key={r.round} style={{ marginBottom: 8 }}>
-          <button
-            type="button"
-            aria-expanded={openRound === r.round}
-            onClick={() => setOpenRound(openRound === r.round ? null : r.round)}
-            style={{
-              width: "100%", display: "flex", alignItems: "center", gap: 10,
-              padding: "10px 14px", background: "#f8fafc", border: "1px solid #e2e8f0",
-              borderRadius: 8, cursor: "pointer", direction: "rtl", textAlign: "right",
-            }}
-          >
-            <span style={{ color: "#3b82f6", fontSize: 12, fontWeight: 600 }}>סיבוב {r.round}</span>
-            {r.analyst_trends_failed && <Badge text="שגיאה בסיבוב זה" variant="warn" />}
-            <span style={{ flex: 1 }} />
-            <span style={{ color: "#64748b", fontSize: 11 }}>{openRound === r.round ? "▲" : "▼"}</span>
-          </button>
-          {openRound === r.round && (
-            <div style={{ border: "1px solid #e2e8f0", borderTop: "none", borderRadius: "0 0 8px 8px", background: "#f8fafc", padding: 16 }}>
-              <p style={{ color: "#3b82f6", fontSize: 12, fontWeight: 600, margin: "0 0 8px" }}>מגמות חיצוניות:</p>
-              <p style={{ color: "#64748b", fontSize: 12, lineHeight: 1.8, whiteSpace: "pre-wrap", margin: "0 0 16px" }}>{r.analyst_trends}</p>
-              <p style={{ color: "#10b981", fontSize: 12, fontWeight: 600, margin: "0 0 8px" }}>תרגום עסקי:</p>
-              <p style={{ color: "#64748b", fontSize: 12, lineHeight: 1.8, whiteSpace: "pre-wrap", margin: 0 }}>{r.analyst_business}</p>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function EcosystemPage() {
-  const navigate  = useNavigate();
-  const [data,    setData]    = useState(null);
+  const navigate = useNavigate();
+  const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(null);
+  const [error, setError]     = useState(null);
 
   useEffect(() => {
-    fetchSynthesis()
+    getExecutiveAnalysis()
       .then(setData)
-      .catch(e => setError(e.message))
+      .catch((e) => setError(e.message || String(e)))
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" }}>
-      <p style={{ color: "#64748b", fontSize: 15 }}>טוען ניתוח אקו-סיסטם…</p>
-    </div>
-  );
+  if (loading) return <Page><Center>טוען ניתוח אחרון…</Center></Page>;
+  if (error)   return <Page><ErrorBox message={error} /></Page>;
+  if (!data?.available) {
+    return (
+      <Page>
+        <EmptyState
+          onRun={() => navigate("/analytics/analysis")}
+          onHistory={() => navigate("/analytics/reports")}
+        />
+      </Page>
+    );
+  }
 
-  if (error || !data?.available) return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60vh", gap: 12, direction: "rtl", textAlign: "center" }}>
-      <span style={{ fontSize: 36 }}>🌐</span>
-      <p style={{ color: "#0f172a", fontSize: 16, fontWeight: 600, margin: 0 }}>
-        אין נתוני אקו-סיסטם עדיין
-      </p>
-      <p style={{ color: "#64748b", fontSize: 13, margin: 0, maxWidth: 340 }}>
-        נתוני האקו-סיסטם מתמלאים אוטומטית בסיום ריצת ניתוח שלב 0.
-        לחץ כאן כדי לעבור לדף הניתוח ולהפעיל ריצה.
-      </p>
-      <button
-        type="button"
-        onClick={() => navigate("/analytics/analysis")}
-        style={{ background: "#1e3a5f", color: "#1e40af", border: "1px solid #2d4a6e", borderRadius: 8, padding: "10px 24px", cursor: "pointer", fontSize: 14, marginTop: 4 }}
-      >
-        ← עבור לדף הניתוח
-      </button>
-    </div>
-  );
-
-  const {
-    synthesis, key_findings,
-    hallucination_check, validation, url_report,
-    rounds, additional_fetches,
-    completed_at,
-  } = data;
-
-  const flagged = hallucination_check?.flagged_claims ?? [];
+  const briefsByDept = data.briefs_by_dept || {};
+  const deptKeys = [
+    ...DEPT_ORDER.filter((d) => briefsByDept[d]?.length),
+    ...Object.keys(briefsByDept).filter((d) => !DEPT_ORDER.includes(d)),
+  ];
 
   return (
-    <div lang="he" style={{ padding: "24px 20px", maxWidth: 900, margin: "0 auto", direction: "rtl", color: "#0f172a", fontFamily: "'Segoe UI', sans-serif" }}>
-
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 700 }}>ניתוח אקו-סיסטם</h1>
-        <p style={{ margin: 0, color: "#64748b", fontSize: 13 }}>
-          עודכן: {completed_at ? new Date(completed_at).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" }) : "—"}
+    <Page>
+      <div style={{ marginBottom: 28 }}>
+        <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 4px" }}>
+          ניתוח מנהלים — שלב 0
+          {data.cutoff_date && <> · baseline עד {data.cutoff_date}</>}
+          {" · "}הופק {fmtDate(data.generated_at)}
+          {" · "}{data.n_facts} facts ניתוחים
+          {" · "}סוכנים: {(data.agents_used || []).join(" + ")}
         </p>
       </div>
 
-      {/* Hallucination warning */}
-      {flagged.length > 0 && (
-        <div style={{ background: "#1c0f03", border: "1px solid #92400e", borderRadius: 10, padding: "12px 16px", marginBottom: 20 }}>
-          <p style={{ margin: "0 0 8px", color: "#ca8a04", fontWeight: 600, fontSize: 13 }}>
-            ✱ בודק הזיות דגל {flagged.length} טענות שלא אומתו במקורות:
+      {data.headline && (
+        <Section title="התמונה הכוללת" emoji="📌" tone="primary">
+          <p style={{
+            fontSize: 18, lineHeight: 1.7, color: "#0f172a",
+            fontWeight: 500, margin: 0,
+          }}>
+            {data.headline}
           </p>
-          <ul style={{ margin: 0, padding: "0 20px" }}>
-            {flagged.map((f, i) => <li key={i} style={{ color: "#fbbf24", fontSize: 12, marginBottom: 4 }}>{f}</li>)}
-          </ul>
-        </div>
+        </Section>
       )}
 
-      {/* Sections */}
-      <Section title="ממצאים מרכזיים" icon="✦" defaultOpen={true}>
-        <KeyFindings findings={key_findings} />
-      </Section>
+      {data.biggest_alert && (
+        <Section title="הממצא הכי בולט" emoji="⚠️" tone="alert">
+          <p style={{ fontSize: 15, lineHeight: 1.7, color: "#7c2d12", margin: 0 }}>
+            {data.biggest_alert}
+          </p>
+        </Section>
+      )}
 
-      <Section title="סיכום אקו-סיסטם מאומת" icon="📋" defaultOpen={true}>
-        <SynthesisText text={synthesis} />
-      </Section>
+      {data.key_points?.length > 0 && (
+        <Section title="ממצאים מרכזיים" emoji="🔑">
+          <ul style={{ margin: 0, paddingInlineStart: 22, fontSize: 14, lineHeight: 1.85 }}>
+            {data.key_points.map((p, i) => (
+              <li key={i} style={{ color: "#1e293b", marginBottom: 8 }}>{p}</li>
+            ))}
+          </ul>
+        </Section>
+      )}
 
-      <Section title="ולידציית מקורות" icon="🔍" defaultOpen={false}>
-        <SourcesValidation validation={validation ?? []} urlReport={url_report ?? []} />
-      </Section>
-
-      {additional_fetches?.length > 0 && (
-        <Section title={`מידע נוסף שנבקש במהלך הדיבייט (${additional_fetches.length})`} icon="📡" defaultOpen={false}>
-          {additional_fetches.map((f, i) => (
-            <div key={i} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-                <Badge text={`סיבוב ${f.round}`} />
-                <Badge text={f.validated ? "✓ אושר" : "✗ לא אומת"} variant={f.validated ? "ok" : "warn"} />
-              </div>
-              <p style={{ margin: "0 0 4px", color: "#64748b", fontSize: 12 }}><strong>שאילתה:</strong> {f.query}</p>
-              {f.rejected_urls?.length > 0 && (
-                <p style={{ margin: 0, color: "#ef4444", fontSize: 11 }}>קישורים שבורים: {f.rejected_urls.join(", ")}</p>
-              )}
-            </div>
+      {deptKeys.length > 0 && (
+        <Section title="שאלות לחקירה — מועברות למחלקות" emoji="📋" tone="action">
+          <p style={{ color: "#475569", fontSize: 13, margin: "0 0 16px", lineHeight: 1.7 }}>
+            כל קבוצה למטה היא תיק חקירה למחלקה אחת. שלב 0 זיהה את הסוגיה ומציף את השאלות —
+            המחלקה האחראית עונה. כך כולן מתחילות מאותו דף.
+          </p>
+          {deptKeys.map((dept) => (
+            <DeptCard key={dept} name={dept} briefs={briefsByDept[dept]} />
           ))}
         </Section>
       )}
 
-      <Section title={`סיבובי דיבייט (${rounds?.length ?? 0})`} icon="💬" defaultOpen={false}>
-        <DebateRounds rounds={rounds ?? []} />
-      </Section>
+      <div style={{
+        marginTop: 32, padding: "14px 18px",
+        background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10,
+        fontSize: 12, color: "#64748b",
+      }}>
+        💾 דוח שמור ב-stage0_reports.id={data.report_id}.
+        ניתן להשוות בין דוחות בעמוד <a
+          href="#"
+          onClick={(e) => { e.preventDefault(); navigate("/analytics/reports"); }}
+          style={{ color: "#1e40af" }}
+        >דוחות</a>.
+      </div>
+    </Page>
+  );
+}
 
+// ─── Components ──────────────────────────────────────────────────────────────
+
+function Page({ children }) {
+  return (
+    <div lang="he" dir="rtl" style={{
+      background:  "#ffffff",
+      color:       "#0f172a",
+      minHeight:   "calc(100vh - 56px - 42px)",
+      fontFamily:  "'Segoe UI', sans-serif",
+    }}>
+      <div style={{ maxWidth: 1000, margin: "0 auto", padding: "32px 24px 64px" }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 6px", color: "#0f172a" }}>
+          📋 ניתוח מנהלים
+        </h1>
+        <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 28px" }}>
+          סיכום מנוסח לבני אדם של ניתוח שלב 0 — מאקרו, ממצאים, ושאלות חקירה למחלקות.
+        </p>
+        {children}
+      </div>
     </div>
   );
 }
+
+function Section({ title, emoji, tone = "neutral", children }) {
+  const palette = {
+    neutral: { bg: "#ffffff", border: "#e2e8f0", title: "#0f172a" },
+    primary: { bg: "#eff6ff", border: "#bfdbfe", title: "#1e3a8a" },
+    alert:   { bg: "#fff7ed", border: "#fed7aa", title: "#9a3412" },
+    action:  { bg: "#f0fdf4", border: "#bbf7d0", title: "#14532d" },
+  }[tone];
+
+  return (
+    <div style={{
+      background: palette.bg,
+      border:     `1px solid ${palette.border}`,
+      borderRadius: 12,
+      padding:    "20px 22px",
+      marginBottom: 20,
+    }}>
+      <h2 style={{
+        fontSize: 17, fontWeight: 700, margin: "0 0 14px",
+        color: palette.title, display: "flex", alignItems: "center", gap: 8,
+      }}>
+        {emoji && <span>{emoji}</span>}
+        {title}
+      </h2>
+      {children}
+    </div>
+  );
+}
+
+function DeptCard({ name, briefs }) {
+  const [open, setOpen] = useState(true);
+  const icon = DEPT_ICON[name] || "📌";
+
+  return (
+    <div style={{
+      background:   "#ffffff",
+      border:       "1px solid #cbd5e1",
+      borderRadius: 10,
+      padding:      "14px 16px",
+      marginBottom: 12,
+    }}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          width: "100%", display: "flex", justifyContent: "space-between",
+          alignItems: "center", background: "none", border: "none",
+          cursor: "pointer", padding: 0, fontFamily: "inherit",
+        }}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 20 }}>{icon}</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
+            {name}
+          </span>
+          <span style={{
+            fontSize: 11, padding: "2px 8px", background: "#f1f5f9",
+            color: "#475569", borderRadius: 99,
+          }}>
+            {briefs.length} {briefs.length === 1 ? "סוגיה" : "סוגיות"}
+          </span>
+        </span>
+        <span style={{ fontSize: 13, color: "#94a3b8" }}>{open ? "▼" : "◀"}</span>
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
+          {briefs.map((b, i) => <BriefCard key={i} brief={b} index={i + 1} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BriefCard({ brief, index }) {
+  return (
+    <div style={{
+      background:   "#fafbfc",
+      borderInlineStart: "3px solid #3b82f6",
+      borderRadius: 6,
+      padding:      "12px 14px",
+    }}>
+      <p style={{
+        fontSize: 14, fontWeight: 600, color: "#0f172a", margin: "0 0 6px",
+      }}>
+        {index}. {brief.issue}
+      </p>
+
+      {brief.where && (
+        <p style={{ fontSize: 12, color: "#475569", margin: "0 0 6px" }}>
+          <strong>איפה:</strong> {brief.where}
+        </p>
+      )}
+
+      {brief.evidence && (
+        <p style={{ fontSize: 12, color: "#475569", margin: "0 0 8px",
+                    background: "#ffffff", padding: "6px 10px",
+                    border: "1px solid #e2e8f0", borderRadius: 6 }}>
+          <strong>ראיה:</strong> {brief.evidence}
+        </p>
+      )}
+
+      {brief.next_questions?.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <p style={{ fontSize: 12, fontWeight: 600, color: "#1e40af",
+                      margin: "0 0 4px" }}>שאלות לחקירה:</p>
+          <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 13,
+                       lineHeight: 1.7, color: "#1e293b" }}>
+            {brief.next_questions.map((q, i) => <li key={i}>{q}</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Center({ children }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "80px 20px", color: "#64748b", fontSize: 14,
+    }}>{children}</div>
+  );
+}
+
+function ErrorBox({ message }) {
+  return (
+    <div style={{
+      background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b",
+      borderRadius: 10, padding: "16px 20px", fontSize: 14,
+    }}>
+      ⚠ שגיאה בטעינת הניתוח: {message}
+    </div>
+  );
+}
+
+function EmptyState({ onRun, onHistory }) {
+  return (
+    <div style={{
+      textAlign: "center", padding: "60px 20px",
+      background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: 12,
+    }}>
+      <div style={{ fontSize: 48, marginBottom: 14 }}>📭</div>
+      <h3 style={{ fontSize: 18, color: "#0f172a", margin: "0 0 6px" }}>
+        עדיין אין ניתוח מנהלים זמין
+      </h3>
+      <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 18px" }}>
+        כדי להפיק את הניתוח הראשון — בצע ריצה של שלב 0.
+      </p>
+      <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+        <button onClick={onRun} style={btnPrimary}>הפעל ניתוח שלב 0</button>
+        <button onClick={onHistory} style={btnSecondary}>היסטוריית דוחות</button>
+      </div>
+    </div>
+  );
+}
+
+const btnPrimary = {
+  background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 8,
+  padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer",
+};
+const btnSecondary = {
+  background: "#fff", color: "#1e293b", border: "1px solid #cbd5e1",
+  borderRadius: 8, padding: "10px 20px", fontSize: 14, cursor: "pointer",
+};
