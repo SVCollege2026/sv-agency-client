@@ -125,6 +125,10 @@ export async function getBaselineFacts() {
   return request("GET", "/api/dashboard/baseline-facts");
 }
 
+export async function getStage0Report(reportId) {
+  return request("GET", `/api/dashboard/stage0-report/${reportId}`);
+}
+
 /** All structured analytics — full dashboard data */
 export async function getAnalytics() {
   return request("GET", "/api/dashboard/analytics");
