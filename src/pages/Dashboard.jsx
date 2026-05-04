@@ -96,8 +96,8 @@ function FactChart({ fact }) {
 
   const { type, labelKey, valueKeys } = shape;
 
-  // Limit to 3 series for readability
-  const keys = valueKeys.slice(0, 3);
+  // Limit to 8 series — we want full source breakdown visible
+  const keys = valueKeys.slice(0, 8);
 
   return (
     <div style={{ width: "100%", height: 280, marginTop: 6 }}>

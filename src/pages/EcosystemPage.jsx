@@ -74,42 +74,120 @@ export default function EcosystemPage() {
 
   return (
     <Page>
-      <div style={{ marginBottom: 28 }}>
+      <div style={{ marginBottom: 24 }}>
         <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 4px" }}>
           ניתוח מנהלים — שלב 0
           {data.cutoff_date && <> · baseline עד {data.cutoff_date}</>}
           {" · "}הופק {fmtDate(data.generated_at)}
-          {" · "}{data.n_facts} facts ניתוחים
+          {" · "}{data.n_facts} ניתוחים בבסיס
           {" · "}סוכנים: {(data.agents_used || []).join(" + ")}
         </p>
       </div>
 
-      {data.headline && (
+      {/* ── 1. תקופה ── */}
+      {data.data_period && (
+        <Section title="תקופת הניתוח" emoji="📅" tone="neutral">
+          <p style={{ fontSize: 14, color: "#1e293b", margin: 0, lineHeight: 1.7 }}>
+            {data.data_period}
+          </p>
+        </Section>
+      )}
+
+      {/* ── 2. מגבלות נתונים — קודם הכל ── */}
+      {data.data_limitations?.length > 0 && (
+        <Section title="מגבלות נתונים שיש לקחת בחשבון" emoji="📋" tone="neutral">
+          <ul style={{ margin: 0, paddingInlineStart: 22, fontSize: 13.5, lineHeight: 1.8 }}>
+            {data.data_limitations.map((p, i) => (
+              <li key={i} style={{ color: "#475569", marginBottom: 6 }}>{p}</li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {/* ── 3. תמונת מאקרו ── */}
+      {data.macro_picture && (
         <Section title="התמונה הכוללת" emoji="📌" tone="primary">
-          <p style={{
-            fontSize: 18, lineHeight: 1.7, color: "#0f172a",
-            fontWeight: 500, margin: 0,
-          }}>
+          <p style={{ fontSize: 16, lineHeight: 1.8, color: "#0f172a",
+                      fontWeight: 400, margin: 0 }}>
+            {data.macro_picture}
+          </p>
+        </Section>
+      )}
+
+      {data.headline && data.headline !== data.macro_picture && (
+        <Section title="כותרת מרכזית" emoji="🎯" tone="primary">
+          <p style={{ fontSize: 18, lineHeight: 1.7, color: "#0f172a",
+                      fontWeight: 500, margin: 0 }}>
             {data.headline}
           </p>
         </Section>
       )}
 
-      {data.biggest_alert && (
-        <Section title="הממצא הכי בולט" emoji="⚠️" tone="alert">
-          <p style={{ fontSize: 15, lineHeight: 1.7, color: "#7c2d12", margin: 0 }}>
-            {data.biggest_alert}
-          </p>
+      {/* ── 4. מסע הלקוח ── */}
+      {data.customer_journey_findings?.length > 0 && (
+        <Section title="מסע הלקוח: התעניינות → ליד → הרשמה → קורס" emoji="🛤️" tone="neutral">
+          <ul style={{ margin: 0, paddingInlineStart: 22, fontSize: 14, lineHeight: 1.85 }}>
+            {data.customer_journey_findings.map((p, i) => (
+              <li key={i} style={{ color: "#1e293b", marginBottom: 8 }}>{p}</li>
+            ))}
+          </ul>
         </Section>
       )}
 
+      {/* ── 5. פרופיל קהל ── */}
+      {data.demographic_findings?.length > 0 && (
+        <Section title="פרופיל הקהל (גילאים, קורסים, מקורות)" emoji="👥" tone="neutral">
+          <ul style={{ margin: 0, paddingInlineStart: 22, fontSize: 14, lineHeight: 1.85 }}>
+            {data.demographic_findings.map((p, i) => (
+              <li key={i} style={{ color: "#1e293b", marginBottom: 8 }}>{p}</li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {/* ── 6. ממצאים מספריים ── */}
       {data.key_points?.length > 0 && (
-        <Section title="ממצאים מרכזיים" emoji="🔑">
+        <Section title="ממצאים מספריים מרכזיים" emoji="🔑">
           <ul style={{ margin: 0, paddingInlineStart: 22, fontSize: 14, lineHeight: 1.85 }}>
             {data.key_points.map((p, i) => (
               <li key={i} style={{ color: "#1e293b", marginBottom: 8 }}>{p}</li>
             ))}
           </ul>
+        </Section>
+      )}
+
+      {/* ── 7. ממצאים מאוששים מריצות קודמות ── */}
+      {data.validated_findings?.length > 0 && (
+        <Section title="ממצאים מאוששים (מצטברים על פני ריצות)" emoji="✅" tone="neutral">
+          <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px" }}>
+            ממצאים שהאנליסטים אישרו במספר ריצות. ככל שהמספר גדל — הוודאות עולה.
+          </p>
+          <ul style={{ margin: 0, paddingInlineStart: 22, fontSize: 13.5, lineHeight: 1.85 }}>
+            {data.validated_findings.map((f, i) => (
+              <li key={i} style={{ color: "#1e293b", marginBottom: 8 }}>
+                <strong style={{ color: "#1e40af" }}>[{f.topic}]</strong> {f.finding}
+                {f.run_count > 1 && (
+                  <span style={{ color: "#16a34a", fontSize: 11, marginInlineStart: 6 }}>
+                    ({f.run_count}× אומת)
+                  </span>
+                )}
+                {f.evidence && (
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                    {f.evidence}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {/* ── 8. התראה ── */}
+      {data.biggest_alert && (
+        <Section title="הממצא הכי בולט" emoji="⚠️" tone="alert">
+          <p style={{ fontSize: 15, lineHeight: 1.7, color: "#7c2d12", margin: 0 }}>
+            {data.biggest_alert}
+          </p>
         </Section>
       )}
 
