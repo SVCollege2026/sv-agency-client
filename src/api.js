@@ -121,6 +121,10 @@ export async function getStage0History() {
   return request("GET", "/api/dashboard/stage0-history");
 }
 
+export async function getBaselineFacts() {
+  return request("GET", "/api/dashboard/baseline-facts");
+}
+
 /** All structured analytics — full dashboard data */
 export async function getAnalytics() {
   return request("GET", "/api/dashboard/analytics");
