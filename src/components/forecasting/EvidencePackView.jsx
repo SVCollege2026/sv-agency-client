@@ -24,7 +24,7 @@ export default function EvidencePackView({ pack, defaultOpen = false }) {
     <div dir="rtl" style={{
       border: "1px solid #1e3a5f",
       borderRadius: 10,
-      background: "#0d1626",
+      background: "#f8fafc",
       marginTop: 12,
     }}>
       <button
@@ -32,7 +32,7 @@ export default function EvidencePackView({ pack, defaultOpen = false }) {
         onClick={() => setOpen(!open)}
         style={{
           width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
-          background: "transparent", border: "none", color: "#e2e8f0",
+          background: "transparent", border: "none", color: "#0f172a",
           padding: "12px 16px", cursor: "pointer", fontSize: 14, fontWeight: 600, textAlign: "right",
         }}
       >
@@ -46,7 +46,7 @@ export default function EvidencePackView({ pack, defaultOpen = false }) {
       </button>
 
       {open && (
-        <div style={{ padding: "0 16px 16px", fontSize: 13, color: "#cbd5e1" }}>
+        <div style={{ padding: "0 16px 16px", fontSize: 13, color: "#0f172a" }}>
           <Section title="מקורות" items={sources} empty="לא צוינו מקורות" />
           <Section
             title="טווחי תאריכים"
@@ -61,12 +61,12 @@ export default function EvidencePackView({ pack, defaultOpen = false }) {
   );
 }
 
-function Section({ title, items, color = "#cbd5e1", empty = "—" }) {
+function Section({ title, items, color = "#e2e8f0", empty = "—" }) {
   return (
     <div style={{ marginTop: 10 }}>
-      <div style={{ color: "#94a3b8", fontWeight: 600, marginBottom: 6, fontSize: 12 }}>{title}</div>
+      <div style={{ color: "#64748b", fontWeight: 600, marginBottom: 6, fontSize: 12 }}>{title}</div>
       {!items || items.length === 0 ? (
-        <div style={{ color: "#475569", fontSize: 12 }}>{empty}</div>
+        <div style={{ color: "#64748b", fontSize: 12 }}>{empty}</div>
       ) : (
         <ul style={{ margin: 0, padding: "0 18px 0 0", color }}>
           {items.map((it, i) => (

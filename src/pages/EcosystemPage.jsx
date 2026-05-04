@@ -19,7 +19,7 @@ async function fetchSynthesis() {
 const Section = ({ title, icon, children, defaultOpen = true }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div style={{ background: "#0d1626", border: "1px solid #1e293b", borderRadius: 12, marginBottom: 16, overflow: "hidden" }}>
+    <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, marginBottom: 16, overflow: "hidden" }}>
       <button
         type="button"
         aria-expanded={open}
@@ -31,11 +31,11 @@ const Section = ({ title, icon, children, defaultOpen = true }) => {
         }}
       >
         <span style={{ fontSize: 18 }}>{icon}</span>
-        <span style={{ flex: 1, color: "#e2e8f0", fontSize: 15, fontWeight: 600 }}>{title}</span>
-        <span style={{ color: "#475569", fontSize: 12 }}>{open ? "▲" : "▼"}</span>
+        <span style={{ flex: 1, color: "#0f172a", fontSize: 15, fontWeight: 600 }}>{title}</span>
+        <span style={{ color: "#64748b", fontSize: 12 }}>{open ? "▲" : "▼"}</span>
       </button>
       {open && (
-        <div style={{ padding: "0 20px 20px", borderTop: "1px solid #1e293b" }}>
+        <div style={{ padding: "0 20px 20px", borderTop: "1px solid #e2e8f0" }}>
           {children}
         </div>
       )}
@@ -45,10 +45,10 @@ const Section = ({ title, icon, children, defaultOpen = true }) => {
 
 const Badge = ({ text, variant = "default" }) => {
   const styles = {
-    default:  { background: "#1e293b", color: "#94a3b8" },
+    default:  { background: "#e2e8f0", color: "#64748b" },
     ok:       { background: "#064e3b", color: "#6ee7b7" },
-    warn:     { background: "#431a03", color: "#fcd34d" },
-    danger:   { background: "#450a0a", color: "#fca5a5" },
+    warn:     { background: "#431a03", color: "#ca8a04" },
+    danger:   { background: "#450a0a", color: "#dc2626" },
   };
   const s = styles[variant] || styles.default;
   return (
@@ -61,7 +61,7 @@ const Badge = ({ text, variant = "default" }) => {
 // ─── Sub-sections ─────────────────────────────────────────────────────────────
 
 function KeyFindings({ findings }) {
-  if (!findings?.length) return <p style={{ color: "#475569", fontSize: 13 }}>אין ממצאים זמינים.</p>;
+  if (!findings?.length) return <p style={{ color: "#64748b", fontSize: 13 }}>אין ממצאים זמינים.</p>;
   return (
     <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
       {findings.map((f, i) => (
@@ -73,7 +73,7 @@ function KeyFindings({ findings }) {
           }}
         >
           <span style={{ color: "#3b82f6", fontSize: 16, flexShrink: 0, marginTop: 2 }}>✦</span>
-          <p style={{ margin: 0, color: "#cbd5e1", fontSize: 13, lineHeight: 1.7 }}>
+          <p style={{ margin: 0, color: "#0f172a", fontSize: 13, lineHeight: 1.7 }}>
             {typeof f === "string" ? f : f.finding ?? JSON.stringify(f)}
           </p>
         </li>
@@ -83,9 +83,9 @@ function KeyFindings({ findings }) {
 }
 
 function SynthesisText({ text }) {
-  if (!text) return <p style={{ color: "#475569", fontSize: 13 }}>אין סיכום זמין.</p>;
+  if (!text) return <p style={{ color: "#64748b", fontSize: 13 }}>אין סיכום זמין.</p>;
   return (
-    <div style={{ color: "#cbd5e1", fontSize: 13, lineHeight: 1.9, whiteSpace: "pre-wrap" }}>
+    <div style={{ color: "#0f172a", fontSize: 13, lineHeight: 1.9, whiteSpace: "pre-wrap" }}>
       {text}
     </div>
   );
@@ -98,7 +98,7 @@ function SourcesValidation({ validation = [], urlReport = [] }) {
     return m;
   }, [urlReport]);
 
-  if (!validation.length) return <p style={{ color: "#475569", fontSize: 13 }}>אין נתוני ולידציה.</p>;
+  if (!validation.length) return <p style={{ color: "#64748b", fontSize: 13 }}>אין נתוני ולידציה.</p>;
   return (
     <div>
       {validation.map((v, i) => {
@@ -108,13 +108,13 @@ function SourcesValidation({ validation = [], urlReport = [] }) {
           <div
             key={i}
             style={{
-              background: "#080e1a", border: `1px solid ${isApproved ? "#064e3b" : "#450a0a"}`,
+              background: "#f8fafc", border: `1px solid ${isApproved ? "#064e3b" : "#450a0a"}`,
               borderRadius: 8, padding: "12px 14px", marginBottom: 10,
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
               <Badge text={isApproved ? "✓ אושר" : "✗ נדחה"} variant={isApproved ? "ok" : "danger"} />
-              <p style={{ margin: 0, color: "#94a3b8", fontSize: 12, flex: 1 }}>{v.query}</p>
+              <p style={{ margin: 0, color: "#64748b", fontSize: 12, flex: 1 }}>{v.query}</p>
             </div>
             {v.reasoning && (
               <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>נימוק: {v.reasoning}</p>
@@ -128,7 +128,7 @@ function SourcesValidation({ validation = [], urlReport = [] }) {
                   </a>
                 ))}
                 {urls.broken_urls?.map(u => (
-                  <span key={u} style={{ fontSize: 10, color: "#fca5a5", background: "#450a0a", borderRadius: 4, padding: "1px 6px" }}>
+                  <span key={u} style={{ fontSize: 10, color: "#dc2626", background: "#450a0a", borderRadius: 4, padding: "1px 6px" }}>
                     ✗ {u.slice(0, 40)}…
                   </span>
                 ))}
@@ -143,7 +143,7 @@ function SourcesValidation({ validation = [], urlReport = [] }) {
 
 function DebateRounds({ rounds = [] }) {
   const [openRound, setOpenRound] = useState(null);
-  if (!rounds.length) return <p style={{ color: "#475569", fontSize: 13 }}>אין סיבובי דיבייט זמינים.</p>;
+  if (!rounds.length) return <p style={{ color: "#64748b", fontSize: 13 }}>אין סיבובי דיבייט זמינים.</p>;
   return (
     <div>
       <p style={{ color: "#64748b", fontSize: 12, margin: "0 0 12px" }}>
@@ -157,21 +157,21 @@ function DebateRounds({ rounds = [] }) {
             onClick={() => setOpenRound(openRound === r.round ? null : r.round)}
             style={{
               width: "100%", display: "flex", alignItems: "center", gap: 10,
-              padding: "10px 14px", background: "#080e1a", border: "1px solid #1e293b",
+              padding: "10px 14px", background: "#f8fafc", border: "1px solid #e2e8f0",
               borderRadius: 8, cursor: "pointer", direction: "rtl", textAlign: "right",
             }}
           >
             <span style={{ color: "#3b82f6", fontSize: 12, fontWeight: 600 }}>סיבוב {r.round}</span>
             {r.analyst_trends_failed && <Badge text="שגיאה בסיבוב זה" variant="warn" />}
             <span style={{ flex: 1 }} />
-            <span style={{ color: "#475569", fontSize: 11 }}>{openRound === r.round ? "▲" : "▼"}</span>
+            <span style={{ color: "#64748b", fontSize: 11 }}>{openRound === r.round ? "▲" : "▼"}</span>
           </button>
           {openRound === r.round && (
-            <div style={{ border: "1px solid #1e293b", borderTop: "none", borderRadius: "0 0 8px 8px", background: "#080e1a", padding: 16 }}>
+            <div style={{ border: "1px solid #e2e8f0", borderTop: "none", borderRadius: "0 0 8px 8px", background: "#f8fafc", padding: 16 }}>
               <p style={{ color: "#3b82f6", fontSize: 12, fontWeight: 600, margin: "0 0 8px" }}>מגמות חיצוניות:</p>
-              <p style={{ color: "#94a3b8", fontSize: 12, lineHeight: 1.8, whiteSpace: "pre-wrap", margin: "0 0 16px" }}>{r.analyst_trends}</p>
+              <p style={{ color: "#64748b", fontSize: 12, lineHeight: 1.8, whiteSpace: "pre-wrap", margin: "0 0 16px" }}>{r.analyst_trends}</p>
               <p style={{ color: "#10b981", fontSize: 12, fontWeight: 600, margin: "0 0 8px" }}>תרגום עסקי:</p>
-              <p style={{ color: "#94a3b8", fontSize: 12, lineHeight: 1.8, whiteSpace: "pre-wrap", margin: 0 }}>{r.analyst_business}</p>
+              <p style={{ color: "#64748b", fontSize: 12, lineHeight: 1.8, whiteSpace: "pre-wrap", margin: 0 }}>{r.analyst_business}</p>
             </div>
           )}
         </div>
@@ -204,7 +204,7 @@ export default function EcosystemPage() {
   if (error || !data?.available) return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60vh", gap: 12, direction: "rtl", textAlign: "center" }}>
       <span style={{ fontSize: 36 }}>🌐</span>
-      <p style={{ color: "#e2e8f0", fontSize: 16, fontWeight: 600, margin: 0 }}>
+      <p style={{ color: "#0f172a", fontSize: 16, fontWeight: 600, margin: 0 }}>
         אין נתוני אקו-סיסטם עדיין
       </p>
       <p style={{ color: "#64748b", fontSize: 13, margin: 0, maxWidth: 340 }}>
@@ -214,7 +214,7 @@ export default function EcosystemPage() {
       <button
         type="button"
         onClick={() => navigate("/analytics/analysis")}
-        style={{ background: "#1e3a5f", color: "#93c5fd", border: "1px solid #2d4a6e", borderRadius: 8, padding: "10px 24px", cursor: "pointer", fontSize: 14, marginTop: 4 }}
+        style={{ background: "#1e3a5f", color: "#1e40af", border: "1px solid #2d4a6e", borderRadius: 8, padding: "10px 24px", cursor: "pointer", fontSize: 14, marginTop: 4 }}
       >
         ← עבור לדף הניתוח
       </button>
@@ -231,7 +231,7 @@ export default function EcosystemPage() {
   const flagged = hallucination_check?.flagged_claims ?? [];
 
   return (
-    <div lang="he" style={{ padding: "24px 20px", maxWidth: 900, margin: "0 auto", direction: "rtl", color: "#e2e8f0", fontFamily: "'Segoe UI', sans-serif" }}>
+    <div lang="he" style={{ padding: "24px 20px", maxWidth: 900, margin: "0 auto", direction: "rtl", color: "#0f172a", fontFamily: "'Segoe UI', sans-serif" }}>
 
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
@@ -244,7 +244,7 @@ export default function EcosystemPage() {
       {/* Hallucination warning */}
       {flagged.length > 0 && (
         <div style={{ background: "#1c0f03", border: "1px solid #92400e", borderRadius: 10, padding: "12px 16px", marginBottom: 20 }}>
-          <p style={{ margin: "0 0 8px", color: "#fcd34d", fontWeight: 600, fontSize: 13 }}>
+          <p style={{ margin: "0 0 8px", color: "#ca8a04", fontWeight: 600, fontSize: 13 }}>
             ✱ בודק הזיות דגל {flagged.length} טענות שלא אומתו במקורות:
           </p>
           <ul style={{ margin: 0, padding: "0 20px" }}>
@@ -269,12 +269,12 @@ export default function EcosystemPage() {
       {additional_fetches?.length > 0 && (
         <Section title={`מידע נוסף שנבקש במהלך הדיבייט (${additional_fetches.length})`} icon="📡" defaultOpen={false}>
           {additional_fetches.map((f, i) => (
-            <div key={i} style={{ background: "#080e1a", border: "1px solid #1e293b", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
+            <div key={i} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
               <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
                 <Badge text={`סיבוב ${f.round}`} />
                 <Badge text={f.validated ? "✓ אושר" : "✗ לא אומת"} variant={f.validated ? "ok" : "warn"} />
               </div>
-              <p style={{ margin: "0 0 4px", color: "#94a3b8", fontSize: 12 }}><strong>שאילתה:</strong> {f.query}</p>
+              <p style={{ margin: "0 0 4px", color: "#64748b", fontSize: 12 }}><strong>שאילתה:</strong> {f.query}</p>
               {f.rejected_urls?.length > 0 && (
                 <p style={{ margin: 0, color: "#ef4444", fontSize: 11 }}>קישורים שבורים: {f.rejected_urls.join(", ")}</p>
               )}

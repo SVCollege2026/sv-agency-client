@@ -186,7 +186,7 @@ function fmtDelta(d) {
 }
 function deltaColor(d) {
   if (d == null || d === 0) return "#94a3b8";
-  return d > 0 ? "#86efac" : "#fca5a5";
+  return d > 0 ? "#16a34a" : "#dc2626";
 }
 
 // Metrics list — תואם בדיוק ל-METRICS שב-build_monthly_comparison.py:325-374
@@ -292,9 +292,9 @@ function MonthlyKpiView() {
       style={{
         padding: "8px 16px", fontSize: 13, fontWeight: 600,
         borderRadius: 8, cursor: "pointer",
-        background: tab === id ? "#1e3a5f" : "#0d1626",
-        color:      tab === id ? "#e2e8f0" : "#64748b",
-        border: `1px solid ${tab === id ? "#3b82f6" : "#1e293b"}`,
+        background: tab === id ? "#1e3a5f" : "#ffffff",
+        color:      tab === id ? "#ffffff" : "#64748b",
+        border: `1px solid ${tab === id ? "#1e3a5f" : "#cbd5e1"}`,
       }}>{label}</button>
   );
 
@@ -307,8 +307,8 @@ function MonthlyKpiView() {
         <span style={{ marginInlineStart: 12, fontSize: 12, color: "#64748b" }}>השוואה:</span>
         <select value={currYear} onChange={(e) => setCurrYear(Number(e.target.value))}
           style={{
-            background: "#0d1626", border: "1px solid #1e3a5f",
-            color: "#cbd5e1", borderRadius: 6, padding: "6px 10px", fontSize: 13,
+            background: "#f1f5f9", border: "1px solid #1e3a5f",
+            color: "#0f172a", borderRadius: 6, padding: "6px 10px", fontSize: 13,
           }}>
           {[2024, 2025, 2026].map((y) => (
             <option key={y} value={y}>{y - 1} מול {y}</option>
@@ -318,8 +318,8 @@ function MonthlyKpiView() {
         {tab === "courses" && (
           <select value={courseMetric} onChange={(e) => setCourseMetric(e.target.value)}
             style={{
-              background: "#0d1626", border: "1px solid #1e3a5f",
-              color: "#cbd5e1", borderRadius: 6, padding: "6px 10px", fontSize: 13,
+              background: "#f1f5f9", border: "1px solid #1e3a5f",
+              color: "#0f172a", borderRadius: 6, padding: "6px 10px", fontSize: 13,
             }}>
             {COURSE_METRICS.map((m) => (
               <option key={m.id} value={m.id}>{m.label}</option>
@@ -341,15 +341,15 @@ function MonthlyKpiView() {
 
       {actionMsg && (
         <div style={{
-          background: actionMsg.startsWith("✗") ? "#1a0c0c" : "#0c1a0e",
-          border:     `1px solid ${actionMsg.startsWith("✗") ? "#7f1d1d" : "#166534"}`,
-          color:      actionMsg.startsWith("✗") ? "#fca5a5" : "#86efac",
+          background: actionMsg.startsWith("✗") ? "#fef2f2" : "#f0fdf4",
+          border:     `1px solid ${actionMsg.startsWith("✗") ? "#fecaca" : "#bbf7d0"}`,
+          color:      actionMsg.startsWith("✗") ? "#991b1b" : "#15803d",
           borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 12,
         }}>{actionMsg}</div>
       )}
 
       {error && (
-        <div style={{ background: "#1a0c0c", border: "1px solid #7f1d1d", color: "#fca5a5",
+        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626",
                       padding: 10, borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
           ⚠ {error}
         </div>
@@ -402,18 +402,18 @@ function SchoolKpiTable({ rows, currYear }) {
   const subYearShort = (y) => String(y).slice(-2);
 
   return (
-    <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, overflow: "hidden" }}>
+    <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-          <thead style={{ background: "#0d1626", position: "sticky", top: 0 }}>
+          <thead style={{ background: "#f1f5f9", position: "sticky", top: 0 }}>
             {/* Row 1: months (each colSpan=3) */}
             <tr>
               <th rowSpan={2} style={{ ...thStyle, minWidth: 280, textAlign: "right",
-                  borderInlineEnd: "1px solid #1e293b", background: "#0d1626" }}>מטריקה</th>
+                  borderInlineEnd: "1px solid #cbd5e1", background: "#f1f5f9" }}>מטריקה</th>
               {monthsToShow.map((m) => (
                 <th key={m} colSpan={3} style={{ ...thStyle, textAlign: "center",
-                    borderInlineEnd: "1px solid #1e293b", color: "#93c5fd",
-                    background: "#101a2c", fontSize: 13 }}>
+                    borderInlineEnd: "1px solid #cbd5e1", color: "#1e40af",
+                    background: "#f8fafc", fontSize: 13 }}>
                   {HEB_MONTHS_FULL[m - 1]}
                 </th>
               ))}
@@ -422,14 +422,14 @@ function SchoolKpiTable({ rows, currYear }) {
             <tr>
               {monthsToShow.flatMap((m) => [
                 <th key={`${m}-prev`} style={{ ...thStyle, textAlign: "center",
-                    color: "#94a3b8", borderInlineStart: "1px solid #1e293b" }}>
+                    color: "#64748b", borderInlineStart: "1px solid #e2e8f0" }}>
                   '{subYearShort(prevYear)}
                 </th>,
-                <th key={`${m}-curr`} style={{ ...thStyle, textAlign: "center", color: "#94a3b8" }}>
+                <th key={`${m}-curr`} style={{ ...thStyle, textAlign: "center", color: "#64748b" }}>
                   '{subYearShort(currYear)}
                 </th>,
                 <th key={`${m}-delta`} style={{ ...thStyle, textAlign: "center",
-                    color: "#94a3b8", borderInlineEnd: "1px solid #1e293b" }}>Δ%</th>,
+                    color: "#64748b", borderInlineEnd: "1px solid #cbd5e1" }}>Δ%</th>,
               ])}
             </tr>
           </thead>
@@ -437,9 +437,9 @@ function SchoolKpiTable({ rows, currYear }) {
             {SCHOOL_METRICS.map((row, idx) => {
               if (row.group) {
                 return (
-                  <tr key={`g-${idx}`} style={{ background: "#0d1f3a", borderTop: "1px solid #1e3a5f" }}>
+                  <tr key={`g-${idx}`} style={{ background: "#dbeafe", borderTop: "1px solid #1e3a5f" }}>
                     <td colSpan={1 + monthsToShow.length * 3}
-                        style={{ padding: "8px 12px", fontWeight: 700, color: "#93c5fd", fontSize: 12 }}>
+                        style={{ padding: "8px 12px", fontWeight: 700, color: "#1e40af", fontSize: 12 }}>
                       {row.label}
                     </td>
                   </tr>
@@ -447,13 +447,13 @@ function SchoolKpiTable({ rows, currYear }) {
               }
               return (
                 <tr key={row.key} style={{
-                  borderTop: "1px solid #101a2c",
-                  background: row.total ? "#101a2c" : "transparent",
+                  borderTop: "1px solid #f1f5f9",
+                  background: row.total ? "#f1f5f9" : "transparent",
                   fontWeight: row.total ? 700 : 400,
-                  color: row.total ? "#e2e8f0" : "#cbd5e1",
+                  color: row.total ? "#0f172a" : "#1e293b",
                 }}>
                   <td style={{ ...tdStyle, textAlign: "right",
-                       borderInlineEnd: "1px solid #1e293b", whiteSpace: "nowrap" }}>{row.label}</td>
+                       borderInlineEnd: "1px solid #cbd5e1", whiteSpace: "nowrap" }}>{row.label}</td>
                   {monthsToShow.map((m) => {
                     const prevRow = byYearMonth[prevYear]?.[m];
                     const currRow = byYearMonth[currYear]?.[m];
@@ -462,11 +462,11 @@ function SchoolKpiTable({ rows, currYear }) {
                     const d   = pctChange(v25, v26);
                     return [
                       <td key={`${m}-p`} style={{ ...tdStyle, textAlign: "center",
-                          borderInlineStart: "1px solid #1e293b" }}>{fmtMetric(v25, row.kind)}</td>,
+                          borderInlineStart: "1px solid #e2e8f0" }}>{fmtMetric(v25, row.kind)}</td>,
                       <td key={`${m}-c`} style={{ ...tdStyle, textAlign: "center" }}>{fmtMetric(v26, row.kind)}</td>,
                       <td key={`${m}-d`} style={{ ...tdStyle, textAlign: "center",
                           color: deltaColor(d), fontWeight: 600,
-                          borderInlineEnd: "1px solid #1e293b" }}>{fmtDelta(d)}</td>,
+                          borderInlineEnd: "1px solid #cbd5e1" }}>{fmtDelta(d)}</td>,
                     ];
                   })}
                 </tr>
@@ -534,20 +534,20 @@ function CoursesKpiTable({ rows, currYear, metricId }) {
   }
 
   return (
-    <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, overflow: "hidden" }}>
-      <div style={{ padding: "10px 14px", color: "#64748b", fontSize: 12, borderBottom: "1px solid #1e293b" }}>
-        מציג: <span style={{ color: "#93c5fd", fontWeight: 600 }}>{metricLabel}</span> · השוואה {prevYear} מול {currYear}
+    <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ padding: "10px 14px", color: "#64748b", fontSize: 12, borderBottom: "1px solid #e2e8f0" }}>
+        מציג: <span style={{ color: "#1e40af", fontWeight: 600 }}>{metricLabel}</span> · השוואה {prevYear} מול {currYear}
       </div>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-          <thead style={{ background: "#0d1626" }}>
+          <thead style={{ background: "#f1f5f9" }}>
             <tr>
               <th rowSpan={2} style={{ ...thStyle, minWidth: 180, textAlign: "right",
-                  borderInlineEnd: "1px solid #1e293b", background: "#0d1626" }}>קורס</th>
+                  borderInlineEnd: "1px solid #cbd5e1", background: "#f1f5f9" }}>קורס</th>
               {monthsToShow.map((m) => (
                 <th key={m} colSpan={3} style={{ ...thStyle, textAlign: "center",
-                    borderInlineEnd: "1px solid #1e293b", color: "#93c5fd",
-                    background: "#101a2c", fontSize: 13 }}>
+                    borderInlineEnd: "1px solid #cbd5e1", color: "#1e40af",
+                    background: "#f8fafc", fontSize: 13 }}>
                   {HEB_MONTHS_FULL[m - 1]}
                 </th>
               ))}
@@ -555,45 +555,45 @@ function CoursesKpiTable({ rows, currYear, metricId }) {
             <tr>
               {monthsToShow.flatMap((m) => [
                 <th key={`${m}-p`} style={{ ...thStyle, textAlign: "center",
-                    color: "#94a3b8", borderInlineStart: "1px solid #1e293b" }}>'{subYearShort(prevYear)}</th>,
-                <th key={`${m}-c`} style={{ ...thStyle, textAlign: "center", color: "#94a3b8" }}>'{subYearShort(currYear)}</th>,
+                    color: "#64748b", borderInlineStart: "1px solid #e2e8f0" }}>'{subYearShort(prevYear)}</th>,
+                <th key={`${m}-c`} style={{ ...thStyle, textAlign: "center", color: "#64748b" }}>'{subYearShort(currYear)}</th>,
                 <th key={`${m}-d`} style={{ ...thStyle, textAlign: "center",
-                    color: "#94a3b8", borderInlineEnd: "1px solid #1e293b" }}>Δ%</th>,
+                    color: "#64748b", borderInlineEnd: "1px solid #cbd5e1" }}>Δ%</th>,
               ])}
             </tr>
           </thead>
           <tbody>
             {courseList.map((course) => (
-              <tr key={course} style={{ borderTop: "1px solid #101a2c", color: "#cbd5e1" }}>
-                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: "#93c5fd",
-                     borderInlineEnd: "1px solid #1e293b" }}>{course}</td>
+              <tr key={course} style={{ borderTop: "1px solid #f1f5f9", color: "#0f172a" }}>
+                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: "#1e40af",
+                     borderInlineEnd: "1px solid #cbd5e1" }}>{course}</td>
                 {monthsToShow.map((m) => {
                   const v25 = byCourse[course]?.[prevYear]?.[m]?.[metricId] ?? null;
                   const v26 = byCourse[course]?.[currYear]?.[m]?.[metricId] ?? null;
                   const d   = pctChange(v25, v26);
                   return [
                     <td key={`${m}-p`} style={{ ...tdStyle, textAlign: "center",
-                         borderInlineStart: "1px solid #1e293b" }}>{fmtMetric(v25, "n")}</td>,
+                         borderInlineStart: "1px solid #e2e8f0" }}>{fmtMetric(v25, "n")}</td>,
                     <td key={`${m}-c`} style={{ ...tdStyle, textAlign: "center" }}>{fmtMetric(v26, "n")}</td>,
                     <td key={`${m}-d`} style={{ ...tdStyle, textAlign: "center", color: deltaColor(d),
-                         fontWeight: 600, borderInlineEnd: "1px solid #1e293b" }}>{fmtDelta(d)}</td>,
+                         fontWeight: 600, borderInlineEnd: "1px solid #cbd5e1" }}>{fmtDelta(d)}</td>,
                   ];
                 })}
               </tr>
             ))}
             {/* סה"כ בית הספר */}
-            <tr style={{ borderTop: "2px solid #1e3a5f", background: "#101a2c", fontWeight: 700, color: "#e2e8f0" }}>
-              <td style={{ ...tdStyle, textAlign: "right", borderInlineEnd: "1px solid #1e293b" }}>סה"כ בית הספר</td>
+            <tr style={{ borderTop: "2px solid #1e3a5f", background: "#f8fafc", fontWeight: 700, color: "#0f172a" }}>
+              <td style={{ ...tdStyle, textAlign: "right", borderInlineEnd: "1px solid #cbd5e1" }}>סה"כ בית הספר</td>
               {monthsToShow.map((m) => {
                 const v25 = totals[prevYear][m];
                 const v26 = totals[currYear][m];
                 const d   = pctChange(v25, v26);
                 return [
                   <td key={`${m}-p`} style={{ ...tdStyle, textAlign: "center",
-                       borderInlineStart: "1px solid #1e293b" }}>{fmtMetric(v25, "n")}</td>,
+                       borderInlineStart: "1px solid #e2e8f0" }}>{fmtMetric(v25, "n")}</td>,
                   <td key={`${m}-c`} style={{ ...tdStyle, textAlign: "center" }}>{fmtMetric(v26, "n")}</td>,
                   <td key={`${m}-d`} style={{ ...tdStyle, textAlign: "center", color: deltaColor(d),
-                       fontWeight: 700, borderInlineEnd: "1px solid #1e293b" }}>{fmtDelta(d)}</td>,
+                       fontWeight: 700, borderInlineEnd: "1px solid #cbd5e1" }}>{fmtDelta(d)}</td>,
                 ];
               })}
             </tr>
@@ -809,16 +809,16 @@ export default function MediaReportsPage() {
       dir="rtl"
       style={{
         minHeight:  "calc(100vh - 56px)",
-        background: "#060d1a",
-        color:      "#e2e8f0",
+        background: "#ffffff",
+        color:      "#0f172a",
         fontFamily: "'Segoe UI', sans-serif",
       }}
     >
       {/* ── Sub-nav (minimal, back-to-portal) ── */}
       <div
         style={{
-          background:   "#0a1628",
-          borderBottom: "1px solid #1e293b",
+          background:   "#ffffff",
+          borderBottom: "1px solid #e2e8f0",
           padding:      "0 16px",
           display:      "flex",
           alignItems:   "center",
@@ -827,7 +827,7 @@ export default function MediaReportsPage() {
       >
         <div style={{ padding: "11px 14px", display: "flex", alignItems: "center", gap: 8 }}>
           <span>📣</span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#93c5fd" }}>מחלקת מדיה · דוחות</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#1e40af" }}>מחלקת מדיה · דוחות</span>
         </div>
         <button
           type="button"
@@ -835,11 +835,11 @@ export default function MediaReportsPage() {
           style={{
             display: "flex", alignItems: "center", gap: 5,
             padding: "7px 12px", marginRight: 8, fontSize: 12,
-            color: "#475569", background: "none",
-            border: "1px solid #1e293b", borderRadius: 7, cursor: "pointer",
+            color: "#64748b", background: "none",
+            border: "1px solid #e2e8f0", borderRadius: 7, cursor: "pointer",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "#93c5fd"; e.currentTarget.style.borderColor = "#3b82f6"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "#475569"; e.currentTarget.style.borderColor = "#1e293b"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "#1e40af"; e.currentTarget.style.borderColor = "#3b82f6"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "#475569"; e.currentTarget.style.borderColor = "#cbd5e1"; }}
         >
           ⌂ פורטל
         </button>
@@ -849,7 +849,7 @@ export default function MediaReportsPage() {
         {/* ── Header ── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "#e2e8f0" }}>דוחות מדיה</h1>
+            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "#0f172a" }}>דוחות מדיה</h1>
             <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>
               נתונים גולמיים ל-Meta / Google + לידים מ-Fireberry · שלב א' — ללא המלצות
             </p>
@@ -858,7 +858,7 @@ export default function MediaReportsPage() {
             type="button"
             onClick={() => setShowRuns((v) => !v)}
             style={{
-              background: "#0d1626", border: "1px solid #1e3a5f", color: "#93c5fd",
+              background: "#f1f5f9", border: "1px solid #1e3a5f", color: "#1e40af",
               borderRadius: 8, padding: "8px 14px", fontSize: 12, cursor: "pointer",
             }}
           >
@@ -876,9 +876,9 @@ export default function MediaReportsPage() {
               style={{
                 padding: "8px 18px", fontSize: 13, fontWeight: 600,
                 borderRadius: 8, cursor: "pointer",
-                background: mode === m.id ? "#1e3a5f" : "#0d1626",
-                color:      mode === m.id ? "#e2e8f0" : "#64748b",
-                border: `1px solid ${mode === m.id ? "#3b82f6" : "#1e293b"}`,
+                background: mode === m.id ? "#1e3a5f" : "#ffffff",
+                color:      mode === m.id ? "#ffffff" : "#64748b",
+                border: `1px solid ${mode === m.id ? "#1e3a5f" : "#cbd5e1"}`,
                 transition: "all 0.15s",
               }}
             >
@@ -889,12 +889,12 @@ export default function MediaReportsPage() {
 
         {/* ── Filters ── */}
         <div style={{
-          background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10,
+          background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10,
           padding: "14px 16px", marginBottom: 16,
           display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
         }}>
           {mode === "daily" && (
-            <label style={{ fontSize: 13, color: "#94a3b8", display: "flex", alignItems: "center", gap: 6 }}>
+            <label style={{ fontSize: 13, color: "#64748b", display: "flex", alignItems: "center", gap: 6 }}>
               תאריך:
               <input type="date" value={day} onChange={(e) => setDay(e.target.value)}
                 style={dateInputStyle} />
@@ -902,11 +902,11 @@ export default function MediaReportsPage() {
           )}
           {mode === "weekly" && (
             <>
-              <label style={{ fontSize: 13, color: "#94a3b8", display: "flex", alignItems: "center", gap: 6 }}>
+              <label style={{ fontSize: 13, color: "#64748b", display: "flex", alignItems: "center", gap: 6 }}>
                 מ:
                 <input type="date" value={weekStart} onChange={(e) => setWeekStart(e.target.value)} style={dateInputStyle} />
               </label>
-              <label style={{ fontSize: 13, color: "#94a3b8", display: "flex", alignItems: "center", gap: 6 }}>
+              <label style={{ fontSize: 13, color: "#64748b", display: "flex", alignItems: "center", gap: 6 }}>
                 עד:
                 <input type="date" value={weekEnd} onChange={(e) => setWeekEnd(e.target.value)} style={dateInputStyle} />
               </label>
@@ -917,18 +917,18 @@ export default function MediaReportsPage() {
           )}
           {mode === "range" && (
             <>
-              <label style={{ fontSize: 13, color: "#94a3b8", display: "flex", alignItems: "center", gap: 6 }}>
+              <label style={{ fontSize: 13, color: "#64748b", display: "flex", alignItems: "center", gap: 6 }}>
                 מ:
                 <input type="date" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)} style={dateInputStyle} />
               </label>
-              <label style={{ fontSize: 13, color: "#94a3b8", display: "flex", alignItems: "center", gap: 6 }}>
+              <label style={{ fontSize: 13, color: "#64748b", display: "flex", alignItems: "center", gap: 6 }}>
                 עד:
                 <input type="date" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)} style={dateInputStyle} />
               </label>
             </>
           )}
 
-          <label style={{ fontSize: 13, color: "#94a3b8", display: "flex", alignItems: "center", gap: 6 }}>
+          <label style={{ fontSize: 13, color: "#64748b", display: "flex", alignItems: "center", gap: 6 }}>
             פלטפורמה:
             <select value={platformFilter} onChange={(e) => setPlatformFilter(e.target.value)} style={selectStyle}>
               <option value="all">כל הפלטפורמות</option>
@@ -969,9 +969,9 @@ export default function MediaReportsPage() {
         {/* ── Action message ── */}
         {actionMsg && (
           <div style={{
-            background: actionMsg.startsWith("✗") ? "#1a0c0c" : "#0c1a0e",
-            border:     `1px solid ${actionMsg.startsWith("✗") ? "#7f1d1d" : "#166534"}`,
-            color:      actionMsg.startsWith("✗") ? "#fca5a5" : "#86efac",
+            background: actionMsg.startsWith("✗") ? "#fef2f2" : "#f0fdf4",
+            border:     `1px solid ${actionMsg.startsWith("✗") ? "#fecaca" : "#bbf7d0"}`,
+            color:      actionMsg.startsWith("✗") ? "#991b1b" : "#15803d",
             borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 14,
           }}>
             {actionMsg}
@@ -984,7 +984,7 @@ export default function MediaReportsPage() {
             <strong>סטטוס הדוח:</strong> {hebStatus(run.status)}
             {run.email_sent_at && <span> · מייל נשלח {fmtDateTime(run.email_sent_at)}</span>}
             {run.platforms_err && Object.keys(run.platforms_err).length > 0 && (
-              <span style={{ color: "#fca5a5", marginInlineStart: 8 }}>
+              <span style={{ color: "#dc2626", marginInlineStart: 8 }}>
                 (שגיאות: {Object.keys(run.platforms_err).join(", ")})
               </span>
             )}
@@ -1024,9 +1024,9 @@ export default function MediaReportsPage() {
                 style={{
                   padding: "7px 14px", fontSize: 12, fontWeight: 600,
                   borderRadius: 8, cursor: "pointer",
-                  background: dailyView === v.id ? "#1e3a5f" : "#0d1626",
-                  color:      dailyView === v.id ? "#e2e8f0" : "#64748b",
-                  border: `1px solid ${dailyView === v.id ? "#3b82f6" : "#1e293b"}`,
+                  background: dailyView === v.id ? "#1e3a5f" : "#ffffff",
+                  color:      dailyView === v.id ? "#ffffff" : "#64748b",
+                  border: `1px solid ${dailyView === v.id ? "#1e3a5f" : "#cbd5e1"}`,
                 }}
               >
                 {v.label}
@@ -1038,13 +1038,13 @@ export default function MediaReportsPage() {
         {/* ── Column picker (רק בטבלאות עם עמודות) ── */}
         {!(mode === "daily" && (dailyView === "sub_status" || dailyView === "analytics")) && (
           <details style={{
-            background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10,
+            background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10,
             padding: "10px 14px", marginBottom: 14, fontSize: 13,
           }}>
-            <summary style={{ cursor: "pointer", color: "#94a3b8", fontWeight: 600 }}>⚙ בחר עמודות</summary>
+            <summary style={{ cursor: "pointer", color: "#64748b", fontWeight: 600 }}>⚙ בחר עמודות</summary>
             <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 14 }}>
               {activeColumns.map((c) => (
-                <label key={c.key} style={{ display: "flex", alignItems: "center", gap: 6, color: "#cbd5e1", cursor: "pointer" }}>
+                <label key={c.key} style={{ display: "flex", alignItems: "center", gap: 6, color: "#0f172a", cursor: "pointer" }}>
                   <input type="checkbox" checked={!!visibleCols[c.key]}
                     onChange={(e) => setVisibleCols({ ...visibleCols, [c.key]: e.target.checked })} />
                   {c.label}
@@ -1056,7 +1056,7 @@ export default function MediaReportsPage() {
 
         {/* ── Error ── */}
         {error && (
-          <div style={{ background: "#1a0c0c", border: "1px solid #7f1d1d", color: "#fca5a5", padding: 12, borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
+          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", padding: 12, borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
             ⚠ {error}
           </div>
         )}
@@ -1069,10 +1069,10 @@ export default function MediaReportsPage() {
         ) : mode === "daily" && dailyView === "analytics" ? (
           <AnalyticsPanel analytics={data?.analytics} loading={loading} />
         ) : (
-          <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, overflow: "hidden" }}>
+          <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead style={{ background: "#0d1626" }}>
+                <thead style={{ background: "#f1f5f9" }}>
                   <tr>
                     {visibleColList.map((c) => (
                       <th key={c.key} style={thStyle}>{c.label}</th>
@@ -1088,10 +1088,10 @@ export default function MediaReportsPage() {
                   )}
                   {!loading && tableRows.map((r, i) => (
                     <tr key={i} style={{
-                      background: r.is_summary ? "#111d33" : "transparent",
-                      borderTop: "1px solid #101a2c",
-                      fontWeight: r.is_summary ? 600 : 400,
-                      color:      r.source_kind === "non_paid" ? "#a7f3d0" : (r.is_summary ? "#93c5fd" : "#cbd5e1"),
+                      background: r.is_summary ? "#fef3c7" : (i % 2 === 1 ? "#fafbfc" : "#ffffff"),
+                      borderTop: "1px solid #e2e8f0",
+                      fontWeight: r.is_summary ? 700 : 400,
+                      color:      r.source_kind === "non_paid" ? "#15803d" : (r.is_summary ? "#1e40af" : "#0f172a"),
                     }}>
                       {visibleColList.map((c) => (
                         <td key={c.key} style={tdStyle}>
@@ -1108,11 +1108,11 @@ export default function MediaReportsPage() {
 
         {/* ── Runs history panel ── */}
         {showRuns && (
-          <div style={{ marginTop: 20, background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, padding: 16 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 600, color: "#e2e8f0", margin: "0 0 12px" }}>ריצות אחרונות</h3>
+          <div style={{ marginTop: 20, background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 16 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: "#0f172a", margin: "0 0 12px" }}>ריצות אחרונות</h3>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
-                <thead style={{ background: "#0d1626" }}>
+                <thead style={{ background: "#f1f5f9" }}>
                   <tr>
                     <th style={thStyle}>סוג</th>
                     <th style={thStyle}>תאריך/שבוע</th>
@@ -1124,7 +1124,7 @@ export default function MediaReportsPage() {
                 </thead>
                 <tbody>
                   {runs.slice(0, 40).map((r, i) => (
-                    <tr key={i} style={{ borderTop: "1px solid #101a2c", color: "#cbd5e1" }}>
+                    <tr key={i} style={{ borderTop: "1px solid #f1f5f9", color: "#0f172a" }}>
                       <td style={tdStyle}>{r.kind === "weekly" ? "שבועי" : "יומי"}</td>
                       <td style={tdStyle}>{r.report_date || `${r.week_start} — ${r.week_end}`}</td>
                       <td style={tdStyle}><span style={{ color: statusColor(r.status) }}>{hebStatus(r.status)}</span></td>
@@ -1132,7 +1132,7 @@ export default function MediaReportsPage() {
                       <td style={tdStyle}>{fmtDateTime(r.completed_at)}</td>
                       <td style={tdStyle}>
                         {r.email_sent_at ? "✓ " + fmtDateTime(r.email_sent_at) :
-                         r.email_error ? <span style={{ color: "#fca5a5" }} title={r.email_error}>✗</span> : "—"}
+                         r.email_error ? <span style={{ color: "#dc2626" }} title={r.email_error}>✗</span> : "—"}
                       </td>
                     </tr>
                   ))}
@@ -1143,7 +1143,7 @@ export default function MediaReportsPage() {
         )}
 
         {/* ── Footer note ── */}
-        <p style={{ marginTop: 20, fontSize: 11, color: "#334155", textAlign: "center" }}>
+        <p style={{ marginTop: 20, fontSize: 11, color: "#94a3b8", textAlign: "center" }}>
           שלב א' — נתונים יבשים בלבד. ניתוח והמלצות יגיעו בשלבים הבאים.
         </p>
       </div>
@@ -1156,13 +1156,13 @@ export default function MediaReportsPage() {
 function SubStatusTable({ rows, loading }) {
   const total = rows.reduce((s, r) => s + (r.leads_count || 0), 0);
   return (
-    <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, overflow: "hidden" }}>
-      <div style={{ padding: "10px 14px", color: "#64748b", fontSize: 12, borderBottom: "1px solid #1e293b" }}>
+    <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ padding: "10px 14px", color: "#64748b", fontSize: 12, borderBottom: "1px solid #e2e8f0" }}>
         פירוט תת-סטטוס — רק על לידים שנוצרו היום ({fmtNum(total)} לידים)
       </div>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <thead style={{ background: "#0d1626" }}>
+          <thead style={{ background: "#f1f5f9" }}>
             <tr>
               <th style={thStyle}>תת-סטטוס</th>
               <th style={thStyle}>כמות לידים</th>
@@ -1175,7 +1175,7 @@ function SubStatusTable({ rows, loading }) {
             {!loading && rows.map((r, i) => {
               const pct = total ? (r.leads_count / total * 100) : 0;
               return (
-                <tr key={i} style={{ borderTop: "1px solid #101a2c", color: "#cbd5e1" }}>
+                <tr key={i} style={{ borderTop: "1px solid #f1f5f9", color: "#0f172a" }}>
                   <td style={tdStyle}>{r.sub_status_name}</td>
                   <td style={tdStyle}>{fmtNum(r.leads_count)}</td>
                   <td style={tdStyle}>{fmtPct(pct)}</td>
@@ -1193,11 +1193,11 @@ function SubStatusTable({ rows, loading }) {
 
 function AnalyticsPanel({ analytics, loading }) {
   if (loading) {
-    return <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, padding: 36, textAlign: "center", color: "#64748b" }}>טוען…</div>;
+    return <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 36, textAlign: "center", color: "#64748b" }}>טוען…</div>;
   }
   if (!analytics) {
     return (
-      <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, padding: 36, textAlign: "center", color: "#64748b", fontSize: 13 }}>
+      <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 36, textAlign: "center", color: "#64748b", fontSize: 13 }}>
         עדיין אין נתוני אנליטיקס ליום זה. הרץ את הדוח היומי מחדש — סוכני GA4/GSC ייאספו אוטומטית.
       </div>
     );
@@ -1211,16 +1211,16 @@ function AnalyticsPanel({ analytics, loading }) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
       {/* סטטוס שולפים */}
-      <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#64748b" }}>
-        <strong style={{ color: "#93c5fd" }}>סוכני שולפים:</strong>
-        {ok.length > 0 && <span style={{ color: "#86efac", marginInlineStart: 8 }}>✓ {ok.join(", ")}</span>}
-        {Object.keys(err).length > 0 && <span style={{ color: "#fca5a5", marginInlineStart: 8 }}>✗ {Object.keys(err).join(", ")}</span>}
+      <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#64748b" }}>
+        <strong style={{ color: "#1e40af" }}>סוכני שולפים:</strong>
+        {ok.length > 0 && <span style={{ color: "#16a34a", marginInlineStart: 8 }}>✓ {ok.join(", ")}</span>}
+        {Object.keys(err).length > 0 && <span style={{ color: "#dc2626", marginInlineStart: 8 }}>✗ {Object.keys(err).join(", ")}</span>}
       </div>
 
       {/* GA4 */}
       {ga4 && (
-        <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, padding: 16 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#93c5fd", margin: "0 0 12px" }}>🌐 Google Analytics 4</h3>
+        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 16 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1e40af", margin: "0 0 12px" }}>🌐 Google Analytics 4</h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 14 }}>
             <MiniStat label="Sessions" value={fmtNum(ga4.sessions)} />
             <MiniStat label="Users" value={fmtNum(ga4.total_users)} />
@@ -1261,16 +1261,16 @@ function AnalyticsPanel({ analytics, loading }) {
 
       {/* GSC */}
       {gsc && (
-        <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, padding: 16 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#93c5fd", margin: "0 0 12px" }}>🔍 Google Search Console</h3>
+        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 16 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1e40af", margin: "0 0 12px" }}>🔍 Google Search Console</h3>
           {!gsc.properties?.length && (
             <div style={{ color: "#64748b", fontSize: 12 }}>
               אין נתוני GSC להיום. ייתכן ש-GSC עדיין לא עיבד את היום (עיכוב ~2-3 ימים) או שה-service account לא הוזמן כ-User ב-Search Console.
             </div>
           )}
           {(gsc.properties || []).map((p, i) => (
-            <div key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: i < gsc.properties.length - 1 ? "1px solid #1e293b" : "none" }}>
-              <div style={{ color: "#cbd5e1", fontWeight: 600, marginBottom: 8 }}>{p.site_url}</div>
+            <div key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: i < gsc.properties.length - 1 ? "1px solid #e2e8f0" : "none" }}>
+              <div style={{ color: "#0f172a", fontWeight: 600, marginBottom: 8 }}>{p.site_url}</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8, marginBottom: 10 }}>
                 <MiniStat label="Clicks" value={fmtNum(p.clicks)} />
                 <MiniStat label="Impressions" value={fmtNum(p.impressions)} />
@@ -1294,7 +1294,7 @@ function AnalyticsPanel({ analytics, loading }) {
 
       {/* Placeholder: סושיאל אורגני */}
       {(analytics.meta_page_data || analytics.ig_organic_data || analytics.tiktok_data) && (
-        <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, padding: 16, fontSize: 12, color: "#64748b" }}>
+        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 16, fontSize: 12, color: "#64748b" }}>
           <strong>📱 סושיאל אורגני:</strong> placeholders לעתיד — יחובר כשהפעילות האורגנית תתחיל.
         </div>
       )}
@@ -1304,9 +1304,9 @@ function AnalyticsPanel({ analytics, loading }) {
 
 function MiniStat({ label, value }) {
   return (
-    <div style={{ background: "#060d1a", borderRadius: 8, padding: "8px 10px", border: "1px solid #1e293b" }}>
+    <div style={{ background: "#ffffff", borderRadius: 8, padding: "8px 10px", border: "1px solid #e2e8f0" }}>
       <div style={{ fontSize: 10, color: "#64748b", marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 15, fontWeight: 700, color: "#e2e8f0" }}>{value}</div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{value}</div>
     </div>
   );
 }
@@ -1315,15 +1315,15 @@ function SimpleTable({ title, cols, rows }) {
   if (!rows || !rows.length) return null;
   return (
     <div style={{ marginTop: 12 }}>
-      <div style={{ color: "#94a3b8", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{title}</div>
+      <div style={{ color: "#64748b", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{title}</div>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-          <thead style={{ background: "#0d1626" }}>
+          <thead style={{ background: "#f1f5f9" }}>
             <tr>{cols.map((c) => <th key={c.k} style={thStyle}>{c.l}</th>)}</tr>
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={i} style={{ borderTop: "1px solid #101a2c", color: "#cbd5e1" }}>
+              <tr key={i} style={{ borderTop: "1px solid #f1f5f9", color: "#0f172a" }}>
                 {cols.map((c) => (
                   <td key={c.k} style={{ ...tdStyle, maxWidth: c.k === "page" || c.k === "query" ? 280 : "auto", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {c.num ? fmtNum(r[c.k], c.k === "position" || c.k === "avg_position" ? 2 : 0) : (r[c.k] ?? "—")}
@@ -1342,9 +1342,9 @@ function SimpleTable({ title, cols, rows }) {
 
 function StatCard({ label, value }) {
   return (
-    <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, padding: "12px 14px" }}>
+    <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 14px" }}>
       <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 700, color: "#e2e8f0" }}>{value}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{value}</div>
     </div>
   );
 }
@@ -1362,12 +1362,12 @@ function hebStatus(s) {
 
 function statusColor(s) {
   return {
-    completed: "#86efac",
-    partial:   "#fcd34d",
-    running:   "#93c5fd",
-    failed:    "#fca5a5",
-    timeout:   "#fca5a5",
-  }[s] || "#94a3b8";
+    completed: "#16a34a",
+    partial:   "#ca8a04",
+    running:   "#2563eb",
+    failed:    "#dc2626",
+    timeout:   "#dc2626",
+  }[s] || "#64748b";
 }
 
 function fmtDateTime(iso) {
@@ -1380,42 +1380,44 @@ function fmtDateTime(iso) {
 function runStatusStyle(status) {
   const color = statusColor(status);
   return {
-    background: "#0a1628", border: `1px solid ${color}40`,
-    color: "#cbd5e1", borderRadius: 8,
+    background: "#ffffff", border: `1px solid ${color}50`,
+    color: "#0f172a", borderRadius: 8,
     padding: "10px 14px", fontSize: 13, marginBottom: 14,
   };
 }
 
 const dateInputStyle = {
-  background: "#060d1a", color: "#e2e8f0", border: "1px solid #1e293b",
+  background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1",
   borderRadius: 6, padding: "5px 8px", fontSize: 13,
 };
 
 const selectStyle = {
-  background: "#060d1a", color: "#e2e8f0", border: "1px solid #1e293b",
+  background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1",
   borderRadius: 6, padding: "5px 8px", fontSize: 13,
 };
 
 const chipBtnStyle = {
-  background: "#0d1626", border: "1px solid #1e3a5f", color: "#93c5fd",
+  background: "#eff6ff", border: "1px solid #93c5fd", color: "#1e40af",
   borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer",
 };
 
 const primaryBtn = {
-  background: "#1e3a5f", border: "1px solid #3b82f6", color: "#e2e8f0",
+  background: "#1e3a5f", border: "1px solid #1e40af", color: "#ffffff",
   borderRadius: 8, padding: "7px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
 };
 
 const secondaryBtn = {
-  background: "#0d1626", border: "1px solid #1e293b", color: "#cbd5e1",
+  background: "#ffffff", border: "1px solid #cbd5e1", color: "#0f172a",
   borderRadius: 8, padding: "7px 14px", fontSize: 13, cursor: "pointer",
 };
 
 const thStyle = {
-  textAlign: "right", fontSize: 12, fontWeight: 600, color: "#94a3b8",
-  padding: "10px 12px", borderBottom: "1px solid #1e293b", whiteSpace: "nowrap",
+  textAlign: "right", fontSize: 12, fontWeight: 700, color: "#0f172a",
+  padding: "10px 12px", borderBottom: "1px solid #cbd5e1", whiteSpace: "nowrap",
+  background: "#f1f5f9",
 };
 
 const tdStyle = {
   padding: "9px 12px", whiteSpace: "nowrap",
+  borderBottom: "1px solid #f1f5f9",
 };

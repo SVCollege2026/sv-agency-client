@@ -37,8 +37,8 @@ const QUESTION_KINDS = [
 ];
 
 const STATUS_HE = {
-  queued:               { label: "בתור",          color: "#94a3b8" },
-  validating:           { label: "אימות",          color: "#94a3b8" },
+  queued:               { label: "בתור",          color: "#475569" },
+  validating:           { label: "אימות",          color: "#475569" },
   running:              { label: "רץ",             color: "#3b82f6" },
   completed:            { label: "הושלם",          color: "#16a34a" },
   failed:               { label: "נכשל",           color: "#dc2626" },
@@ -121,7 +121,7 @@ export default function ForecastingPage() {
 
   return (
     <div lang="he" dir="rtl" style={{
-      background: "#060d1a", color: "#e2e8f0",
+      background: "#ffffff", color: "#0f172a",
       fontFamily: "'Segoe UI', sans-serif",
       minHeight: "calc(100vh - 56px)",
       padding: "32px 24px",
@@ -130,8 +130,8 @@ export default function ForecastingPage() {
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <button onClick={() => navigate("/")}
-                  style={{ background: "transparent", border: "1px solid #1e3a5f",
-                           color: "#94a3b8", padding: "5px 12px", borderRadius: 6,
+                  style={{ background: "transparent", border: "1px solid #cbd5e1",
+                           color: "#475569", padding: "5px 12px", borderRadius: 6,
                            cursor: "pointer", fontSize: 12 }}>
             ← חזרה לפורטל
           </button>
@@ -175,8 +175,8 @@ export default function ForecastingPage() {
                 rows={3}
                 placeholder="לדוגמה: כמה לידים נצפה לקבל ביוני 2026? האם יש עלייה בביקוש לקורסי AI?"
                 style={{
-                  width: "100%", background: "#0a1322", color: "#e2e8f0",
-                  border: "1px solid #1e3a5f", borderRadius: 8,
+                  width: "100%", background: "#ffffff", color: "#0f172a",
+                  border: "1px solid #cbd5e1", borderRadius: 8,
                   padding: "10px 12px", fontSize: 14, resize: "vertical",
                   fontFamily: "inherit", boxSizing: "border-box",
                 }}
@@ -199,8 +199,8 @@ export default function ForecastingPage() {
                 <button
                   type="button" onClick={reset}
                   style={{
-                    background: "transparent", border: "1px solid #1e3a5f",
-                    color: "#94a3b8", borderRadius: 8, padding: "10px 22px",
+                    background: "transparent", border: "1px solid #cbd5e1",
+                    color: "#475569", borderRadius: 8, padding: "10px 22px",
                     fontSize: 14, cursor: "pointer",
                   }}>
                   שאלה חדשה
@@ -208,7 +208,7 @@ export default function ForecastingPage() {
               )}
             </div>
             {error && (
-              <div style={{ color: "#fca5a5", fontSize: 13 }}>שגיאה: {error}</div>
+              <div style={{ color: "#dc2626", fontSize: 13 }}>שגיאה: {error}</div>
             )}
           </form>
         </div>
@@ -228,7 +228,7 @@ export default function ForecastingPage() {
             </div>
 
             {!resultData && statusInfo?.status !== "failed" && (
-              <div style={{ color: "#94a3b8", fontSize: 13, padding: 16, textAlign: "center" }}>
+              <div style={{ color: "#475569", fontSize: 13, padding: 16, textAlign: "center" }}>
                 ⏳ ה-ReAct loop של מנהל החיזוי רץ ברקע…
                 <br />
                 <small style={{ color: "#64748b" }}>polling כל 5 שניות. זמן ממוצע: 30-90 שניות.</small>
@@ -236,7 +236,7 @@ export default function ForecastingPage() {
             )}
 
             {statusInfo?.status === "failed" && (
-              <div style={{ color: "#fca5a5", fontSize: 13, padding: 12 }}>
+              <div style={{ color: "#dc2626", fontSize: 13, padding: 12 }}>
                 ❌ הריצה נכשלה. {statusInfo.error_message ? `סיבה: ${statusInfo.error_message}` : ""}
               </div>
             )}
@@ -283,20 +283,20 @@ function ResultDisplay({ result }) {
       ) : (
         <>
           {/* תשובה טקסטואלית */}
-          <div style={{ background: "#0a1322", borderRadius: 8, padding: 16, color: "#e2e8f0",
+          <div style={{ background: "#ffffff", borderRadius: 8, padding: 16, color: "#0f172a",
                         whiteSpace: "pre-wrap", fontSize: 14, lineHeight: 1.7, marginBottom: 14 }}>
             {result.answer_text}
           </div>
 
           {/* Prediction box */}
           {pred?.point != null && (
-            <div style={{ background: "#0a1322", borderRadius: 8, padding: 14, marginBottom: 14,
+            <div style={{ background: "#ffffff", borderRadius: 8, padding: 14, marginBottom: 14,
                           border: "1px solid #16a34a40" }}>
-              <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 4 }}>תחזית מספרית</div>
+              <div style={{ fontSize: 12, color: "#475569", marginBottom: 4 }}>תחזית מספרית</div>
               <div style={{ fontSize: 24, color: "#16a34a", fontWeight: 700 }}>
                 {Math.round(pred.point).toLocaleString()}
                 {pred.range_low != null && pred.range_high != null && (
-                  <span style={{ fontSize: 14, color: "#94a3b8", marginRight: 12 }}>
+                  <span style={{ fontSize: 14, color: "#475569", marginRight: 12 }}>
                     {" "}(טווח {Math.round(pred.range_low).toLocaleString()}–{Math.round(pred.range_high).toLocaleString()})
                   </span>
                 )}
@@ -313,7 +313,7 @@ function ResultDisplay({ result }) {
           {/* Signals */}
           {sigs.length > 0 && (
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 8 }}>Signals</div>
+              <div style={{ fontSize: 12, color: "#475569", marginBottom: 8 }}>Signals</div>
               <div>
                 {sigs.map((s, i) => <SignalChip key={i} signal={s} />)}
               </div>
@@ -329,20 +329,20 @@ function ResultDisplay({ result }) {
 }
 
 const cardStyle = {
-  background: "#0d1626", border: "1px solid #1e3a5f", borderRadius: 14,
-  padding: 20, marginBottom: 20,
+  background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 14,
+  padding: 20, marginBottom: 20, boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
 };
 
-const h2Style = { margin: "0 0 14px", color: "#e2e8f0", fontSize: 17 };
+const h2Style = { margin: "0 0 14px", color: "#0f172a", fontSize: 17 };
 
 const labelStyle = {
   display: "block", fontSize: 12, fontWeight: 600,
-  color: "#94a3b8", marginBottom: 6,
+  color: "#475569", marginBottom: 6,
 };
 
 const selectStyle = {
   width: "100%",
-  background: "#0a1322", border: "1px solid #1e3a5f", color: "#e2e8f0",
+  background: "#ffffff", border: "1px solid #cbd5e1", color: "#0f172a",
   borderRadius: 8, padding: "9px 12px", fontSize: 14,
   boxSizing: "border-box",
 };

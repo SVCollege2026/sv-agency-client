@@ -304,7 +304,7 @@ export default function PortalHome() {
     <div
       lang="he"
       style={{
-        background: "#060d1a", color: "#e2e8f0",
+        background: "#ffffff", color: "#0f172a",
         fontFamily: "'Segoe UI', sans-serif", direction: "rtl",
         minHeight: "calc(100vh - 56px)",
         display: "flex", flexDirection: "column",
@@ -312,7 +312,7 @@ export default function PortalHome() {
     >
       {/* ── Main ── */}
       <div style={{ flex: 1, padding: "40px 24px", maxWidth: 1020, margin: "0 auto", width: "100%" }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 6px", color: "#e2e8f0" }}>בחר מחלקה</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 6px", color: "#0f172a" }}>בחר מחלקה</h1>
         <p style={{ color: "#64748b", fontSize: 14, margin: "0 0 36px" }}>
           כל מחלקה מופעלת על ידי מערך סוכני AI ייעודי
         </p>
@@ -360,11 +360,11 @@ export default function PortalHome() {
 
       {/* ── Footer ── */}
       <div style={{
-        borderTop: "1px solid #0f172a", padding: "14px 24px",
+        borderTop: "1px solid #e2e8f0", padding: "14px 24px",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         flexWrap: "wrap", gap: 8,
       }}>
-        <p style={{ margin: 0, fontSize: 11, color: "#334155" }}>
+        <p style={{ margin: 0, fontSize: 11, color: "#94a3b8" }}>
           SV Agency © {new Date().getFullYear()} — SVCollege
         </p>
         <button
@@ -372,13 +372,13 @@ export default function PortalHome() {
           onClick={() => setBugOpen(true)}
           style={{
             display: "flex", alignItems: "center", gap: 6,
-            background: "none", border: "1px solid #1e293b",
+            background: "none", border: "1px solid #cbd5e1",
             borderRadius: 7, padding: "5px 14px",
             fontSize: 12, color: "#64748b", cursor: "pointer",
             transition: "all 0.15s",
           }}
           onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#dc2626"; e.currentTarget.style.color = "#ef4444"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e293b"; e.currentTarget.style.color = "#64748b"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#cbd5e1"; e.currentTarget.style.color = "#64748b"; }}
         >
           🐛 דיווח תקלות
         </button>

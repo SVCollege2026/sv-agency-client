@@ -18,13 +18,13 @@ export default function AnalyticsLayout() {
   const navigate = useNavigate();
 
   return (
-    <div style={{ minHeight: "calc(100vh - 56px)", background: "#060d1a", direction: "rtl" }}>
+    <div style={{ minHeight: "calc(100vh - 56px)", background: "#ffffff", direction: "rtl" }}>
 
       {/* ── Secondary nav ── */}
       <div
         style={{
-          background:   "#0a1628",
-          borderBottom: "1px solid #1e293b",
+          background:   "#f8fafc",
+          borderBottom: "1px solid #e2e8f0",
           padding:      "0 16px",
           display:      "flex",
           alignItems:   "center",
@@ -43,8 +43,8 @@ export default function AnalyticsLayout() {
                 padding:        "11px 14px",
                 fontSize:       13,
                 fontWeight:     isActive ? 600 : 400,
-                color:          isActive ? "#93c5fd" : "#64748b",
-                borderBottom:   isActive ? "2px solid #3b82f6" : "2px solid transparent",
+                color:          isActive ? "#1e40af" : "#64748b",
+                borderBottom:   isActive ? "2px solid #1e3a5f" : "2px solid transparent",
                 textDecoration: "none",
                 whiteSpace:     "nowrap",
                 transition:     "color 0.15s",
@@ -67,17 +67,17 @@ export default function AnalyticsLayout() {
             padding:      "7px 12px",
             marginRight:  8,
             fontSize:     12,
-            color:        "#475569",
-            background:   "none",
-            border:       "1px solid #1e293b",
+            color:        "#64748b",
+            background:   "#ffffff",
+            border:       "1px solid #cbd5e1",
             borderRadius: 7,
             cursor:       "pointer",
             whiteSpace:   "nowrap",
             flexShrink:   0,
             transition:   "color 0.15s, border-color 0.15s",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "#93c5fd"; e.currentTarget.style.borderColor = "#3b82f6"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "#475569"; e.currentTarget.style.borderColor = "#1e293b"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "#1e40af"; e.currentTarget.style.borderColor = "#1e3a5f"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "#64748b"; e.currentTarget.style.borderColor = "#cbd5e1"; }}
           title="חזרה לפורטל הראשי"
         >
           ⌂ פורטל

@@ -11,7 +11,7 @@ export default function Layout() {
   const navigate = useNavigate();
 
   return (
-    <div style={{ minHeight: "100vh", background: "#060d1a", display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100vh", background: "#ffffff", display: "flex", flexDirection: "column" }}>
 
       {/* ── Fixed top bar ──
           direction: ltr → logo LEFT, SV Agency RIGHT

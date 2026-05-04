@@ -17,7 +17,7 @@ const SIGNAL_META = {
 
 export default function SignalChip({ signal }) {
   if (!signal) return null;
-  const meta = SIGNAL_META[signal.type] || { label: signal.type, emoji: "•", color: "#94a3b8" };
+  const meta = SIGNAL_META[signal.type] || { label: signal.type, emoji: "•", color: "#64748b" };
   const valueText = signal.value != null
     ? typeof signal.value === "number" ? signal.value.toFixed(2) : String(signal.value)
     : null;
@@ -32,7 +32,7 @@ export default function SignalChip({ signal }) {
         borderRadius: 999,
         padding: "5px 12px",
         fontSize: 12,
-        color: "#e2e8f0",
+        color: "#0f172a",
         margin: "0 4px 4px 0",
       }}
     >
@@ -42,7 +42,7 @@ export default function SignalChip({ signal }) {
         <span style={{ color: meta.color, fontWeight: 600 }}>· {signal.label}</span>
       )}
       {valueText && (
-        <span style={{ color: "#94a3b8" }}>({valueText})</span>
+        <span style={{ color: "#64748b" }}>({valueText})</span>
       )}
     </div>
   );

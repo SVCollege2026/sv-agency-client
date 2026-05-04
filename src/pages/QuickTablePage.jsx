@@ -31,9 +31,9 @@ export default function QuickTablePage() {
   }
 
   return (
-    <div style={{ padding: 24, color: "#e2e8f0", maxWidth: 1200, margin: "0 auto" }}>
+    <div style={{ padding: 24, color: "#0f172a", maxWidth: 1200, margin: "0 auto" }}>
       <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 8 }}>ניתוח נקודתי</h1>
-      <p style={{ color: "#94a3b8", fontSize: 14, marginBottom: 24 }}>
+      <p style={{ color: "#64748b", fontSize: 14, marginBottom: 24 }}>
         שאלה אחת, טבלה אחת — ללא דיון אנליסטים, ללא דוח מנהלים. תוך שניות.
       </p>
 
@@ -48,9 +48,9 @@ export default function QuickTablePage() {
             padding: 12,
             fontSize: 14,
             background: "#0f1d33",
-            border: "1px solid #1e293b",
+            border: "1px solid #e2e8f0",
             borderRadius: 6,
-            color: "#e2e8f0",
+            color: "#0f172a",
             resize: "vertical",
             fontFamily: "inherit",
             direction: "rtl",
@@ -64,7 +64,7 @@ export default function QuickTablePage() {
               padding: "10px 24px",
               fontSize: 14,
               fontWeight: 600,
-              background: loading ? "#1e293b" : "#3b82f6",
+              background: loading ? "#e2e8f0" : "#3b82f6",
               border: "none",
               borderRadius: 6,
               color: "#fff",
@@ -80,9 +80,9 @@ export default function QuickTablePage() {
         <div style={{
           padding: 14,
           background: "#3b1818",
-          border: "1px solid #7f1d1d",
+          border: "1px solid #fecaca",
           borderRadius: 6,
-          color: "#fca5a5",
+          color: "#dc2626",
           marginBottom: 20,
         }}>
           {error}
@@ -111,11 +111,11 @@ function ResultDisplay({ result }) {
   return (
     <div style={{
       background: "#0f1d33",
-      border: "1px solid #1e293b",
+      border: "1px solid #e2e8f0",
       borderRadius: 8,
       padding: 20,
     }}>
-      <div style={{ marginBottom: 12, fontSize: 13, color: "#94a3b8" }}>
+      <div style={{ marginBottom: 12, fontSize: 13, color: "#64748b" }}>
         <span style={{ color: "#3b82f6" }}>n_input:</span> {meta.n_input ?? "?"} ·
         <span style={{ color: "#3b82f6", marginRight: 8 }}>n_after_filters:</span> {meta.n_after_filters ?? "?"} ·
         <span style={{ color: "#3b82f6", marginRight: 8 }}>operation:</span> {meta.operation ?? "?"}
@@ -126,8 +126,8 @@ function ResultDisplay({ result }) {
       </h2>
 
       {layout.notes && (
-        <div style={{ marginBottom: 12, padding: 10, background: "#1e293b",
-                      borderRadius: 4, fontSize: 12, color: "#94a3b8" }}>
+        <div style={{ marginBottom: 12, padding: 10, background: "#e2e8f0",
+                      borderRadius: 4, fontSize: 12, color: "#64748b" }}>
           {layout.notes}
         </div>
       )}
@@ -148,10 +148,10 @@ function ResultDisplay({ result }) {
                     colSpan={g.span || 1}
                     style={{
                       padding: "10px 12px",
-                      borderBottom: "1px solid #1e293b",
-                      borderLeft: i < groups.length - 1 ? "1px solid #1e293b" : "none",
+                      borderBottom: "1px solid #e2e8f0",
+                      borderLeft: i < groups.length - 1 ? "1px solid #e2e8f0" : "none",
                       textAlign: "center",
-                      color: "#cbd5e1",
+                      color: "#0f172a",
                       fontWeight: 600,
                     }}
                   >
@@ -160,15 +160,15 @@ function ResultDisplay({ result }) {
                 ))}
               </tr>
             )}
-            <tr style={{ background: "#0a1628" }}>
+            <tr style={{ background: "#ffffff" }}>
               {cols.map((c, i) => (
                 <th
                   key={c.key || i}
                   style={{
                     padding: "9px 12px",
-                    borderBottom: "1px solid #1e293b",
+                    borderBottom: "1px solid #e2e8f0",
                     textAlign: "right",
-                    color: "#94a3b8",
+                    color: "#64748b",
                     fontWeight: 500,
                     whiteSpace: "nowrap",
                   }}
@@ -180,7 +180,7 @@ function ResultDisplay({ result }) {
           </thead>
           <tbody>
             {rows.map((r, ri) => (
-              <tr key={ri} style={{ background: ri % 2 ? "#0a1628" : "transparent" }}>
+              <tr key={ri} style={{ background: ri % 2 ? "#ffffff" : "transparent" }}>
                 {cols.map((c, ci) => {
                   const v = (r.values || {})[c.key];
                   return (
@@ -189,7 +189,7 @@ function ResultDisplay({ result }) {
                       style={{
                         padding: "8px 12px",
                         borderBottom: "1px solid #172033",
-                        color: ci === 0 ? "#cbd5e1" : "#94a3b8",
+                        color: ci === 0 ? "#e2e8f0" : "#64748b",
                         fontWeight: ci === 0 ? 500 : 400,
                       }}
                     >
@@ -206,8 +206,8 @@ function ResultDisplay({ result }) {
                     key={ci}
                     style={{
                       padding: "10px 12px",
-                      borderTop: "2px solid #1e293b",
-                      color: "#cbd5e1",
+                      borderTop: "2px solid #e2e8f0",
+                      color: "#0f172a",
                     }}
                   >
                     {ci === 0 ? "סה\"כ" : formatValue(totals[c.key])}

@@ -15,13 +15,13 @@ import {
 import { getAnalytics, getDashboardStage0 } from "../api.js";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
-const BG      = "#060d1a";
-const PANEL   = "#0a1628";
-const CARD    = "#0d1f38";
-const BORDER  = "#1e293b";
-const TEXT    = "#e2e8f0";
+const BG      = "#ffffff";
+const PANEL   = "#ffffff";
+const CARD    = "#ffffff";
+const BORDER  = "#e2e8f0";
+const TEXT    = "#0f172a";
 const MUTED   = "#64748b";
-const DIM     = "#94a3b8";
+const DIM     = "#64748b";
 
 const ACCENT = {
   media:    "#06b6d4",
@@ -61,7 +61,7 @@ const objToRows = (obj) =>
 const RtlTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background:"#0f1f35", border:"1px solid #334155", borderRadius:8, padding:"10px 14px", direction:"rtl", textAlign:"right", fontSize:12, minWidth:160 }}>
+    <div style={{ background:"#0f1f35", border:"1px solid #94a3b8", borderRadius:8, padding:"10px 14px", direction:"rtl", textAlign:"right", fontSize:12, minWidth:160 }}>
       {label && <p style={{ color:DIM, marginBottom:6, fontWeight:600 }}>{label}</p>}
       {payload.map((p, i) => (
         <p key={i} style={{ color:p.color, margin:"3px 0", display:"flex", justifyContent:"space-between", gap:16 }}>
@@ -261,7 +261,7 @@ function CrossBuilder({ analytics }) {
         {[{id:"leads",label:"לידים"},{id:"enrolled",label:"נרשמים"},{id:"conversion_pct",label:"המרה %"}].map(m=>(
           <button key={m.id} onClick={()=>setMetric(m.id)} style={{
             background: metric===m.id ? "#1e3a5f" : "transparent",
-            color: metric===m.id ? "#93c5fd" : MUTED,
+            color: metric===m.id ? "#1e40af" : MUTED,
             border:`1px solid ${metric===m.id ? "#3b82f6" : BORDER}`,
             borderRadius:8, padding:"5px 14px", cursor:"pointer", fontSize:12,
           }}>{m.label}</button>
@@ -296,7 +296,7 @@ function CrossBuilder({ analytics }) {
                         padding:"7px 10px", textAlign:"center",
                         borderBottom:`1px solid #0a0f1e`,
                         background: val != null ? heatColor(val, maxVal, accent) : "transparent",
-                        color: val != null ? TEXT : "#334155",
+                        color: val != null ? TEXT : "#94a3b8",
                       }}>
                         {val != null ? (metric==="conversion_pct" ? `${Number(val).toFixed(1)}%` : fmt(val)) : "—"}
                       </td>
@@ -385,7 +385,7 @@ export default function Dashboard() {
         </div>
         <button
           onClick={()=>navigate("/analytics/analysis")}
-          style={{ background:"#1e293b", color:DIM, border:"none", borderRadius:8, padding:"8px 16px", cursor:"pointer", fontSize:12 }}
+          style={{ background:"#e2e8f0", color:DIM, border:"none", borderRadius:8, padding:"8px 16px", cursor:"pointer", fontSize:12 }}
         >
           ← הפעל ניתוח חדש
         </button>
@@ -678,8 +678,8 @@ export default function Dashboard() {
 
             {/* Biggest alert (new structure) */}
             {biggestAlert && (
-              <div style={{ background:"#2a0e0a", border:"1px solid #fca5a5", borderRadius:12, padding:"18px 22px", marginBottom:16 }}>
-                <p style={{ color:"#fca5a5", fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.06em", margin:"0 0 8px" }}>⚠ דורש תשומת לב מיידית</p>
+              <div style={{ background:"#2a0e0a", border:"1px solid #dc2626", borderRadius:12, padding:"18px 22px", marginBottom:16 }}>
+                <p style={{ color:"#dc2626", fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.06em", margin:"0 0 8px" }}>⚠ דורש תשומת לב מיידית</p>
                 <p style={{ color:"#fecaca", fontSize:14, lineHeight:1.6, margin:0 }}>{biggestAlert}</p>
               </div>
             )}
@@ -709,7 +709,7 @@ export default function Dashboard() {
                   {anomalies.map((a, i) => (
                     <div key={i} style={{ display:"flex", gap:10, alignItems:"flex-start" }}>
                       <span style={{ color:ACCENT.exec, fontSize:14, flexShrink:0 }}>▸</span>
-                      <p style={{ color:"#fcd34d", fontSize:13, lineHeight:1.6, margin:0 }}>{a}</p>
+                      <p style={{ color:"#ca8a04", fontSize:13, lineHeight:1.6, margin:0 }}>{a}</p>
                     </div>
                   ))}
                 </div>
@@ -725,7 +725,7 @@ export default function Dashboard() {
                     const trimmed = line.trim();
                     if (!trimmed) return <div key={i} style={{ height:8 }} />;
                     if (trimmed.startsWith("**") && trimmed.endsWith("**"))
-                      return <p key={i} style={{ color:"#93c5fd", fontWeight:700, fontSize:15, margin:"16px 0 6px" }}>{trimmed.replace(/\*\*/g,"")}</p>;
+                      return <p key={i} style={{ color:"#1e40af", fontWeight:700, fontSize:15, margin:"16px 0 6px" }}>{trimmed.replace(/\*\*/g,"")}</p>;
                     if (trimmed.startsWith("# "))
                       return <h3 key={i} style={{ color:TEXT, fontSize:16, fontWeight:700, margin:"18px 0 8px" }}>{trimmed.slice(2)}</h3>;
                     if (trimmed.startsWith("- ") || trimmed.startsWith("• "))
