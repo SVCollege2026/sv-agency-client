@@ -66,8 +66,9 @@ export default function EcosystemPage() {
     );
   }
 
-  // ⚠ issue_briefs ו-validated_findings נשמרים ב-DB אבל לא מוצגים פה —
-  //   זהו ממשק להנהלת בית הספר, לא לאורקסטרציה פנימית.
+  // השאלות מוצגות כ"שאלות לדיון" — נושאים להנהלה לשקול ולחקור.
+  // הראוטינג למחלקות הוא תהליך נפרד. ה-validated_findings נשארים פנימיים בלבד.
+  const allBriefs = Object.values(data.briefs_by_dept || {}).flat();
 
   return (
     <Page>
@@ -159,6 +160,27 @@ export default function EcosystemPage() {
           <p style={{ fontSize: 15, lineHeight: 1.7, color: "#7c2d12", margin: 0 }}>
             {data.biggest_alert}
           </p>
+        </Section>
+      )}
+
+      {/* ── 8. שאלות נוספות לדיון ── */}
+      {allBriefs.length > 0 && (
+        <Section title="שאלות נוספות לדיון" emoji="💭" tone="neutral">
+          <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 12px", lineHeight: 1.7 }}>
+            נושאים שעלו במהלך הניתוח ושכדאי להמשיך לחקור.
+          </p>
+          <ul style={{ margin: 0, paddingInlineStart: 22, fontSize: 14, lineHeight: 1.85 }}>
+            {allBriefs.flatMap((b, bi) => (b.next_questions || []).map((q, qi) => (
+              <li key={`${bi}-${qi}`} style={{ color: "#1e293b", marginBottom: 10 }}>
+                {q}
+                {b.where && (
+                  <span style={{ display: "block", fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
+                    בהקשר: {b.where}
+                  </span>
+                )}
+              </li>
+            )))}
+          </ul>
         </Section>
       )}
 
