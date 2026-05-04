@@ -9,6 +9,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   BarChart, Bar, LineChart, Line, ComposedChart,
+  PieChart, Pie,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, Cell,
 } from "recharts";
@@ -39,7 +40,26 @@ function fmtDateTime(iso) {
   catch { return iso; }
 }
 
-// Detect chart shape: line for monthly, bar for category, none if unsuitable
+// Pivot helper: converts rows like [{x:..., group_by:..., value:...}, ...]
+// into [{x: x_val, series_a: v, series_b: v}, ...] suitable for grouped/stacked charts
+function pivotByGroup(rows, xKey, groupKey, valueKey) {
+  const out = {};
+  const groups = new Set();
+  for (const r of rows || []) {
+    const x = r[xKey];
+    if (x == null) continue;
+    if (!out[x]) out[x] = { [xKey]: x };
+    const g = r[groupKey];
+    if (g != null) {
+      out[x][g] = r[valueKey];
+      groups.add(g);
+    }
+  }
+  return { data: Object.values(out), seriesKeys: [...groups] };
+}
+
+// Detect chart shape: line for monthly, bar for category, none if unsuitable.
+// Used as FALLBACK when fact has no explicit chart_type.
 function pickChartShape(fact) {
   const cols = fact.columns || [];
   const rows = fact.rows || [];
@@ -90,23 +110,195 @@ function CustomTooltip({ active, payload, label }) {
 
 // ─── Components ───────────────────────────────────────────────────────────────
 
-function FactChart({ fact }) {
-  const shape = useMemo(() => pickChartShape(fact), [fact]);
-  if (!shape) return null;
+// ─── Chart renderers ──────────────────────────────────────────────────────────
 
-  const { type, labelKey, valueKeys } = shape;
+function PieChartView({ fact }) {
+  const cfg = fact.chart_config || {};
+  const labelKey = cfg.label || (fact.columns || [])[0];
+  const valueKey = cfg.value || (fact.columns || []).find((c) => c !== labelKey);
+  const data = (fact.rows || []).filter((r) => r[valueKey] != null);
+  return (
+    <div style={{ width: "100%", height: 300, marginTop: 6 }}>
+      <ResponsiveContainer>
+        <PieChart>
+          <Pie data={data} dataKey={valueKey} nameKey={labelKey}
+               cx="50%" cy="50%" outerRadius={100} label={(e) => e[labelKey]}>
+            {data.map((_, i) => <Cell key={i} fill={PAL[i % PAL.length]} />)}
+          </Pie>
+          <Tooltip content={<CustomTooltip />} />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
-  // Limit to 8 series — we want full source breakdown visible
-  const keys = valueKeys.slice(0, 8);
+function HBarChartView({ fact }) {
+  const cfg = fact.chart_config || {};
+  const xKey = cfg.x || (fact.columns || [])[0];
+  const yKey = cfg.y || (fact.columns || []).find((c) => c !== xKey);
+  const data = [...(fact.rows || [])].sort((a, b) => (b[yKey] || 0) - (a[yKey] || 0));
+  const height = Math.max(220, data.length * 28);
+  return (
+    <div style={{ width: "100%", height, marginTop: 6 }}>
+      <ResponsiveContainer>
+        <BarChart data={data} layout="vertical"
+                  margin={{ top: 6, right: 30, bottom: 6, left: 110 }}>
+          <CartesianGrid stroke="#f1f5f9" horizontal={false} />
+          <XAxis type="number" tick={{ fontSize: 11, fill: "#475569" }} />
+          <YAxis type="category" dataKey={xKey} tick={{ fontSize: 11, fill: "#475569" }}
+                 width={100} />
+          <Tooltip content={<CustomTooltip />} />
+          <Bar dataKey={yKey} fill={PAL[0]} radius={[0, 4, 4, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
+function BarChartView({ fact }) {
+  const cfg = fact.chart_config || {};
+  const xKey = cfg.x || (fact.columns || [])[0];
+  const yKey = cfg.y || (fact.columns || []).find((c) => c !== xKey);
+  const isPct = (yKey || "").includes("pct") || (yKey || "").includes("rate");
+  return (
+    <div style={{ width: "100%", height: 260, marginTop: 6 }}>
+      <ResponsiveContainer>
+        <BarChart data={fact.rows} margin={{ top: 6, right: 18, bottom: 6, left: 18 }}>
+          <CartesianGrid stroke="#f1f5f9" />
+          <XAxis dataKey={xKey} tick={{ fontSize: 11, fill: "#475569" }} />
+          <YAxis tick={{ fontSize: 11, fill: "#475569" }}
+                 tickFormatter={isPct ? ((v) => `${v}%`) : undefined} />
+          <Tooltip content={<CustomTooltip />} />
+          <Bar dataKey={yKey} fill={PAL[0]} radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function LineChartView({ fact }) {
+  const cfg = fact.chart_config || {};
+  const xKey = cfg.x || (fact.columns || [])[0];
+  // Multiple series — either explicit list, or pivot by group_by, or numeric cols
+  let data = fact.rows;
+  let seriesKeys = [];
+  if (Array.isArray(cfg.series) && cfg.series.length) {
+    seriesKeys = cfg.series;
+  } else if (cfg.group_by && cfg.value) {
+    const piv = pivotByGroup(fact.rows, xKey, cfg.group_by, cfg.value);
+    data = piv.data;
+    seriesKeys = piv.seriesKeys;
+  } else if (cfg.y) {
+    seriesKeys = [cfg.y];
+  } else {
+    seriesKeys = (fact.columns || []).filter((c) => c !== xKey).slice(0, 5);
+  }
   return (
     <div style={{ width: "100%", height: 280, marginTop: 6 }}>
       <ResponsiveContainer>
-        {type === "line" ? (
+        <LineChart data={data} margin={{ top: 6, right: 18, bottom: 6, left: 18 }}>
+          <CartesianGrid stroke="#f1f5f9" />
+          <XAxis dataKey={xKey} tick={{ fontSize: 10, fill: "#475569" }} />
+          <YAxis tick={{ fontSize: 11, fill: "#475569" }} />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          {seriesKeys.map((k, i) => (
+            <Line key={k} type="monotone" dataKey={k} stroke={PAL[i % PAL.length]}
+                  strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 5 }} />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function StackedBarView({ fact }) {
+  const cfg = fact.chart_config || {};
+  const xKey = cfg.x || (fact.columns || [])[0];
+  let data = fact.rows;
+  let seriesKeys = [];
+  if (cfg.group_by && cfg.value) {
+    const piv = pivotByGroup(fact.rows, xKey, cfg.group_by, cfg.value);
+    data = piv.data;
+    seriesKeys = piv.seriesKeys;
+  } else {
+    const exclude = new Set([xKey, ...(cfg.exclude || [])]);
+    seriesKeys = (fact.columns || []).filter((c) => !exclude.has(c));
+  }
+  return (
+    <div style={{ width: "100%", height: 300, marginTop: 6 }}>
+      <ResponsiveContainer>
+        <BarChart data={data} margin={{ top: 6, right: 18, bottom: 6, left: 18 }}>
+          <CartesianGrid stroke="#f1f5f9" />
+          <XAxis dataKey={xKey} tick={{ fontSize: 11, fill: "#475569" }} />
+          <YAxis tick={{ fontSize: 11, fill: "#475569" }} />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          {seriesKeys.map((k, i) => (
+            <Bar key={k} dataKey={k} stackId="a" fill={PAL[i % PAL.length]} />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function GroupedBarView({ fact }) {
+  // Same shape as stacked but without stackId
+  const cfg = fact.chart_config || {};
+  const xKey = cfg.x || (fact.columns || [])[0];
+  let data = fact.rows;
+  let seriesKeys = [];
+  if (cfg.group_by && cfg.value) {
+    const piv = pivotByGroup(fact.rows, xKey, cfg.group_by, cfg.value);
+    data = piv.data;
+    seriesKeys = piv.seriesKeys;
+  } else {
+    const exclude = new Set([xKey, ...(cfg.exclude || [])]);
+    seriesKeys = (fact.columns || []).filter((c) => !exclude.has(c));
+  }
+  return (
+    <div style={{ width: "100%", height: 300, marginTop: 6 }}>
+      <ResponsiveContainer>
+        <BarChart data={data} margin={{ top: 6, right: 18, bottom: 6, left: 18 }}>
+          <CartesianGrid stroke="#f1f5f9" />
+          <XAxis dataKey={xKey} tick={{ fontSize: 11, fill: "#475569" }} />
+          <YAxis tick={{ fontSize: 11, fill: "#475569" }} />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          {seriesKeys.map((k, i) => (
+            <Bar key={k} dataKey={k} fill={PAL[i % PAL.length]} radius={[4, 4, 0, 0]} />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function FactChart({ fact }) {
+  const t = fact.chart_type || "auto";
+
+  if (t === "pie")          return <PieChartView fact={fact} />;
+  if (t === "hbar")         return <HBarChartView fact={fact} />;
+  if (t === "bar")          return <BarChartView fact={fact} />;
+  if (t === "line")         return <LineChartView fact={fact} />;
+  if (t === "stacked_bar")  return <StackedBarView fact={fact} />;
+  if (t === "grouped_bar")  return <GroupedBarView fact={fact} />;
+  if (t === "table" || t === "metric") return null; // nothing — table is rendered below
+
+  // auto fallback (legacy)
+  const shape = pickChartShape(fact);
+  if (!shape) return null;
+  const { type, labelKey, valueKeys } = shape;
+  const keys = valueKeys.slice(0, 8);
+  if (type === "line") {
+    return (
+      <div style={{ width: "100%", height: 280, marginTop: 6 }}>
+        <ResponsiveContainer>
           <LineChart data={fact.rows} margin={{ top: 6, right: 18, bottom: 6, left: 18 }}>
             <CartesianGrid stroke="#f1f5f9" />
-            <XAxis dataKey={labelKey} tick={{ fontSize: 11, fill: "#475569" }}
-                   reversed={false} />
+            <XAxis dataKey={labelKey} tick={{ fontSize: 11, fill: "#475569" }} />
             <YAxis tick={{ fontSize: 11, fill: "#475569" }} />
             <Tooltip content={<CustomTooltip />} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
@@ -115,18 +307,23 @@ function FactChart({ fact }) {
                     strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
             ))}
           </LineChart>
-        ) : (
-          <BarChart data={fact.rows} margin={{ top: 6, right: 18, bottom: 6, left: 18 }}>
-            <CartesianGrid stroke="#f1f5f9" />
-            <XAxis dataKey={labelKey} tick={{ fontSize: 11, fill: "#475569" }} />
-            <YAxis tick={{ fontSize: 11, fill: "#475569" }} />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            {keys.map((k, i) => (
-              <Bar key={k} dataKey={k} fill={PAL[i % PAL.length]} radius={[4, 4, 0, 0]} />
-            ))}
-          </BarChart>
-        )}
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+  return (
+    <div style={{ width: "100%", height: 280, marginTop: 6 }}>
+      <ResponsiveContainer>
+        <BarChart data={fact.rows} margin={{ top: 6, right: 18, bottom: 6, left: 18 }}>
+          <CartesianGrid stroke="#f1f5f9" />
+          <XAxis dataKey={labelKey} tick={{ fontSize: 11, fill: "#475569" }} />
+          <YAxis tick={{ fontSize: 11, fill: "#475569" }} />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          {keys.map((k, i) => (
+            <Bar key={k} dataKey={k} fill={PAL[i % PAL.length]} radius={[4, 4, 0, 0]} />
+          ))}
+        </BarChart>
       </ResponsiveContainer>
     </div>
   );
@@ -177,8 +374,13 @@ function FactTable({ fact }) {
 }
 
 function FactCard({ fact }) {
-  const [tableOpen, setTableOpen] = useState(false);
-  const hasChart = !!pickChartShape(fact);
+  const isTable = (fact.chart_type === "table");
+  const hasChart = !isTable && (fact.chart_type !== "metric") && (
+    fact.chart_type && fact.chart_type !== "auto"
+      ? true
+      : !!pickChartShape(fact)
+  );
+  const [tableOpen, setTableOpen] = useState(isTable); // tables expanded by default
 
   return (
     <div style={{
@@ -188,8 +390,17 @@ function FactCard({ fact }) {
       <h3 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
         {fact.title}
       </h3>
-      {fact.description && (
-        <p style={{ margin: "0 0 12px", fontSize: 13, color: "#475569", lineHeight: 1.6 }}>
+
+      {/* Chart caption — מסביר מה הגרף מציג (שונה מה-description שהוא קונטקסט) */}
+      {hasChart && fact.chart_caption && (
+        <p style={{ margin: "0 0 8px", fontSize: 13, color: "#1e293b", lineHeight: 1.6 }}>
+          {fact.chart_caption}
+        </p>
+      )}
+
+      {/* Description — קונטקסט נוסף, רק אם שונה משמעותית מה-caption */}
+      {fact.description && (!fact.chart_caption || fact.description !== fact.chart_caption) && (
+        <p style={{ margin: "0 0 12px", fontSize: 12, color: "#64748b", lineHeight: 1.6 }}>
           {fact.description}
         </p>
       )}
