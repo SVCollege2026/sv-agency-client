@@ -150,14 +150,105 @@ const MODES = [
 ];
 
 // ─── Monthly KPI sub-component ─────────────────────────────────────────────
+// תצוגה זו מחקה את SV_Monthly_Comparison.xlsx:
+//   • חודשים = עמודות רמה 1 (ינואר/פברואר/...), כל אחת מתחלקת ל-3 עמודות 25/26/Δ%
+//   • מטריקות = שורות (לידים מ-Meta, תקציב, CPL, נרשמים, מבטלים, ...)
+
+const HEB_MONTHS_FULL = [
+  "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני",
+  "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר",
+];
+
+// Format helpers — תואמים ל-build_monthly_comparison.py
+function fmtMetric(v, kind) {
+  if (v == null || v === "") return "—";
+  const n = Number(v);
+  if (Number.isNaN(n)) return "—";
+  if (kind === "n")        return fmtNum(Math.round(n), 0);
+  if (kind === "money")    return `₪${fmtNum(Math.round(n), 0)}`;
+  if (kind === "money_d")  return `₪${fmtNum(n, 2)}`;
+  if (kind === "pct")      return `${fmtNum(n * 100, 2)}%`;
+  return String(v);
+}
+
+function pctChange(v25, v26) {
+  if (v25 == null || v26 == null) return null;
+  const a = Number(v25), b = Number(v26);
+  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  if (a === 0)  return b === 0 ? 0 : null;
+  return (b - a) / a * 100;
+}
+
+function fmtDelta(d) {
+  if (d == null) return "—";
+  const sign = d > 0 ? "+" : "";
+  return `${sign}${fmtNum(d, 1)}%`;
+}
+function deltaColor(d) {
+  if (d == null || d === 0) return "#94a3b8";
+  return d > 0 ? "#86efac" : "#fca5a5";
+}
+
+// Metrics list — תואם בדיוק ל-METRICS שב-build_monthly_comparison.py:325-374
+const SCHOOL_METRICS = [
+  { label: "▼ בלוק 1 — פעילות החודש (Action) ▼",        group: true },
+  { label: "— לידים שהגיעו (לפי פלטפורמה) —",            group: true },
+  { label: "לידים מ-Meta (פייסבוק+אינסטגרם)",           key: "leads_meta",        kind: "n"       },
+  { label: "לידים מ-Google",                            key: "leads_google",      kind: "n"       },
+  { label: "לידים מטיקטוק/לינקדאין",                    key: "leads_other_paid",  kind: "n"       },
+  { label: "לידים מספקי לידים",                         key: "leads_vendor",      kind: "n"       },
+  { label: "לידים אורגניים",                            key: "leads_organic",     kind: "n"       },
+  { label: "לידים אחר/לא ידוע",                         key: "leads_other",       kind: "n"       },
+  { label: "סה\"כ לידים",                              key: "leads_total",       kind: "n",      total: true },
+  { label: "— תקציב מדיה (Meta + Google בנפרד) —",       group: true },
+  { label: "תקציב Meta ₪",                              key: "spend_meta",        kind: "money"   },
+  { label: "תקציב Google ₪",                            key: "spend_google",      kind: "money"   },
+  { label: "סה\"כ תקציב ₪",                            key: "spend_total",       kind: "money",  total: true },
+  { label: "— CPL לפי פלטפורמה —",                     group: true },
+  { label: "CPL Meta ₪ (תקציב/לידים Meta)",             key: "cpl_meta",          kind: "money_d" },
+  { label: "CPL Google ₪ (תקציב/לידים Google)",         key: "cpl_google",        kind: "money_d" },
+  { label: "— נרשמים שעשו רישום החודש (Action) —",     group: true },
+  { label: "נרשמים החודש סה\"כ",                       key: "reg_action_total",  kind: "n",      total: true },
+  { label: "   ↳ ממקור Meta",                          key: "reg_action_meta",   kind: "n"       },
+  { label: "   ↳ ממקור Google",                        key: "reg_action_google", kind: "n"       },
+  { label: "עלות לנרשם Action — Meta ₪ ⚠",             key: "cpr_action_meta",   kind: "money_d" },
+  { label: "עלות לנרשם Action — Google ₪ ⚠",           key: "cpr_action_google", kind: "money_d" },
+  { label: "% המרה Action ⚠",                          key: "conv_action",       kind: "pct"     },
+  { label: "מבטלים החודש",                             key: "canc_action",       kind: "n"       },
+  { label: "% ביטול",                                  key: "canc_rate",         kind: "pct"     },
+  { label: "▼ בלוק 2 — מקור הליד (Attribution / Cohort) ▼", group: true },
+  { label: "— מהלידים שהגיעו בחודש: כמה נרשמו —",      group: true },
+  { label: "סה\"כ נרשמו עד היום",                      key: "reg_cohort_total",  kind: "n",      total: true },
+  { label: "   ↳ נרשמו באותו חודש",                    key: "reg_same_month",    kind: "n"       },
+  { label: "   ↳ נרשמו +1 חודש",                       key: "reg_plus1",         kind: "n"       },
+  { label: "   ↳ נרשמו +2 חודשים ויותר",               key: "reg_plus2plus",     kind: "n"       },
+  { label: "— נרשמים מהקוהורט לפי פלטפורמה —",        group: true },
+  { label: "נרשמים מקוהורט — Meta",                    key: "reg_cohort_meta",   kind: "n"       },
+  { label: "נרשמים מקוהורט — Google",                  key: "reg_cohort_google", kind: "n"       },
+  { label: "— ROI אמיתי (Cohort) —",                  group: true },
+  { label: "% המרה Cohort",                            key: "conv_cohort",       kind: "pct"     },
+  { label: "עלות לנרשם Cohort — Meta ₪ ✓",             key: "cpr_cohort_meta",   kind: "money_d" },
+  { label: "עלות לנרשם Cohort — Google ₪ ✓",           key: "cpr_cohort_google", kind: "money_d" },
+];
+
+// קורסים פעילים — תואם ל-monthly_kpi_aggregator._ACTIVE_COURSES
+const COURSE_METRICS = [
+  { id: "reg_total_ytd", label: "סה\"כ נרשמו (YTD)" },
+  { id: "active_ytd",    label: "רשומים פעילים (YTD)" },
+  { id: "canc_ytd",      label: "מבטלים (YTD)" },
+  { id: "frozen_ytd",    label: "מקפיאים (YTD)" },
+];
 
 function MonthlyKpiView() {
   const [tab, setTab] = useState("school"); // 'school' | 'courses'
   const [school, setSchool] = useState([]);
   const [courses, setCourses] = useState([]);
-  const [year, setYear]   = useState(2026);
+  const [currYear, setCurrYear] = useState(2026); // השנה ה"נוכחית" — תושווה ל-(currYear-1)
+  const [courseMetric, setCourseMetric] = useState("reg_total_ytd");
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
+  const [running, setRunning] = useState(false);
+  const [actionMsg, setActionMsg] = useState(null);
 
   async function load() {
     setLoading(true); setError(null);
@@ -166,14 +257,35 @@ function MonthlyKpiView() {
         const d = await getMonthlySchoolKpi();
         setSchool(d.rows || []);
       } else {
-        const d = await getMonthlyCoursesKpi({ year });
-        setCourses(d.rows || []);
+        // לקורסים — מביאים גם year וגם year-1 כדי שיהיה לנו Y-o-Y
+        const [a, b] = await Promise.all([
+          getMonthlyCoursesKpi({ year: currYear - 1 }),
+          getMonthlyCoursesKpi({ year: currYear }),
+        ]);
+        setCourses([...(a.rows || []), ...(b.rows || [])]);
       }
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [tab, year]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [tab, currYear]);
+
+  async function handleRecompute() {
+    // טריגר ידני לחודש שעבר (כמו ה-cron)
+    const today = new Date();
+    let y = today.getFullYear(), m = today.getMonth(); // החודש הקודם (0-indexed → 1..12 אחרי +1)
+    if (m === 0) { y -= 1; m = 12; }
+    setRunning(true); setActionMsg(null);
+    try {
+      const res = await runMonthlyKpi(y, m);
+      setActionMsg(`✓ חישוב מחדש ל-${res.month}: ${res.rows?.school || 0} בית-ספר, ${res.rows?.courses || 0} קורסים. (מקור: ${res.source})`);
+      await load();
+    } catch (e) {
+      setActionMsg(`✗ שגיאה: ${e.message}`);
+    } finally {
+      setRunning(false);
+    }
+  }
 
   const tabBtn = (id, label) => (
     <button key={id} type="button" onClick={() => setTab(id)}
@@ -188,22 +300,53 @@ function MonthlyKpiView() {
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 14, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
         {tabBtn("school",  "🏫 סה\"כ בית הספר")}
         {tabBtn("courses", "🎓 לפי קורס YTD")}
 
+        <span style={{ marginInlineStart: 12, fontSize: 12, color: "#64748b" }}>השוואה:</span>
+        <select value={currYear} onChange={(e) => setCurrYear(Number(e.target.value))}
+          style={{
+            background: "#0d1626", border: "1px solid #1e3a5f",
+            color: "#cbd5e1", borderRadius: 6, padding: "6px 10px", fontSize: 13,
+          }}>
+          {[2024, 2025, 2026].map((y) => (
+            <option key={y} value={y}>{y - 1} מול {y}</option>
+          ))}
+        </select>
+
         {tab === "courses" && (
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))}
+          <select value={courseMetric} onChange={(e) => setCourseMetric(e.target.value)}
             style={{
-              marginRight: 12, background: "#0d1626", border: "1px solid #1e3a5f",
+              background: "#0d1626", border: "1px solid #1e3a5f",
               color: "#cbd5e1", borderRadius: 6, padding: "6px 10px", fontSize: 13,
             }}>
-            {[2023, 2024, 2025, 2026].map((y) => (
-              <option key={y} value={y}>{y}</option>
+            {COURSE_METRICS.map((m) => (
+              <option key={m.id} value={m.id}>{m.label}</option>
             ))}
           </select>
         )}
+
+        <div style={{ flex: 1 }} />
+
+        <button type="button" onClick={handleRecompute} disabled={running}
+          style={{ ...secondaryBtn, opacity: running ? 0.6 : 1 }}>
+          {running ? "מחשב…" : "▶ חשב מחדש (חודש שעבר)"}
+        </button>
+        <button type="button" onClick={load} disabled={loading}
+          style={{ ...secondaryBtn, opacity: loading ? 0.6 : 1 }}>
+          🔄 רענן
+        </button>
       </div>
+
+      {actionMsg && (
+        <div style={{
+          background: actionMsg.startsWith("✗") ? "#1a0c0c" : "#0c1a0e",
+          border:     `1px solid ${actionMsg.startsWith("✗") ? "#7f1d1d" : "#166534"}`,
+          color:      actionMsg.startsWith("✗") ? "#fca5a5" : "#86efac",
+          borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 12,
+        }}>{actionMsg}</div>
+      )}
 
       {error && (
         <div style={{ background: "#1a0c0c", border: "1px solid #7f1d1d", color: "#fca5a5",
@@ -216,48 +359,119 @@ function MonthlyKpiView() {
         <div style={{ textAlign: "center", color: "#64748b", padding: 40 }}>טוען…</div>
       )}
 
-      {!loading && tab === "school" && <SchoolKpiTable rows={school} />}
-      {!loading && tab === "courses" && <CoursesKpiTable rows={courses} year={year} />}
+      {!loading && tab === "school"  && <SchoolKpiTable  rows={school} currYear={currYear} />}
+      {!loading && tab === "courses" && <CoursesKpiTable rows={courses} currYear={currYear} metricId={courseMetric} />}
     </div>
   );
 }
 
-function SchoolKpiTable({ rows }) {
-  // School-wide KPIs — month rows, key metrics in columns
-  const cols = [
-    { k: "month_ym",          h: "חודש" },
-    { k: "leads_total",       h: "לידים סה\"כ", fmt: (v) => fmtNum(v) },
-    { k: "leads_meta",        h: "Meta",       fmt: (v) => fmtNum(v) },
-    { k: "leads_google",      h: "Google",     fmt: (v) => fmtNum(v) },
-    { k: "leads_organic",     h: "אורגני",     fmt: (v) => fmtNum(v) },
-    { k: "leads_vendor",      h: "ספקי לידים", fmt: (v) => fmtNum(v) },
-    { k: "spend_total",       h: "תקציב סה\"כ", fmt: fmtMoney },
-    { k: "spend_meta",        h: "תקציב Meta", fmt: fmtMoney },
-    { k: "spend_google",      h: "תקציב Google", fmt: fmtMoney },
-    { k: "cpl_meta",          h: "CPL Meta",   fmt: fmtMoney },
-    { k: "cpl_google",        h: "CPL Google", fmt: fmtMoney },
-    { k: "reg_action_total",  h: "נרשמים",     fmt: (v) => fmtNum(v) },
-    { k: "canc_action",       h: "מבטלים",     fmt: (v) => fmtNum(v) },
-    { k: "canc_rate",         h: "% ביטול",    fmt: (v) => v != null ? fmtPct(v * 100) : "—" },
-  ];
-  if (!rows || rows.length === 0) {
-    return <div style={{ color: "#64748b", padding: 40, textAlign: "center" }}>אין נתונים</div>;
+// SchoolKpiTable — Y-o-Y pivot בסגנון Excel.
+//   header: row 1 = months (colSpan=3), row 2 = "25 | 26 | Δ%"
+//   body:   each metric row + group separators
+function SchoolKpiTable({ rows, currYear }) {
+  const prevYear = currYear - 1;
+
+  // Build map: year → { month_num → row }
+  const byYearMonth = useMemo(() => {
+    const map = {};
+    for (const r of rows || []) {
+      if (!r.month_ym) continue;
+      const y = parseInt(r.month_ym.slice(0, 4), 10);
+      const m = parseInt(r.month_ym.slice(5, 7), 10);
+      if (!map[y]) map[y] = {};
+      map[y][m] = r;
+    }
+    return map;
+  }, [rows]);
+
+  // קביעת חודשים להצגה — כל החודשים שיש להם נתונים בשנה הנוכחית או הקודמת
+  const monthsToShow = useMemo(() => {
+    const set = new Set();
+    [prevYear, currYear].forEach((y) => {
+      if (byYearMonth[y]) Object.keys(byYearMonth[y]).forEach((m) => set.add(parseInt(m, 10)));
+    });
+    return [...set].sort((a, b) => a - b);
+  }, [byYearMonth, prevYear, currYear]);
+
+  if (monthsToShow.length === 0) {
+    return <div style={{ color: "#64748b", padding: 40, textAlign: "center" }}>
+      אין נתונים להשוואה בין {prevYear} ל-{currYear}
+    </div>;
   }
+
+  const subYearShort = (y) => String(y).slice(-2);
+
   return (
     <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, overflow: "hidden" }}>
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <thead style={{ background: "#0d1626" }}>
-            <tr>{cols.map((c) => <th key={c.k} style={thStyle}>{c.h}</th>)}</tr>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead style={{ background: "#0d1626", position: "sticky", top: 0 }}>
+            {/* Row 1: months (each colSpan=3) */}
+            <tr>
+              <th rowSpan={2} style={{ ...thStyle, minWidth: 280, textAlign: "right",
+                  borderInlineEnd: "1px solid #1e293b", background: "#0d1626" }}>מטריקה</th>
+              {monthsToShow.map((m) => (
+                <th key={m} colSpan={3} style={{ ...thStyle, textAlign: "center",
+                    borderInlineEnd: "1px solid #1e293b", color: "#93c5fd",
+                    background: "#101a2c", fontSize: 13 }}>
+                  {HEB_MONTHS_FULL[m - 1]}
+                </th>
+              ))}
+            </tr>
+            {/* Row 2: 25 | 26 | Δ% */}
+            <tr>
+              {monthsToShow.flatMap((m) => [
+                <th key={`${m}-prev`} style={{ ...thStyle, textAlign: "center",
+                    color: "#94a3b8", borderInlineStart: "1px solid #1e293b" }}>
+                  '{subYearShort(prevYear)}
+                </th>,
+                <th key={`${m}-curr`} style={{ ...thStyle, textAlign: "center", color: "#94a3b8" }}>
+                  '{subYearShort(currYear)}
+                </th>,
+                <th key={`${m}-delta`} style={{ ...thStyle, textAlign: "center",
+                    color: "#94a3b8", borderInlineEnd: "1px solid #1e293b" }}>Δ%</th>,
+              ])}
+            </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.month_ym} style={{ borderTop: "1px solid #101a2c", color: "#cbd5e1" }}>
-                {cols.map((c) => (
-                  <td key={c.k} style={tdStyle}>{c.fmt ? c.fmt(r[c.k]) : (r[c.k] ?? "—")}</td>
-                ))}
-              </tr>
-            ))}
+            {SCHOOL_METRICS.map((row, idx) => {
+              if (row.group) {
+                return (
+                  <tr key={`g-${idx}`} style={{ background: "#0d1f3a", borderTop: "1px solid #1e3a5f" }}>
+                    <td colSpan={1 + monthsToShow.length * 3}
+                        style={{ padding: "8px 12px", fontWeight: 700, color: "#93c5fd", fontSize: 12 }}>
+                      {row.label}
+                    </td>
+                  </tr>
+                );
+              }
+              return (
+                <tr key={row.key} style={{
+                  borderTop: "1px solid #101a2c",
+                  background: row.total ? "#101a2c" : "transparent",
+                  fontWeight: row.total ? 700 : 400,
+                  color: row.total ? "#e2e8f0" : "#cbd5e1",
+                }}>
+                  <td style={{ ...tdStyle, textAlign: "right",
+                       borderInlineEnd: "1px solid #1e293b", whiteSpace: "nowrap" }}>{row.label}</td>
+                  {monthsToShow.map((m) => {
+                    const prevRow = byYearMonth[prevYear]?.[m];
+                    const currRow = byYearMonth[currYear]?.[m];
+                    const v25 = prevRow ? prevRow[row.key] : null;
+                    const v26 = currRow ? currRow[row.key] : null;
+                    const d   = pctChange(v25, v26);
+                    return [
+                      <td key={`${m}-p`} style={{ ...tdStyle, textAlign: "center",
+                          borderInlineStart: "1px solid #1e293b" }}>{fmtMetric(v25, row.kind)}</td>,
+                      <td key={`${m}-c`} style={{ ...tdStyle, textAlign: "center" }}>{fmtMetric(v26, row.kind)}</td>,
+                      <td key={`${m}-d`} style={{ ...tdStyle, textAlign: "center",
+                          color: deltaColor(d), fontWeight: 600,
+                          borderInlineEnd: "1px solid #1e293b" }}>{fmtDelta(d)}</td>,
+                    ];
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -265,54 +479,124 @@ function SchoolKpiTable({ rows }) {
   );
 }
 
-function CoursesKpiTable({ rows, year }) {
-  // Pivot: rows = course_clean, cols = month (1..12)
-  const months = ["ינו", "פבר", "מרץ", "אפר", "מאי", "יוני", "יולי", "אוג", "ספט", "אוק", "נוב", "דצמ"];
-  // Build map: course → month_num → row
-  const byCourse = {};
-  for (const r of rows || []) {
-    const list = byCourse[r.course_clean] || (byCourse[r.course_clean] = {});
-    list[r.month_num] = r;
+// CoursesKpiTable — Y-o-Y pivot בסגנון Excel:
+//   header: row 1 = months, row 2 = 25/26/Δ%
+//   body:   each course = one row (אוחד למטריקה אחת לפי הבחירה)
+function CoursesKpiTable({ rows, currYear, metricId }) {
+  const prevYear = currYear - 1;
+
+  // Build map: course → year → month → row
+  const byCourse = useMemo(() => {
+    const map = {};
+    for (const r of rows || []) {
+      if (!r.course_clean) continue;
+      const y = r.year, m = r.month_num;
+      if (!map[r.course_clean]) map[r.course_clean] = {};
+      if (!map[r.course_clean][y]) map[r.course_clean][y] = {};
+      map[r.course_clean][y][m] = r;
+    }
+    return map;
+  }, [rows]);
+
+  const courseList = useMemo(() => Object.keys(byCourse).sort((a, b) => a.localeCompare(b, "he")), [byCourse]);
+
+  const monthsToShow = useMemo(() => {
+    const set = new Set();
+    for (const c of courseList) {
+      [prevYear, currYear].forEach((y) => {
+        if (byCourse[c][y]) Object.keys(byCourse[c][y]).forEach((m) => set.add(parseInt(m, 10)));
+      });
+    }
+    return [...set].sort((a, b) => a - b);
+  }, [byCourse, courseList, prevYear, currYear]);
+
+  if (courseList.length === 0 || monthsToShow.length === 0) {
+    return <div style={{ color: "#64748b", padding: 40, textAlign: "center" }}>
+      אין נתונים להשוואה בין {prevYear} ל-{currYear}
+    </div>;
   }
-  const courseList = Object.keys(byCourse).sort();
-  if (courseList.length === 0) {
-    return <div style={{ color: "#64748b", padding: 40, textAlign: "center" }}>אין נתונים לשנה {year}</div>;
+
+  const subYearShort = (y) => String(y).slice(-2);
+  const metricLabel = COURSE_METRICS.find((m) => m.id === metricId)?.label || metricId;
+
+  // חישוב סה"כ בית הספר (פר חודש פר שנה)
+  const totals = {};
+  for (const y of [prevYear, currYear]) {
+    totals[y] = {};
+    for (const m of monthsToShow) {
+      let s = 0, hasData = false;
+      for (const c of courseList) {
+        const r = byCourse[c]?.[y]?.[m];
+        if (r && r[metricId] != null) { s += Number(r[metricId]); hasData = true; }
+      }
+      totals[y][m] = hasData ? s : null;
+    }
   }
+
   return (
     <div style={{ background: "#0a1628", border: "1px solid #1e293b", borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ padding: "10px 14px", color: "#64748b", fontSize: 12, borderBottom: "1px solid #1e293b" }}>
+        מציג: <span style={{ color: "#93c5fd", fontWeight: 600 }}>{metricLabel}</span> · השוואה {prevYear} מול {currYear}
+      </div>
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead style={{ background: "#0d1626" }}>
             <tr>
-              <th style={thStyle}>קורס</th>
-              <th style={thStyle}>מדד</th>
-              {months.map((m, i) => <th key={i} style={thStyle}>{m}</th>)}
+              <th rowSpan={2} style={{ ...thStyle, minWidth: 180, textAlign: "right",
+                  borderInlineEnd: "1px solid #1e293b", background: "#0d1626" }}>קורס</th>
+              {monthsToShow.map((m) => (
+                <th key={m} colSpan={3} style={{ ...thStyle, textAlign: "center",
+                    borderInlineEnd: "1px solid #1e293b", color: "#93c5fd",
+                    background: "#101a2c", fontSize: 13 }}>
+                  {HEB_MONTHS_FULL[m - 1]}
+                </th>
+              ))}
+            </tr>
+            <tr>
+              {monthsToShow.flatMap((m) => [
+                <th key={`${m}-p`} style={{ ...thStyle, textAlign: "center",
+                    color: "#94a3b8", borderInlineStart: "1px solid #1e293b" }}>'{subYearShort(prevYear)}</th>,
+                <th key={`${m}-c`} style={{ ...thStyle, textAlign: "center", color: "#94a3b8" }}>'{subYearShort(currYear)}</th>,
+                <th key={`${m}-d`} style={{ ...thStyle, textAlign: "center",
+                    color: "#94a3b8", borderInlineEnd: "1px solid #1e293b" }}>Δ%</th>,
+              ])}
             </tr>
           </thead>
           <tbody>
-            {courseList.map((course) => {
-              const monthMap = byCourse[course];
-              const renderRow = (label, key, fmt) => (
-                <tr key={`${course}-${key}`} style={{ borderTop: "1px solid #101a2c", color: "#cbd5e1" }}>
-                  {key === "active_ytd" && (
-                    <td rowSpan={4} style={{ ...tdStyle, fontWeight: 600, color: "#93c5fd",
-                          borderInlineEnd: "1px solid #1e293b" }}>{course}</td>
-                  )}
-                  <td style={{ ...tdStyle, color: "#94a3b8" }}>{label}</td>
-                  {months.map((_, i) => {
-                    const r = monthMap[i + 1];
-                    const v = r ? r[key] : null;
-                    return <td key={i} style={tdStyle}>{v != null ? (fmt ? fmt(v) : v) : "—"}</td>;
-                  })}
-                </tr>
-              );
-              return [
-                renderRow("רשומים פעילים", "active_ytd",     (v) => fmtNum(v)),
-                renderRow("מבטלים",        "canc_ytd",       (v) => fmtNum(v)),
-                renderRow("מקפיאים",       "frozen_ytd",     (v) => fmtNum(v)),
-                renderRow("סה\"כ נרשמו",   "reg_total_ytd",  (v) => fmtNum(v)),
-              ];
-            })}
+            {courseList.map((course) => (
+              <tr key={course} style={{ borderTop: "1px solid #101a2c", color: "#cbd5e1" }}>
+                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: "#93c5fd",
+                     borderInlineEnd: "1px solid #1e293b" }}>{course}</td>
+                {monthsToShow.map((m) => {
+                  const v25 = byCourse[course]?.[prevYear]?.[m]?.[metricId] ?? null;
+                  const v26 = byCourse[course]?.[currYear]?.[m]?.[metricId] ?? null;
+                  const d   = pctChange(v25, v26);
+                  return [
+                    <td key={`${m}-p`} style={{ ...tdStyle, textAlign: "center",
+                         borderInlineStart: "1px solid #1e293b" }}>{fmtMetric(v25, "n")}</td>,
+                    <td key={`${m}-c`} style={{ ...tdStyle, textAlign: "center" }}>{fmtMetric(v26, "n")}</td>,
+                    <td key={`${m}-d`} style={{ ...tdStyle, textAlign: "center", color: deltaColor(d),
+                         fontWeight: 600, borderInlineEnd: "1px solid #1e293b" }}>{fmtDelta(d)}</td>,
+                  ];
+                })}
+              </tr>
+            ))}
+            {/* סה"כ בית הספר */}
+            <tr style={{ borderTop: "2px solid #1e3a5f", background: "#101a2c", fontWeight: 700, color: "#e2e8f0" }}>
+              <td style={{ ...tdStyle, textAlign: "right", borderInlineEnd: "1px solid #1e293b" }}>סה"כ בית הספר</td>
+              {monthsToShow.map((m) => {
+                const v25 = totals[prevYear][m];
+                const v26 = totals[currYear][m];
+                const d   = pctChange(v25, v26);
+                return [
+                  <td key={`${m}-p`} style={{ ...tdStyle, textAlign: "center",
+                       borderInlineStart: "1px solid #1e293b" }}>{fmtMetric(v25, "n")}</td>,
+                  <td key={`${m}-c`} style={{ ...tdStyle, textAlign: "center" }}>{fmtMetric(v26, "n")}</td>,
+                  <td key={`${m}-d`} style={{ ...tdStyle, textAlign: "center", color: deltaColor(d),
+                       fontWeight: 700, borderInlineEnd: "1px solid #1e293b" }}>{fmtDelta(d)}</td>,
+                ];
+              })}
+            </tr>
           </tbody>
         </table>
       </div>
