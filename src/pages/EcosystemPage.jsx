@@ -73,12 +73,26 @@ export default function EcosystemPage() {
   return (
     <Page>
       <div style={{ marginBottom: 24 }}>
-        <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 4px" }}>
-          ניתוח מנהלים — שלב 0
-          {data.cutoff_date && <> · baseline עד {data.cutoff_date}</>}
-          {" · "}הופק {fmtDate(data.generated_at)}
-          {" · "}{data.n_facts} ניתוחים בבסיס
-          {" · "}סוכנים: {(data.agents_used || []).join(" + ")}
+        <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 4px",
+                    display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span>ניתוח מנהלים — שלב 0</span>
+          {data.is_baseline ? (
+            <span title="הגרסה הזאת מקובעת בעמוד 'דוחות'. ריצות חדשות לא ידרסו אותה." style={{
+              fontSize: 10, fontWeight: 700, padding: "2px 7px",
+              background: "#fef3c7", color: "#92400e",
+              border: "1px solid #fcd34d", borderRadius: 4,
+            }}>📌 נקודת אפס מקובעת</span>
+          ) : (
+            <span title="אין גרסה מקובעת — מוצגת הריצה האחרונה. כדי לקבע, פתחי 'דוחות' ולחצי 'קבע כנקודת אפס'." style={{
+              fontSize: 10, fontWeight: 700, padding: "2px 7px",
+              background: "#dbeafe", color: "#1e40af",
+              border: "1px solid #93c5fd", borderRadius: 4,
+            }}>הריצה האחרונה</span>
+          )}
+          {data.cutoff_date && <span>· baseline עד {data.cutoff_date}</span>}
+          <span>· הופק {fmtDate(data.generated_at)}</span>
+          <span>· {data.n_facts} ניתוחים בבסיס</span>
+          <span>· סוכנים: {(data.agents_used || []).join(" + ")}</span>
         </p>
       </div>
 

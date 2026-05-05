@@ -15,7 +15,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, Cell,
 } from "recharts";
-import { getStage0History, getStage0Report } from "../api.js";
+import { getStage0History, getStage0Report, setStage0Baseline } from "../api.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -86,6 +86,7 @@ export default function ReportsPage() {
   const [selectedId, setSelectedId]     = useState(null);
   const [snapshot, setSnapshot]         = useState(null);
   const [loadingSnap, setLoadingSnap]   = useState(false);
+  const [savingBaseline, setSavingBaseline] = useState(false);
 
   // Load list once
   useEffect(() => {
@@ -93,7 +94,10 @@ export default function ReportsPage() {
       .then((d) => {
         const rows = d?.reports || [];
         setList(rows);
-        if (rows.length) setSelectedId(rows[0].id);  // open the latest by default
+        // ברירת מחדל: ה-baseline אם יש, אחרת האחרונה
+        const baseline = rows.find((r) => r.is_baseline);
+        if (baseline)         setSelectedId(baseline.id);
+        else if (rows.length) setSelectedId(rows[0].id);
       })
       .catch((e) => setError(e.message || String(e)))
       .finally(() => setLoadingList(false));
@@ -109,6 +113,24 @@ export default function ReportsPage() {
       .catch((e) => setError(e.message || String(e)))
       .finally(() => setLoadingSnap(false));
   }, [selectedId]);
+
+  const handleSetBaseline = async () => {
+    if (!selectedId || savingBaseline) return;
+    setSavingBaseline(true);
+    setError(null);
+    try {
+      await setStage0Baseline(selectedId);
+      // Refresh list so is_baseline flags update
+      const d = await getStage0History();
+      setList(d?.reports || []);
+    } catch (e) {
+      setError(e.message || String(e));
+    } finally {
+      setSavingBaseline(false);
+    }
+  };
+
+  const currentBaselineId = list.find((r) => r.is_baseline)?.id;
 
   return (
     <div lang="he" dir="rtl" style={{
@@ -156,6 +178,7 @@ export default function ReportsPage() {
               </div>
               {list.map((r) => {
                 const active = r.id === selectedId;
+                const isBaseline = !!r.is_baseline;
                 return (
                   <button
                     key={r.id}
@@ -171,9 +194,22 @@ export default function ReportsPage() {
                       lineHeight: 1.5,
                     }}
                   >
-                    <div style={{ fontWeight: 600, fontSize: 11,
-                                  color: active ? "#bfdbfe" : "#475569" }}>
-                      {fmtDate(r.generated_at)}
+                    <div style={{ display: "flex", alignItems: "center",
+                                  justifyContent: "space-between", gap: 6 }}>
+                      <div style={{ fontWeight: 600, fontSize: 11,
+                                    color: active ? "#bfdbfe" : "#475569" }}>
+                        {fmtDate(r.generated_at)}
+                      </div>
+                      {isBaseline && (
+                        <span title="נקודת אפס" style={{
+                          fontSize: 9, fontWeight: 700, padding: "1px 5px",
+                          background: active ? "#fbbf24" : "#fef3c7",
+                          color:      active ? "#0f172a" : "#92400e",
+                          borderRadius: 4, whiteSpace: "nowrap",
+                        }}>
+                          📌 אפס
+                        </span>
+                      )}
                     </div>
                     <div style={{ marginTop: 2, fontSize: 12 }}>
                       {(r.headline || "(ללא כותרת)").slice(0, 80)}
@@ -191,7 +227,12 @@ export default function ReportsPage() {
                   טוען גרסה…
                 </div>
               ) : snapshot ? (
-                <SnapshotView snapshot={snapshot} />
+                <SnapshotView
+                  snapshot={snapshot}
+                  isBaseline={selectedId === currentBaselineId}
+                  onSetBaseline={handleSetBaseline}
+                  saving={savingBaseline}
+                />
               ) : (
                 <div style={{ padding: 60, textAlign: "center", color: "#64748b" }}>
                   בחר גרסה מהרשימה
@@ -207,7 +248,7 @@ export default function ReportsPage() {
 
 // ─── Snapshot View — Executive analysis + Charts ─────────────────────────────
 
-function SnapshotView({ snapshot }) {
+function SnapshotView({ snapshot, isBaseline, onSetBaseline, saving }) {
   const a = snapshot.analysis || {};
   const c = snapshot.charts || { groups: {} };
 
@@ -215,14 +256,40 @@ function SnapshotView({ snapshot }) {
     <div>
       {/* Header */}
       <div style={{ marginBottom: 20, padding: "12px 16px",
-                    background: "#eff6ff", border: "1px solid #bfdbfe",
-                    borderRadius: 10 }}>
-        <div style={{ fontSize: 11, color: "#1e40af", marginBottom: 2 }}>
-          גרסה
+                    background: isBaseline ? "#fffbeb" : "#eff6ff",
+                    border: "1px solid " + (isBaseline ? "#fcd34d" : "#bfdbfe"),
+                    borderRadius: 10,
+                    display: "flex", alignItems: "center",
+                    justifyContent: "space-between", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 11, color: isBaseline ? "#92400e" : "#1e40af", marginBottom: 2 }}>
+            {isBaseline ? "📌 נקודת האפס" : "גרסה"}
+          </div>
+          <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>
+            {fmtDate(a.generated_at)} · {a.n_facts} ניתוחים · {(a.agents_used || []).join(" + ")}
+          </div>
         </div>
-        <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>
-          {fmtDate(a.generated_at)} · {a.n_facts} ניתוחים · {(a.agents_used || []).join(" + ")}
-        </div>
+        <button
+          type="button"
+          onClick={onSetBaseline}
+          disabled={isBaseline || saving}
+          style={{
+            padding: "8px 14px", fontSize: 12, fontWeight: 600, fontFamily: "inherit",
+            background: isBaseline ? "#fef3c7" : "#1e3a5f",
+            color:      isBaseline ? "#92400e" : "#ffffff",
+            border: "1px solid " + (isBaseline ? "#fcd34d" : "#1e3a5f"),
+            borderRadius: 6,
+            cursor: (isBaseline || saving) ? "default" : "pointer",
+            opacity: saving ? 0.6 : 1,
+            whiteSpace: "nowrap",
+          }}
+          title={isBaseline
+            ? "זאת הגרסה המקובעת — מוצגת בדף 'ניתוח מנהלים'"
+            : "סמן גרסה זו כנקודת אפס. דף 'ניתוח מנהלים' יציג אותה במקום הריצה האחרונה"}
+        >
+          {isBaseline ? "✓ זאת נקודת האפס" :
+           saving      ? "שומר…"           : "📌 קבע כנקודת אפס"}
+        </button>
       </div>
 
       {/* ── Part 1: Executive analysis ── */}
