@@ -58,10 +58,7 @@ export default function EcosystemPage() {
   if (!data?.available) {
     return (
       <Page>
-        <EmptyState
-          onRun={() => navigate("/analytics/analysis")}
-          onHistory={() => navigate("/analytics/reports")}
-        />
+        <EmptyState onHistory={() => navigate("/analytics/reports")} />
       </Page>
     );
   }
@@ -366,7 +363,7 @@ function ErrorBox({ message }) {
   );
 }
 
-function EmptyState({ onRun, onHistory }) {
+function EmptyState({ onHistory }) {
   return (
     <div style={{
       textAlign: "center", padding: "60px 20px",
@@ -377,20 +374,15 @@ function EmptyState({ onRun, onHistory }) {
         עדיין אין ניתוח מנהלים זמין
       </h3>
       <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 18px" }}>
-        כדי להפיק את הניתוח הראשון — בצע ריצה של שלב 0.
+        כדי להפיק ניתוח, יש להריץ את <code>scripts/run_stage0_now.py</code> בטרמינל.
       </p>
       <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-        <button onClick={onRun} style={btnPrimary}>הפעל ניתוח שלב 0</button>
         <button onClick={onHistory} style={btnSecondary}>היסטוריית דוחות</button>
       </div>
     </div>
   );
 }
 
-const btnPrimary = {
-  background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 8,
-  padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer",
-};
 const btnSecondary = {
   background: "#fff", color: "#1e293b", border: "1px solid #cbd5e1",
   borderRadius: 8, padding: "10px 20px", fontSize: 14, cursor: "pointer",

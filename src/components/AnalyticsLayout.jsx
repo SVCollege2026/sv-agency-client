@@ -1,17 +1,19 @@
 /**
  * AnalyticsLayout.jsx — shell של מחלקת אנליזה
- * Secondary nav: לוח בקרה · ניתוח שלב 0 · ניתוח נקודתי · ניתוח מנהלים · דוחות · יעדים
+ * Secondary nav: Dashboard · ניתוח מנהלים · דוחות שמורים
+ *
+ * הוסרו: ניתוח שלב 0 (AnalysisPage), ניתוח נקודתי (QuickTablePage), יעדים
+ * (GoalsPage). הם משאריות הארכיטקטורה הישנה (לפני Stage 0 baseline) ולא
+ * מחוברים למקורות הנתונים הנוכחיים. בעתיד תיבנה כאן יכולת "שאלות לניתוח"
+ * חדשה שתתבסס על baseline_facts (ראו README).
  */
 import React from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
 const NAV = [
-  { to: "/analytics/dashboard",   icon: "📊", label: "לוח בקרה"        },
-  { to: "/analytics/analysis",    icon: "⚙️",  label: "ניתוח שלב 0"     },
-  { to: "/analytics/quick-table", icon: "🎯", label: "ניתוח נקודתי"   },
-  { to: "/analytics/ecosystem",   icon: "📋", label: "ניתוח מנהלים"    },
-  { to: "/analytics/reports",     icon: "📄", label: "דוחות"          },
-  { to: "/analytics/goals",       icon: "🚀", label: "יעדים"          },
+  { to: "/analytics/dashboard", icon: "📊", label: "Dashboard"       },
+  { to: "/analytics/ecosystem", icon: "📋", label: "ניתוח מנהלים"   },
+  { to: "/analytics/reports",   icon: "📄", label: "דוחות שמורים"   },
 ];
 
 export default function AnalyticsLayout() {
