@@ -8,6 +8,9 @@
  * Backend: /api/media-reports/*
  */
 import React, { useState, useEffect, useMemo } from "react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from "recharts";
 import { useNavigate } from "react-router-dom";
 import {
   getMediaDaily,
@@ -258,6 +261,175 @@ const COURSE_METRICS = [
   { id: "frozen_ytd",    label: "מקפיאים (YTD)" },
 ];
 
+// ─── SchoolKpiCharts ──────────────────────────────────────────────────────────
+// 3 bar charts above the table: leads YoY · registrations YoY · spend YoY
+function SchoolKpiCharts({ rows, currYear }) {
+  const prevYear = currYear - 1;
+
+  const byYM = useMemo(() => {
+    const m = {};
+    for (const r of rows || []) {
+      if (!r.month_ym) continue;
+      const y = parseInt(r.month_ym.slice(0, 4), 10);
+      const mo = parseInt(r.month_ym.slice(5, 7), 10);
+      if (!m[y]) m[y] = {};
+      m[y][mo] = r;
+    }
+    return m;
+  }, [rows]);
+
+  const months = useMemo(() => {
+    const s = new Set();
+    [prevYear, currYear].forEach(y => {
+      if (byYM[y]) Object.keys(byYM[y]).forEach(mo => s.add(+mo));
+    });
+    return [...s].sort((a, b) => a - b);
+  }, [byYM, prevYear, currYear]);
+
+  if (!months.length) return null;
+
+  const HEB_S = ["ינו'", "פבר'", "מרץ", "אפר'", "מאי", "יוני",
+                 "יולי", "אוג'", "ספט'", "אוק'", "נוב'", "דצמ'"];
+  const axisTick = { fontSize: 11, fill: "#64748b" };
+
+  const leadsData = months.map(m => ({
+    month: HEB_S[m - 1],
+    [String(prevYear)]: byYM[prevYear]?.[m]?.leads_total ?? null,
+    [String(currYear)]: byYM[currYear]?.[m]?.leads_total ?? null,
+  }));
+  const regData = months.map(m => ({
+    month: HEB_S[m - 1],
+    [String(prevYear)]: byYM[prevYear]?.[m]?.reg_action_total ?? null,
+    [String(currYear)]: byYM[currYear]?.[m]?.reg_action_total ?? null,
+  }));
+  const spendData = months.map(m => ({
+    month: HEB_S[m - 1],
+    [`Meta ${prevYear}`]:   byYM[prevYear]?.[m]?.spend_meta   ?? null,
+    [`Google ${prevYear}`]: byYM[prevYear]?.[m]?.spend_google ?? null,
+    [`Meta ${currYear}`]:   byYM[currYear]?.[m]?.spend_meta   ?? null,
+    [`Google ${currYear}`]: byYM[currYear]?.[m]?.spend_google ?? null,
+  }));
+
+  const tipStyle = {
+    background: "#fff", border: "1px solid #e2e8f0",
+    borderRadius: 8, fontSize: 12, direction: "rtl",
+  };
+  const ChartCard = ({ title, color, children, full }) => (
+    <div style={{
+      background: "#fff", border: "1px solid #e2e8f0",
+      borderTop: `3px solid ${color}`, borderRadius: 10, padding: "14px 16px",
+      gridColumn: full ? "1 / -1" : undefined,
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>{title}</div>
+      <div style={{ width: "100%", height: 220 }}>
+        <ResponsiveContainer>{children}</ResponsiveContainer>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+      <ChartCard title={`לידים חודשי — ${prevYear} מול ${currYear}`} color="#3b82f6">
+        <BarChart data={leadsData} margin={{ top: 4, right: 8, bottom: 4, left: 4 }}>
+          <CartesianGrid stroke="#f1f5f9" vertical={false} />
+          <XAxis dataKey="month" tick={axisTick} />
+          <YAxis tick={axisTick} />
+          <Tooltip contentStyle={tipStyle} />
+          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Bar dataKey={String(prevYear)} fill="#94a3b8" radius={[3, 3, 0, 0]} />
+          <Bar dataKey={String(currYear)} fill="#3b82f6" radius={[3, 3, 0, 0]} />
+        </BarChart>
+      </ChartCard>
+
+      <ChartCard title={`נרשמים חודשי — ${prevYear} מול ${currYear}`} color="#10b981">
+        <BarChart data={regData} margin={{ top: 4, right: 8, bottom: 4, left: 4 }}>
+          <CartesianGrid stroke="#f1f5f9" vertical={false} />
+          <XAxis dataKey="month" tick={axisTick} />
+          <YAxis tick={axisTick} />
+          <Tooltip contentStyle={tipStyle} />
+          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Bar dataKey={String(prevYear)} fill="#94a3b8" radius={[3, 3, 0, 0]} />
+          <Bar dataKey={String(currYear)} fill="#10b981" radius={[3, 3, 0, 0]} />
+        </BarChart>
+      </ChartCard>
+
+      <ChartCard title={`ספנד Meta + Google — ${prevYear} מול ${currYear}`} color="#8b5cf6" full>
+        <BarChart data={spendData} margin={{ top: 4, right: 16, bottom: 4, left: 40 }}>
+          <CartesianGrid stroke="#f1f5f9" vertical={false} />
+          <XAxis dataKey="month" tick={axisTick} />
+          <YAxis tick={axisTick} tickFormatter={v => `₪${(v / 1000).toFixed(0)}K`} />
+          <Tooltip
+            contentStyle={tipStyle}
+            formatter={v => `₪${Math.round(v).toLocaleString("he-IL")}`}
+          />
+          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Bar dataKey={`Meta ${prevYear}`}   fill="#c4b5fd" radius={[3, 3, 0, 0]} />
+          <Bar dataKey={`Google ${prevYear}`} fill="#fde68a" radius={[3, 3, 0, 0]} />
+          <Bar dataKey={`Meta ${currYear}`}   fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+          <Bar dataKey={`Google ${currYear}`} fill="#f59e0b" radius={[3, 3, 0, 0]} />
+        </BarChart>
+      </ChartCard>
+    </div>
+  );
+}
+
+// ─── CoursesKpiCharts ─────────────────────────────────────────────────────────
+// Horizontal grouped bar: each course, prevYear vs currYear for selected metric
+function CoursesKpiCharts({ rows, currYear, metricId }) {
+  const prevYear = currYear - 1;
+
+  const chartData = useMemo(() => {
+    const byCourse = {};
+    for (const r of rows || []) {
+      const c = r.course_clean;
+      if (!c) continue;
+      if (!byCourse[c]) byCourse[c] = {};
+      const y = r.year;
+      // YTD is cumulative — keep row with highest month_num per course×year
+      if (!byCourse[c][y] || (r.month_num || 0) > (byCourse[c][y].month_num || 0))
+        byCourse[c][y] = r;
+    }
+    return Object.entries(byCourse)
+      .map(([course, byYear]) => ({
+        course,
+        [String(prevYear)]: byYear[prevYear]?.[metricId] ?? 0,
+        [String(currYear)]: byYear[currYear]?.[metricId] ?? 0,
+      }))
+      .sort((a, b) => (b[String(currYear)] || 0) - (a[String(currYear)] || 0));
+  }, [rows, currYear, metricId, prevYear]);
+
+  const metricLabel = COURSE_METRICS.find(m => m.id === metricId)?.label || metricId;
+  if (!chartData.length) return null;
+
+  return (
+    <div style={{
+      background: "#fff", border: "1px solid #e2e8f0",
+      borderTop: "3px solid #10b981", borderRadius: 10,
+      padding: "14px 16px", marginBottom: 20,
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>
+        {metricLabel} לפי קורס — {prevYear} מול {currYear}
+      </div>
+      <div style={{ width: "100%", height: Math.max(200, chartData.length * 44) }}>
+        <ResponsiveContainer>
+          <BarChart data={chartData} layout="vertical"
+                    margin={{ top: 4, right: 40, bottom: 4, left: 110 }}>
+            <CartesianGrid stroke="#f1f5f9" horizontal={false} />
+            <XAxis type="number" tick={{ fontSize: 11, fill: "#64748b" }} />
+            <YAxis type="category" dataKey="course" tick={{ fontSize: 11, fill: "#64748b" }} width={100} />
+            <Tooltip
+              contentStyle={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }}
+            />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Bar dataKey={String(prevYear)} fill="#94a3b8" radius={[0, 3, 3, 0]} />
+            <Bar dataKey={String(currYear)} fill="#10b981" radius={[0, 3, 3, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
 function MonthlyKpiView() {
   const [tab, setTab] = useState("school"); // 'school' | 'courses'
   const [school, setSchool] = useState([]);
@@ -378,8 +550,18 @@ function MonthlyKpiView() {
         <div style={{ textAlign: "center", color: "#64748b", padding: 40 }}>טוען…</div>
       )}
 
-      {!loading && tab === "school"  && <SchoolKpiTable  rows={school} currYear={currYear} />}
-      {!loading && tab === "courses" && <CoursesKpiTable rows={courses} currYear={currYear} metricId={courseMetric} />}
+      {!loading && tab === "school" && (
+        <>
+          <SchoolKpiCharts rows={school} currYear={currYear} />
+          <SchoolKpiTable  rows={school} currYear={currYear} />
+        </>
+      )}
+      {!loading && tab === "courses" && (
+        <>
+          <CoursesKpiCharts rows={courses} currYear={currYear} metricId={courseMetric} />
+          <CoursesKpiTable  rows={courses} currYear={currYear} metricId={courseMetric} />
+        </>
+      )}
     </div>
   );
 }

@@ -17,7 +17,7 @@ import { getBaselineFacts } from "../api.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const GROUP_ORDER = ["leads", "media", "enrollments", "cancellations", "context", "analytics"];
+const GROUP_ORDER = ["context", "enrollments", "media", "cancellations", "leads", "analytics"];
 
 const GROUP_COLORS = {
   leads:         "#3b82f6",
@@ -90,21 +90,29 @@ function extractKpis(groups) {
   const allFacts = Object.values(groups || {}).flatMap(g => g?.facts || []);
   const byId = Object.fromEntries(allFacts.map(f => [f.fact_id, f]));
   const kpis = [];
+  // כל ה-baseline נכון ל-30/04/2026 — מסומן כך בכל tile
+  const SUB = "ינו'–אפר' 2026";
+
+  let leads2026 = null, enroll2026 = null;
 
   // Leads 2026 (or last available year)
   const leadsFact = byId["leads_by_year"];
   if (leadsFact?.rows?.length) {
     const r = leadsFact.rows.find(r => String(r.year) === "2026") || leadsFact.rows.at(-1);
-    if (r?.total != null)
-      kpis.push({ label: "לידים YTD", value: r.total, format: "num",   color: "#3b82f6", sub: String(r.year) });
+    if (r?.total != null) {
+      leads2026 = r.total;
+      kpis.push({ label: "לידים YTD", value: r.total, format: "num", color: "#3b82f6", sub: SUB });
+    }
   }
 
   // Enrollments 2026
   const enrollFact = byId["enrollments_by_year"];
   if (enrollFact?.rows?.length) {
     const r = enrollFact.rows.find(r => String(r.year) === "2026") || enrollFact.rows.at(-1);
-    if (r?.enrolled_total != null)
-      kpis.push({ label: "נרשמים YTD", value: r.enrolled_total, format: "num", color: "#10b981", sub: String(r.year) });
+    if (r?.enrolled_total != null) {
+      enroll2026 = r.enrolled_total;
+      kpis.push({ label: "נרשמים YTD", value: r.enrolled_total, format: "num", color: "#10b981", sub: SUB });
+    }
   }
 
   // Meta spend 2026
@@ -114,7 +122,7 @@ function extractKpis(groups) {
       String(r.year) === "2026" && String(r.platform || "").toLowerCase().includes("meta"));
     const total = metaRows.reduce((s, r) => s + (r.spend || 0), 0);
     if (total > 0)
-      kpis.push({ label: "ספנד Meta", value: total, format: "money", color: "#8b5cf6", sub: "2026" });
+      kpis.push({ label: "ספנד Meta", value: total, format: "money", color: "#8b5cf6", sub: SUB });
   }
 
   // Google CPL 2026
@@ -123,17 +131,18 @@ function extractKpis(groups) {
     const r = cplFact.rows.find(r =>
       String(r.year) === "2026" && String(r.platform || "").toLowerCase().includes("google"));
     if (r?.cpl != null)
-      kpis.push({ label: "CPL Google", value: r.cpl, format: "money", color: "#f59e0b", sub: "2026" });
+      kpis.push({ label: "CPL Google", value: r.cpl, format: "money", color: "#f59e0b", sub: SUB });
   }
 
-  // Active learners (from status_distribution)
-  const statusFact = byId["status_distribution"];
-  if (statusFact?.rows?.length) {
-    const active = statusFact.rows.find(r =>
-      String(r.status) === "נרשם" || String(r.status).includes("פעיל"));
-    if (active?.n != null)
-      kpis.push({ label: "לומדים פעילים", value: active.n, format: "num", color: "#06b6d4", sub: "כרגע" });
-  }
+  // המרה 2026 (נרשמים ÷ לידים) — מחושב מהנתונים שכבר שלפנו
+  if (leads2026 && enroll2026 && leads2026 > 0)
+    kpis.push({
+      label: "המרה 2026",
+      value: (enroll2026 / leads2026) * 100,
+      format: "pct",
+      color: "#06b6d4",
+      sub: "נרשמים ÷ לידים",
+    });
 
   return kpis;
 }
@@ -726,7 +735,7 @@ export default function Dashboard() {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
-  const [activeTab, setTab]   = useState("leads");
+  const [activeTab, setTab]   = useState("context");
 
   useEffect(() => {
     getBaselineFacts()
