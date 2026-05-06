@@ -1,37 +1,48 @@
 /**
- * EcosystemPage.jsx — ניתוח מנהלים (לשעבר אקו-סיסטם)
+ * EcosystemPage.jsx — ניתוח מנהלים (Audit-style)
  *
- * דוח קריא לבני אדם: מאקרו, ממצאים מרכזיים, התראה, ובסוף
- * שאלות לחקירה למחלקות אחרות (Google/Meta/Creative/Brand/Retention/...).
+ * עיצוב: דוח ביקורת מובנה — כותרת מנהלים, ממצאים ממוינים לפי עדיפות,
+ * ממצאים מאוששים (חוזרים), נתיב לקוח, פרופיל קהל, הקשר נתונים.
  *
- * נתונים: GET /api/dashboard/executive-analysis (מ-public.stage0_reports).
+ * נתונים: GET /api/dashboard/executive-analysis
  */
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getExecutiveAnalysis } from "../api.js";
 
-const DEPT_ORDER = [
-  "מחלקת Google Ads",
-  "מחלקת Meta",
-  "מחלקת מדיה",
-  "מחלקת קריאייטיב",
-  "מחלקת מותג / שיווק אורגני",
-  "מחלקת שימור / מסע לקוח",
-  "מחלקת חיזוי",
-  "מחלקת מטרות-ויעדים",
-];
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-const DEPT_ICON = {
-  "מחלקת Google Ads":           "🔍",
-  "מחלקת Meta":                 "📱",
-  "מחלקת מדיה":                 "📣",
-  "מחלקת קריאייטיב":             "🎨",
-  "מחלקת מותג / שיווק אורגני":   "🌱",
-  "מחלקת שימור / מסע לקוח":      "🔁",
-  "מחלקת חיזוי":                 "📈",
-  "מחלקת מטרות-ויעדים":          "🎯",
-  "אחר":                         "📌",
+const DEPT_META = {
+  "מחלקת Google Ads":           { icon: "🔍", color: "#1e40af", bg: "#dbeafe" },
+  "מחלקת Meta":                 { icon: "📘", color: "#5b21b6", bg: "#ede9fe" },
+  "מחלקת מדיה":                 { icon: "📣", color: "#0e7490", bg: "#cffafe" },
+  "מחלקת קריאייטיב":            { icon: "🎨", color: "#9a3412", bg: "#ffedd5" },
+  "מחלקת מותג / שיווק אורגני":  { icon: "🌱", color: "#14532d", bg: "#dcfce7" },
+  "מחלקת שימור / מסע לקוח":     { icon: "🔁", color: "#713f12", bg: "#fef9c3" },
+  "מחלקת חיזוי":                { icon: "📈", color: "#1e3a5f", bg: "#e0f2fe" },
+  "מחלקת מטרות-ויעדים":         { icon: "🎯", color: "#6b21a8", bg: "#f3e8ff" },
 };
+
+const TOPIC_COLOR = {
+  enrollments:   { bg: "#dcfce7", color: "#14532d" },
+  cancellations: { bg: "#fee2e2", color: "#991b1b" },
+  media:         { bg: "#ede9fe", color: "#5b21b6" },
+  leads:         { bg: "#dbeafe", color: "#1e40af" },
+  google:        { bg: "#dbeafe", color: "#1e40af" },
+  meta:          { bg: "#ede9fe", color: "#5b21b6" },
+};
+
+function topicStyle(topic) {
+  const t = (topic || "").toLowerCase();
+  for (const [k, v] of Object.entries(TOPIC_COLOR)) {
+    if (t.includes(k)) return v;
+  }
+  return { bg: "#f1f5f9", color: "#475569" };
+}
+
+function deptMeta(deptName) {
+  return DEPT_META[deptName] || { icon: "📌", color: "#475569", bg: "#f1f5f9" };
+}
 
 function fmtDate(iso) {
   if (!iso) return "—";
@@ -40,8 +51,10 @@ function fmtDate(iso) {
   } catch { return iso; }
 }
 
+// ─── Main component ──────────────────────────────────────────────────────────
+
 export default function EcosystemPage() {
-  const navigate = useNavigate();
+  const navigate   = useNavigate();
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
@@ -55,171 +68,335 @@ export default function EcosystemPage() {
 
   if (loading) return <Page><Center>טוען ניתוח אחרון…</Center></Page>;
   if (error)   return <Page><ErrorBox message={error} /></Page>;
-  if (!data?.available) {
-    return (
-      <Page>
-        <EmptyState onHistory={() => navigate("/analytics/reports")} />
-      </Page>
-    );
-  }
+  if (!data?.available) return <Page><EmptyState onHistory={() => navigate("/analytics/reports")} /></Page>;
 
-  // השאלות מוצגות כ"שאלות לדיון" — נושאים להנהלה לשקול ולחקור.
-  // הראוטינג למחלקות הוא תהליך נפרד. ה-validated_findings נשארים פנימיים בלבד.
-  const allBriefs = Object.values(data.briefs_by_dept || {}).flat();
+  // ── Flatten all briefs ordered by dept priority ──
+  const deptOrder = [
+    "מחלקת Google Ads", "מחלקת Meta", "מחלקת מדיה",
+    "מחלקת קריאייטיב", "מחלקת מותג / שיווק אורגני",
+    "מחלקת שימור / מסע לקוח", "מחלקת חיזוי", "מחלקת מטרות-ויעדים",
+  ];
+  const briefs = deptOrder.flatMap(dept =>
+    (data.briefs_by_dept?.[dept] || []).map(b => ({ ...b, dept }))
+  );
+  const validated = data.validated_findings || [];
 
   return (
     <Page>
-      <div style={{ marginBottom: 24 }}>
-        <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 4px",
-                    display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <span>ניתוח מנהלים — שלב 0</span>
+      {/* ── Report header ── */}
+      <div style={{
+        background: "#0f172a", borderRadius: 12, padding: "18px 22px",
+        marginBottom: 24, color: "#e2e8f0",
+        display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center",
+        justifyContent: "space-between",
+      }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#f8fafc", marginBottom: 4 }}>
+            ניתוח מנהלים — שלב 0
+          </div>
+          <div style={{ fontSize: 12, color: "#94a3b8", display: "flex", gap: 12, flexWrap: "wrap" }}>
+            {data.cutoff_date && <span>Baseline עד {data.cutoff_date}</span>}
+            {data.data_period  && <span>· {data.data_period}</span>}
+            <span>· הופק {fmtDate(data.generated_at)}</span>
+            <span>· {data.n_facts} ניתוחים</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           {data.is_baseline ? (
-            <span title="הגרסה הזאת מקובעת בעמוד 'דוחות'. ריצות חדשות לא ידרסו אותה." style={{
-              fontSize: 10, fontWeight: 700, padding: "2px 7px",
-              background: "#fef3c7", color: "#92400e",
-              border: "1px solid #fcd34d", borderRadius: 4,
-            }}>📌 נקודת אפס מקובעת</span>
+            <Tag bg="#92400e" color="#fef3c7">📌 נקודת אפס מקובעת</Tag>
           ) : (
-            <span title="אין גרסה מקובעת — מוצגת הריצה האחרונה. כדי לקבע, פתחי 'דוחות' ולחצי 'קבע כנקודת אפס'." style={{
-              fontSize: 10, fontWeight: 700, padding: "2px 7px",
-              background: "#dbeafe", color: "#1e40af",
-              border: "1px solid #93c5fd", borderRadius: 4,
-            }}>הריצה האחרונה</span>
+            <Tag bg="#1e3a5f" color="#bfdbfe">הריצה האחרונה</Tag>
           )}
-          {data.cutoff_date && <span>· baseline עד {data.cutoff_date}</span>}
-          <span>· הופק {fmtDate(data.generated_at)}</span>
-          <span>· {data.n_facts} ניתוחים בבסיס</span>
-          <span>· סוכנים: {(data.agents_used || []).join(" + ")}</span>
-        </p>
+          <Tag bg="#1e293b" color="#94a3b8">{briefs.length} ממצאים</Tag>
+          <Tag bg="#1e293b" color="#94a3b8">{validated.length} מאוששים</Tag>
+        </div>
       </div>
 
-      {/* ── 1. תקופה ── */}
-      {data.data_period && (
-        <Section title="תקופת הניתוח" emoji="📅" tone="neutral">
-          <p style={{ fontSize: 14, color: "#1e293b", margin: 0, lineHeight: 1.7 }}>
-            {data.data_period}
-          </p>
-        </Section>
-      )}
-
-      {/* ── 2. מגבלות נתונים — קודם הכל ── */}
-      {data.data_limitations?.length > 0 && (
-        <Section title="מגבלות נתונים שיש לקחת בחשבון" emoji="📋" tone="neutral">
-          <ul style={{ margin: 0, paddingInlineStart: 22, fontSize: 13.5, lineHeight: 1.8 }}>
-            {data.data_limitations.map((p, i) => (
-              <li key={i} style={{ color: "#475569", marginBottom: 6 }}>{p}</li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {/* ── 3. תמונת מאקרו ── */}
+      {/* ── 1. Macro picture ── */}
       {data.macro_picture && (
-        <Section title="התמונה הכוללת" emoji="📌" tone="primary">
-          <p style={{ fontSize: 16, lineHeight: 1.8, color: "#0f172a",
-                      fontWeight: 400, margin: 0 }}>
+        <Block title="התמונה הכוללת" emoji="📌" tone="primary">
+          <p style={{ fontSize: 15, lineHeight: 1.85, color: "#0f172a", margin: 0 }}>
             {data.macro_picture}
           </p>
-        </Section>
+        </Block>
       )}
 
-      {data.headline && data.headline !== data.macro_picture && (
-        <Section title="כותרת מרכזית" emoji="🎯" tone="primary">
-          <p style={{ fontSize: 18, lineHeight: 1.7, color: "#0f172a",
-                      fontWeight: 500, margin: 0 }}>
-            {data.headline}
+      {/* ── 2. Biggest alert ── */}
+      {data.biggest_alert && (
+        <div style={{
+          background: "#fff7ed", border: "1px solid #fed7aa",
+          borderInlineStart: "5px solid #ea580c",
+          borderRadius: 10, padding: "16px 20px", marginBottom: 20,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 20 }}>⚠️</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#9a3412" }}>
+              הממצא הדחוף ביותר
+            </span>
+            <span style={{
+              fontSize: 10, padding: "2px 8px", borderRadius: 99,
+              background: "#ea580c", color: "#fff", fontWeight: 700,
+            }}>ALERT</span>
+          </div>
+          <p style={{ fontSize: 14, lineHeight: 1.8, color: "#7c2d12", margin: 0 }}>
+            {data.biggest_alert}
           </p>
-        </Section>
+        </div>
       )}
 
-      {/* ── 4. מסע הלקוח ── */}
+      {/* ── 3. Priority findings ── */}
+      {briefs.length > 0 && (
+        <Block title="ממצאים ומשימות לחקירה" emoji="🔎" tone="neutral">
+          <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 16px" }}>
+            ממוינים לפי מחלקה — כל ממצא כולל ראיה, הקשר ושאלות לחקירה.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {briefs.map((b, i) => (
+              <BriefRow key={i} brief={b} index={i + 1} />
+            ))}
+          </div>
+        </Block>
+      )}
+
+      {/* ── 4. Validated recurring findings ── */}
+      {validated.length > 0 && (
+        <Block title="ממצאים מאוששים (חוזרים)" emoji="✅" tone="action">
+          <p style={{ fontSize: 12, color: "#166534", margin: "0 0 16px" }}>
+            ממצאים שנצפו בריצות מרובות — רמת הביטחון גבוהה.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {validated.map((v, i) => (
+              <ValidatedRow key={i} finding={v} />
+            ))}
+          </div>
+        </Block>
+      )}
+
+      {/* ── 5. Key points ── */}
+      {data.key_points?.length > 0 && (
+        <Block title="נתונים מרכזיים" emoji="🔑" tone="neutral">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {data.key_points.map((p, i) => (
+              <div key={i} style={{
+                background: "#f8fafc", border: "1px solid #e2e8f0",
+                borderInlineStart: "3px solid #3b82f6",
+                borderRadius: 7, padding: "10px 14px",
+                fontSize: 13, color: "#1e293b", lineHeight: 1.6,
+              }}>
+                {p}
+              </div>
+            ))}
+          </div>
+        </Block>
+      )}
+
+      {/* ── 6. Customer journey ── */}
       {data.customer_journey_findings?.length > 0 && (
-        <Section title="מסע הלקוח: התעניינות → ליד → הרשמה → קורס" emoji="🛤️" tone="neutral">
+        <Block title="מסע הלקוח: התעניינות → ליד → הרשמה → קורס" emoji="🛤️" tone="neutral">
           <ul style={{ margin: 0, paddingInlineStart: 22, fontSize: 14, lineHeight: 1.85 }}>
             {data.customer_journey_findings.map((p, i) => (
               <li key={i} style={{ color: "#1e293b", marginBottom: 8 }}>{p}</li>
             ))}
           </ul>
-        </Section>
+        </Block>
       )}
 
-      {/* ── 5. פרופיל קהל ── */}
+      {/* ── 7. Demographics ── */}
       {data.demographic_findings?.length > 0 && (
-        <Section title="פרופיל הקהל (גילאים, קורסים, מקורות)" emoji="👥" tone="neutral">
+        <Block title="פרופיל הקהל (גילאים, קורסים, מקורות)" emoji="👥" tone="neutral">
           <ul style={{ margin: 0, paddingInlineStart: 22, fontSize: 14, lineHeight: 1.85 }}>
             {data.demographic_findings.map((p, i) => (
               <li key={i} style={{ color: "#1e293b", marginBottom: 8 }}>{p}</li>
             ))}
           </ul>
-        </Section>
+        </Block>
       )}
 
-      {/* ── 6. ממצאים מספריים ── */}
-      {data.key_points?.length > 0 && (
-        <Section title="ממצאים מספריים מרכזיים" emoji="🔑">
-          <ul style={{ margin: 0, paddingInlineStart: 22, fontSize: 14, lineHeight: 1.85 }}>
-            {data.key_points.map((p, i) => (
-              <li key={i} style={{ color: "#1e293b", marginBottom: 8 }}>{p}</li>
+      {/* ── 8. Data limitations ── */}
+      {data.data_limitations?.length > 0 && (
+        <Block title="מגבלות נתונים" emoji="📋" tone="neutral">
+          <ul style={{ margin: 0, paddingInlineStart: 22, fontSize: 13.5, lineHeight: 1.8 }}>
+            {data.data_limitations.map((p, i) => (
+              <li key={i} style={{ color: "#475569", marginBottom: 6 }}>{p}</li>
             ))}
           </ul>
-        </Section>
+        </Block>
       )}
 
-      {/* ── 7. התראה ── */}
-      {data.biggest_alert && (
-        <Section title="הממצא הכי בולט" emoji="⚠️" tone="alert">
-          <p style={{ fontSize: 15, lineHeight: 1.7, color: "#7c2d12", margin: 0 }}>
-            {data.biggest_alert}
-          </p>
-        </Section>
-      )}
-
-      {/* ── 8. שאלות נוספות לדיון ── */}
-      {allBriefs.length > 0 && (
-        <Section title="שאלות נוספות לדיון" emoji="💭" tone="neutral">
-          <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 12px", lineHeight: 1.7 }}>
-            נושאים שעלו במהלך הניתוח ושכדאי להמשיך לחקור.
-          </p>
-          <ul style={{ margin: 0, paddingInlineStart: 22, fontSize: 14, lineHeight: 1.85 }}>
-            {allBriefs.flatMap((b, bi) => (b.next_questions || []).map((q, qi) => (
-              <li key={`${bi}-${qi}`} style={{ color: "#1e293b", marginBottom: 10 }}>
-                {q}
-                {b.where && (
-                  <span style={{ display: "block", fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-                    בהקשר: {b.where}
-                  </span>
-                )}
-              </li>
-            )))}
-          </ul>
-        </Section>
-      )}
-
+      {/* ── Footer ── */}
       <div style={{
-        marginTop: 32, padding: "14px 18px",
-        background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10,
-        fontSize: 12, color: "#64748b",
+        marginTop: 32, padding: "12px 18px",
+        background: "#f8fafc", border: "1px solid #e2e8f0",
+        borderRadius: 10, fontSize: 12, color: "#64748b",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
-        💾 דוח שמור · ניתן להשוות בין דוחות בעמוד{" "}
-        <a href="#" onClick={(e) => { e.preventDefault(); navigate("/analytics/reports"); }}
-           style={{ color: "#1e40af" }}>דוחות</a>.
+        <span>💾 דוח שמור · ניתן להשוות בין גרסאות</span>
+        <button
+          type="button"
+          onClick={() => navigate("/analytics/reports")}
+          style={{
+            background: "#fff", border: "1px solid #cbd5e1",
+            borderRadius: 7, padding: "5px 14px", fontSize: 12,
+            color: "#1e40af", cursor: "pointer",
+          }}
+        >📂 כל הדוחות</button>
       </div>
     </Page>
   );
 }
 
-// ─── Components ──────────────────────────────────────────────────────────────
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function BriefRow({ brief, index }) {
+  const [open, setOpen] = useState(false);
+  const dm = deptMeta(brief.dept);
+
+  return (
+    <div style={{
+      border: "1px solid #e2e8f0",
+      borderInlineStart: `4px solid ${dm.color}`,
+      borderRadius: 8, overflow: "hidden",
+      background: "#ffffff",
+    }}>
+      {/* Row header — always visible */}
+      <div style={{
+        padding: "12px 16px",
+        display: "flex", gap: 12, alignItems: "flex-start",
+      }}>
+        {/* Index */}
+        <span style={{
+          minWidth: 26, height: 26, borderRadius: "50%",
+          background: dm.bg, color: dm.color,
+          fontWeight: 700, fontSize: 12,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          flexShrink: 0,
+        }}>{index}</span>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Dept tag */}
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 4,
+            fontSize: 11, fontWeight: 700, padding: "2px 8px",
+            background: dm.bg, color: dm.color, borderRadius: 99,
+            marginBottom: 6,
+          }}>
+            {dm.icon} {brief.dept}
+          </span>
+
+          {/* Issue */}
+          <p style={{ fontSize: 13.5, fontWeight: 600, color: "#0f172a",
+                       margin: "0 0 6px", lineHeight: 1.6 }}>
+            {brief.issue}
+          </p>
+
+          {/* Where */}
+          {brief.where && (
+            <p style={{ fontSize: 12, color: "#475569", margin: "0 0 4px" }}>
+              <strong style={{ color: "#0f172a" }}>היכן: </strong>{brief.where}
+            </p>
+          )}
+
+          {/* Evidence */}
+          {brief.evidence && (
+            <div style={{
+              marginTop: 6, padding: "7px 12px",
+              background: "#f8fafc", border: "1px solid #e2e8f0",
+              borderRadius: 6, fontSize: 12, color: "#334155",
+              lineHeight: 1.65,
+            }}>
+              <strong style={{ color: "#0f172a" }}>ראיה: </strong>
+              {brief.evidence}
+            </div>
+          )}
+        </div>
+
+        {/* Toggle questions */}
+        {brief.next_questions?.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setOpen(o => !o)}
+            style={{
+              flexShrink: 0, background: open ? dm.bg : "#f1f5f9",
+              border: `1px solid ${open ? dm.color : "#e2e8f0"}`,
+              borderRadius: 7, padding: "4px 10px",
+              fontSize: 11, fontWeight: 600,
+              color: open ? dm.color : "#64748b",
+              cursor: "pointer", transition: "all 0.15s",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {open ? "▲ " : "▼ "}{brief.next_questions.length} שאלות
+          </button>
+        )}
+      </div>
+
+      {/* Questions — collapsible */}
+      {open && brief.next_questions?.length > 0 && (
+        <div style={{
+          borderTop: `1px solid ${dm.bg}`,
+          background: "#fafbfc", padding: "10px 16px 12px",
+        }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: dm.color,
+                       margin: "0 0 8px" }}>שאלות לחקירה:</p>
+          <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 13,
+                        lineHeight: 1.75, color: "#1e293b" }}>
+            {brief.next_questions.map((q, i) => (
+              <li key={i} style={{ marginBottom: 5 }}>{q}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ValidatedRow({ finding }) {
+  const { bg, color } = topicStyle(finding.topic);
+  const confidence = Math.min(finding.run_count || 1, 5);
+
+  return (
+    <div style={{
+      border: "1px solid #d1fae5",
+      borderInlineStart: "4px solid #10b981",
+      borderRadius: 8, padding: "12px 16px",
+      background: "#f0fdf4",
+    }}>
+      <div style={{
+        display: "flex", gap: 8, alignItems: "center",
+        marginBottom: 6, flexWrap: "wrap",
+      }}>
+        <span style={{
+          fontSize: 11, fontWeight: 700, padding: "2px 8px",
+          background: bg, color, borderRadius: 99,
+        }}>{finding.topic}</span>
+        <span style={{ fontSize: 11, color: "#059669" }}>
+          {"●".repeat(confidence)}{"○".repeat(5 - confidence)} {finding.run_count} ריצות
+        </span>
+      </div>
+      <p style={{ fontSize: 13.5, fontWeight: 600, color: "#065f46",
+                   margin: "0 0 6px", lineHeight: 1.6 }}>
+        {finding.finding}
+      </p>
+      {finding.evidence && (
+        <p style={{ fontSize: 12, color: "#047857", margin: 0, lineHeight: 1.65 }}>
+          <strong>ראיה: </strong>{finding.evidence}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── Layout primitives ────────────────────────────────────────────────────────
 
 function Page({ children }) {
   return (
     <div lang="he" dir="rtl" style={{
-      background:  "#ffffff",
-      color:       "#0f172a",
-      minHeight:   "calc(100vh - 56px - 42px)",
-      fontFamily:  "'Segoe UI', sans-serif",
+      background: "#f8fafc", color: "#0f172a",
+      minHeight: "calc(100vh - 56px - 42px)",
+      fontFamily: "'Segoe UI', sans-serif",
     }}>
-      <div style={{ maxWidth: 1000, margin: "0 auto", padding: "32px 24px 64px" }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 28px", color: "#0f172a" }}>
+      <div style={{ maxWidth: 1040, margin: "0 auto", padding: "28px 22px 64px" }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 20px", color: "#0f172a" }}>
           ניתוח מנהלים
         </h1>
         {children}
@@ -228,25 +405,27 @@ function Page({ children }) {
   );
 }
 
-function Section({ title, emoji, tone = "neutral", children }) {
-  const palette = {
-    neutral: { bg: "#ffffff", border: "#e2e8f0", title: "#0f172a" },
-    primary: { bg: "#eff6ff", border: "#bfdbfe", title: "#1e3a8a" },
-    alert:   { bg: "#fff7ed", border: "#fed7aa", title: "#9a3412" },
-    action:  { bg: "#f0fdf4", border: "#bbf7d0", title: "#14532d" },
-  }[tone];
-
+function Block({ title, emoji, tone = "neutral", children }) {
+  const palettes = {
+    neutral: { bg: "#ffffff", border: "#e2e8f0", title: "#0f172a", topBorder: "#e2e8f0" },
+    primary: { bg: "#eff6ff", border: "#bfdbfe", title: "#1e3a8a", topBorder: "#3b82f6" },
+    alert:   { bg: "#fff7ed", border: "#fed7aa", title: "#9a3412", topBorder: "#ea580c" },
+    action:  { bg: "#f0fdf4", border: "#bbf7d0", title: "#14532d", topBorder: "#10b981" },
+  };
+  const p = palettes[tone] || palettes.neutral;
   return (
     <div style={{
-      background: palette.bg,
-      border:     `1px solid ${palette.border}`,
-      borderRadius: 12,
-      padding:    "20px 22px",
-      marginBottom: 20,
+      background:  p.bg,
+      border:      `1px solid ${p.border}`,
+      borderTop:   `3px solid ${p.topBorder}`,
+      borderRadius: 10,
+      padding:     "18px 20px",
+      marginBottom: 18,
+      boxShadow:   "0 1px 4px rgba(0,0,0,0.04)",
     }}>
       <h2 style={{
-        fontSize: 17, fontWeight: 700, margin: "0 0 14px",
-        color: palette.title, display: "flex", alignItems: "center", gap: 8,
+        fontSize: 15, fontWeight: 700, margin: "0 0 14px",
+        color: p.title, display: "flex", alignItems: "center", gap: 7,
       }}>
         {emoji && <span>{emoji}</span>}
         {title}
@@ -256,90 +435,12 @@ function Section({ title, emoji, tone = "neutral", children }) {
   );
 }
 
-function DeptCard({ name, briefs }) {
-  const [open, setOpen] = useState(true);
-  const icon = DEPT_ICON[name] || "📌";
-
+function Tag({ bg = "#1e293b", color = "#e2e8f0", children }) {
   return (
-    <div style={{
-      background:   "#ffffff",
-      border:       "1px solid #cbd5e1",
-      borderRadius: 10,
-      padding:      "14px 16px",
-      marginBottom: 12,
-    }}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        style={{
-          width: "100%", display: "flex", justifyContent: "space-between",
-          alignItems: "center", background: "none", border: "none",
-          cursor: "pointer", padding: 0, fontFamily: "inherit",
-        }}
-      >
-        <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 20 }}>{icon}</span>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
-            {name}
-          </span>
-          <span style={{
-            fontSize: 11, padding: "2px 8px", background: "#f1f5f9",
-            color: "#475569", borderRadius: 99,
-          }}>
-            {briefs.length} {briefs.length === 1 ? "סוגיה" : "סוגיות"}
-          </span>
-        </span>
-        <span style={{ fontSize: 13, color: "#94a3b8" }}>{open ? "▼" : "◀"}</span>
-      </button>
-
-      {open && (
-        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
-          {briefs.map((b, i) => <BriefCard key={i} brief={b} index={i + 1} />)}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function BriefCard({ brief, index }) {
-  return (
-    <div style={{
-      background:   "#fafbfc",
-      borderInlineStart: "3px solid #3b82f6",
-      borderRadius: 6,
-      padding:      "12px 14px",
-    }}>
-      <p style={{
-        fontSize: 14, fontWeight: 600, color: "#0f172a", margin: "0 0 6px",
-      }}>
-        {index}. {brief.issue}
-      </p>
-
-      {brief.where && (
-        <p style={{ fontSize: 12, color: "#475569", margin: "0 0 6px" }}>
-          <strong>איפה:</strong> {brief.where}
-        </p>
-      )}
-
-      {brief.evidence && (
-        <p style={{ fontSize: 12, color: "#475569", margin: "0 0 8px",
-                    background: "#ffffff", padding: "6px 10px",
-                    border: "1px solid #e2e8f0", borderRadius: 6 }}>
-          <strong>ראיה:</strong> {brief.evidence}
-        </p>
-      )}
-
-      {brief.next_questions?.length > 0 && (
-        <div style={{ marginTop: 8 }}>
-          <p style={{ fontSize: 12, fontWeight: 600, color: "#1e40af",
-                      margin: "0 0 4px" }}>שאלות לחקירה:</p>
-          <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 13,
-                       lineHeight: 1.7, color: "#1e293b" }}>
-            {brief.next_questions.map((q, i) => <li key={i}>{q}</li>)}
-          </ul>
-        </div>
-      )}
-    </div>
+    <span style={{
+      fontSize: 11, fontWeight: 700, padding: "3px 10px",
+      background: bg, color, borderRadius: 99,
+    }}>{children}</span>
   );
 }
 
@@ -355,11 +456,9 @@ function Center({ children }) {
 function ErrorBox({ message }) {
   return (
     <div style={{
-      background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b",
-      borderRadius: 10, padding: "16px 20px", fontSize: 14,
-    }}>
-      ⚠ שגיאה בטעינת הניתוח: {message}
-    </div>
+      background: "#fef2f2", border: "1px solid #fecaca",
+      color: "#991b1b", borderRadius: 10, padding: "16px 20px", fontSize: 14,
+    }}>⚠ שגיאה: {message}</div>
   );
 }
 
@@ -376,14 +475,10 @@ function EmptyState({ onHistory }) {
       <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 18px" }}>
         כדי להפיק ניתוח, יש להריץ את <code>scripts/run_stage0_now.py</code> בטרמינל.
       </p>
-      <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-        <button onClick={onHistory} style={btnSecondary}>היסטוריית דוחות</button>
-      </div>
+      <button onClick={onHistory} style={{
+        background: "#fff", color: "#1e293b", border: "1px solid #cbd5e1",
+        borderRadius: 8, padding: "10px 20px", fontSize: 14, cursor: "pointer",
+      }}>היסטוריית דוחות</button>
     </div>
   );
 }
-
-const btnSecondary = {
-  background: "#fff", color: "#1e293b", border: "1px solid #cbd5e1",
-  borderRadius: 8, padding: "10px 20px", fontSize: 14, cursor: "pointer",
-};
