@@ -312,6 +312,50 @@ function ResultDisplay({ result }) {
         </div>
       )}
 
+      {/* ── Internal analysis (איכות לידים, ימי שבוע, לא רלוונטיים, פוטנציאל שלא נסגר) ── */}
+      {smart.internal_analysis && Object.keys(smart.internal_analysis).length > 0 && (
+        <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#0c4a6e", marginBottom: 10 }}>🔬 ניתוח דאטה פנימי</div>
+          {smart.internal_analysis.lead_quality && (
+            <div style={{ fontSize: 13, color: "#0f172a", marginBottom: 8, lineHeight: 1.7 }}>
+              <b>איכות לידים:</b> {smart.internal_analysis.lead_quality}
+            </div>
+          )}
+          {smart.internal_analysis.day_of_week_pattern && (
+            <div style={{ fontSize: 13, color: "#0f172a", marginBottom: 8, lineHeight: 1.7 }}>
+              <b>דפוסי ימי שבוע:</b> {smart.internal_analysis.day_of_week_pattern}
+            </div>
+          )}
+          {smart.internal_analysis.irrelevant_leads && (
+            <div style={{ fontSize: 13, color: "#0f172a", marginBottom: 8, lineHeight: 1.7 }}>
+              <b>לידים לא רלוונטיים:</b> {smart.internal_analysis.irrelevant_leads}
+            </div>
+          )}
+          {smart.internal_analysis.missed_opportunities && (
+            <div style={{ fontSize: 13, color: "#0f172a", lineHeight: 1.7 }}>
+              <b>פוטנציאל שלא נסגר:</b> {smart.internal_analysis.missed_opportunities}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Media analysis (CPL, budget efficiency) ── */}
+      {smart.media_analysis && Object.keys(smart.media_analysis).length > 0 && (
+        <div style={{ background: "#fdf4ff", border: "1px solid #f5d0fe", borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#86198f", marginBottom: 10 }}>📣 ניתוח מדיה</div>
+          {smart.media_analysis.cost_per_lead_trend && (
+            <div style={{ fontSize: 13, color: "#0f172a", marginBottom: 8, lineHeight: 1.7 }}>
+              <b>מגמת CPL:</b> {smart.media_analysis.cost_per_lead_trend}
+            </div>
+          )}
+          {smart.media_analysis.budget_efficiency && (
+            <div style={{ fontSize: 13, color: "#0f172a", lineHeight: 1.7 }}>
+              <b>יעילות תקציב:</b> {smart.media_analysis.budget_efficiency}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Key findings ── */}
       {(smart.key_findings || []).length > 0 && (
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
