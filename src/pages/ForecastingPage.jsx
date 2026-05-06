@@ -18,8 +18,7 @@ import {
 } from "../api.js";
 import EvidencePackView from "../components/forecasting/EvidencePackView.jsx";
 import SignalChip       from "../components/forecasting/SignalChip.jsx";
-import PatternLibrary   from "../components/forecasting/PatternLibrary.jsx";
-import Stage0Trigger    from "../components/forecasting/Stage0Trigger.jsx";
+// PatternLibrary + Stage0Trigger הוסרו מהתצוגה — debug-only.
 
 // "מי מבקש" dropdown הוסר — היה metadata שבילבל. ברירת המחדל "manual"
 // נשלחת אוטומטית מ-state.
@@ -150,15 +149,7 @@ export default function ForecastingPage() {
         <div style={cardStyle}>
           <h2 style={h2Style}>📝 שאלת חיזוי</h2>
           <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ flex: 1, minWidth: 200 }}>
-                <label style={labelStyle}>סוג שאלה</label>
-                <select value={questionKind} onChange={(e) => setKind(e.target.value)}
-                        style={selectStyle}>
-                  {QUESTION_KINDS.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
-                </select>
-              </div>
-            </div>
+            {/* dropdown של סוג שאלה הוסר — default 'forecast' */}
             <div>
               <label style={labelStyle}>השאלה</label>
               <textarea
@@ -239,21 +230,8 @@ export default function ForecastingPage() {
           </div>
         )}
 
-        {/* ── כלים פנימיים — מוסתר ברירת-מחדל. ספריית דפוסים = pattern_memory
-            גולמי (debug); Stage 0 trigger = הפעלה ידנית של הריצה הראשונית.
-            לא רלוונטי לתצוגת לקוחה. ── */}
-        <details style={{
-          background: "#f8fafc", border: "1px solid #e2e8f0",
-          borderRadius: 10, padding: "8px 14px", marginTop: 14, fontSize: 13,
-        }}>
-          <summary style={{ cursor: "pointer", color: "#64748b", fontWeight: 600 }}>
-            🔧 כלים פנימיים (pattern memory + Stage 0 trigger)
-          </summary>
-          <div style={{ marginTop: 12 }}>
-            <PatternLibrary />
-            <Stage0Trigger />
-          </div>
-        </details>
+        {/* PatternLibrary + Stage0Trigger הוסרו לחלוטין מהתצוגה — debug
+            views, לא רלוונטי לתצוגת לקוחה. */}
 
         {/* ── Disclaimer ── */}
         <div style={{
