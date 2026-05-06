@@ -121,30 +121,7 @@ export default function EcosystemPage() {
         </Block>
       )}
 
-      {/* ── 2. Biggest alert ── */}
-      {data.biggest_alert && (
-        <div style={{
-          background: "#fff7ed", border: "1px solid #fed7aa",
-          borderInlineStart: "5px solid #ea580c",
-          borderRadius: 10, padding: "16px 20px", marginBottom: 20,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <span style={{ fontSize: 20 }}>⚠️</span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#9a3412" }}>
-              הממצא הדחוף ביותר
-            </span>
-            <span style={{
-              fontSize: 10, padding: "2px 8px", borderRadius: 99,
-              background: "#ea580c", color: "#fff", fontWeight: 700,
-            }}>ALERT</span>
-          </div>
-          <p style={{ fontSize: 14, lineHeight: 1.8, color: "#7c2d12", margin: 0 }}>
-            {data.biggest_alert}
-          </p>
-        </div>
-      )}
-
-      {/* ── 3. Priority findings ── */}
+      {/* ── 2. Priority findings ── */}
       {briefs.length > 0 && (
         <Block title="ממצאים ומשימות לחקירה" emoji="🔎" tone="neutral">
           <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 16px" }}>
