@@ -18,6 +18,10 @@ import {
 } from "../api.js";
 import EvidencePackView from "../components/forecasting/EvidencePackView.jsx";
 import SignalChip       from "../components/forecasting/SignalChip.jsx";
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
+  PieChart, Pie, Cell, Legend, LineChart, Line,
+} from "recharts";
 // PatternLibrary + Stage0Trigger הוסרו מהתצוגה — debug-only.
 
 // "מי מבקש" dropdown הוסר — היה metadata שבילבל. ברירת המחדל "manual"
@@ -248,24 +252,125 @@ export default function ForecastingPage() {
   );
 }
 
+// ─── Chart data helpers ────────────────────────────────────────────────────
+
+function _pivotPlatformMonth(rows) {
+  // [{platform, month, leads}, ...] → [{month, Meta: 12, Google: 19, ...}, ...]
+  if (!rows || !rows.length) return [];
+  const byMonth = {};
+  for (const r of rows) {
+    const m = r.month;
+    if (!byMonth[m]) byMonth[m] = { month: m };
+    byMonth[m][r.platform || "—"] = r.leads || 0;
+  }
+  return Object.values(byMonth).sort((a, b) => (a.month || "").localeCompare(b.month || ""));
+}
+
+function _uniquePlatforms(rows) {
+  if (!rows || !rows.length) return [];
+  const out = new Set();
+  for (const r of rows) if (r.platform) out.add(r.platform);
+  return Array.from(out);
+}
+
+// ─── Color palettes ────────────────────────────────────────────────────────
+const STATUS_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#6366f1", "#84cc16"];
+const PLATFORM_COLORS = { Meta: "#1877f2", Google: "#fbbc04", פייסבוק: "#1877f2", אינסטגרם: "#e4405f", גוגל: "#fbbc04", "טיק טוק": "#000000", אורגני: "#10b981" };
+
+function fmtN(v) {
+  if (v == null) return "—";
+  return Number(v).toLocaleString("he-IL");
+}
+function fmtPctV(v) {
+  if (v == null) return "—";
+  return `${(Number(v) * 100).toFixed(1)}%`;
+}
+
+// ─── Stat card ─────────────────────────────────────────────────────────────
+function ForecastStatCard({ label, value, sub, color }) {
+  return (
+    <div style={{
+      background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10,
+      padding: "14px 16px",
+    }}>
+      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: color || "#0f172a" }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{sub}</div>}
+    </div>
+  );
+}
+
+// ─── Section card ──────────────────────────────────────────────────────────
+function ChartCard({ title, children, color }) {
+  return (
+    <div style={{
+      background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10,
+      padding: "14px 16px", minHeight: 260,
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: color || "#0f172a", marginBottom: 10 }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function ResultDisplay({ result }) {
   const sigs = result.signals || [];
   const pred = result.prediction || {};
   const pack = result.evidence_pack || {};
   const smart = result.smart_report || {};
   const scenarios = smart.scenarios || {};
+  const charts = smart.chart_data || {};
+
+  // Compute stat cards values
+  const realPt = (scenarios.realistic || {}).point;
+  const totals = charts.internal_totals || {};
+  const convRate = totals.records ? (totals.enrolled / totals.records) : null;
+  const irrelevantPct = totals.records ? (totals.irrelevant / totals.records) : null;
+  const dowData = charts.day_of_week || [];
+  const bestDow = dowData.length ? [...dowData].sort((a, b) => (b.conv_rate || 0) - (a.conv_rate || 0))[0] : null;
 
   return (
-    <div>
-      {/* ── Smart Report (Claude integrating data + AI knowledge) ── */}
+    <div dir="rtl" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+      {/* ── Stat cards row ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10 }}>
+        <ForecastStatCard
+          label="תחזית ריאלית"
+          value={realPt != null ? fmtN(Math.round(realPt)) : (pred?.point != null ? fmtN(Math.round(pred.point)) : "—")}
+          sub={pred?.horizon || "אופק חיזוי"}
+          color="#1e40af"
+        />
+        <ForecastStatCard
+          label="המרה (לידים → נרשמים)"
+          value={convRate != null ? fmtPctV(convRate) : "—"}
+          sub={totals.records ? `${fmtN(totals.enrolled)}/${fmtN(totals.records)} בדגימה` : "אין נתונים"}
+          color="#16a34a"
+        />
+        <ForecastStatCard
+          label="לא רלוונטיים"
+          value={irrelevantPct != null ? fmtPctV(irrelevantPct) : "—"}
+          sub={totals.irrelevant != null ? `${fmtN(totals.irrelevant)} לידים` : "—"}
+          color="#dc2626"
+        />
+        <ForecastStatCard
+          label="יום חזק בשבוע"
+          value={bestDow ? bestDow.day_name : "—"}
+          sub={bestDow ? `${fmtPctV(bestDow.conv_rate)} המרה` : "—"}
+          color="#7c3aed"
+        />
+      </div>
+
+      {/* ── Smart Report summary (compact narrative) ── */}
       {smart.summary && (
         <div style={{
           background: "#eff6ff", border: "1px solid #bfdbfe",
-          borderRadius: 10, padding: "16px 18px", marginBottom: 14,
+          borderRadius: 10, padding: "14px 16px",
         }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#1e40af", marginBottom: 6 }}>
             🧠 סיכום AI {smart.produced_by === "smart_interpreter:fallback" && (
-              <span style={{ color: "#92400e", fontWeight: 400 }}>(fallback — Claude לא הגיב)</span>
+              <span style={{ color: "#92400e", fontWeight: 400 }}>(fallback)</span>
             )}
           </div>
           <p style={{ margin: 0, fontSize: 14, lineHeight: 1.8, color: "#0f172a" }}>
@@ -274,29 +379,132 @@ function ResultDisplay({ result }) {
         </div>
       )}
 
-      {/* ── Scenarios — פסימי / ריאלי / אופטימי ── */}
-      {Object.keys(scenarios).length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, marginBottom: 14 }}>
-          {[
-            ["pessimistic", "פסימי", "#fee2e2", "#991b1b"],
-            ["realistic",   "ריאלי",  "#fef3c7", "#92400e"],
-            ["optimistic",  "אופטימי", "#dcfce7", "#166534"],
-          ].map(([key, label, bg, fg]) => {
-            const sc = scenarios[key] || {};
-            return (
-              <div key={key} style={{ background: bg, borderRadius: 10, padding: "12px 14px" }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: fg, marginBottom: 4 }}>{label}</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: fg }}>
-                  {sc.point != null ? Math.round(sc.point).toLocaleString("he-IL") : "—"}
+      {/* ── Scenarios bar chart — פסימי / ריאלי / אופטימי ── */}
+      {(charts.scenarios_chart || []).some(s => s.point != null) && (
+        <ChartCard title="🎯 תרחישים — פסימי / ריאלי / אופטימי" color="#1e40af">
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={charts.scenarios_chart} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#475569" }} />
+              <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} />
+              <Tooltip
+                formatter={(v) => fmtN(Math.round(v))}
+                contentStyle={{ fontSize: 12, direction: "rtl" }}
+              />
+              <Bar dataKey="point" radius={[8, 8, 0, 0]}>
+                {(charts.scenarios_chart || []).map((entry, i) => (
+                  <Cell key={i} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          {/* Reasoning under chart */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 10, fontSize: 11, color: "#475569" }}>
+            {["pessimistic", "realistic", "optimistic"].map((k, i) => {
+              const sc = scenarios[k] || {};
+              const colors = ["#dc2626", "#ca8a04", "#16a34a"];
+              return (
+                <div key={k} style={{ borderTop: `2px solid ${colors[i]}`, paddingTop: 6 }}>
+                  {sc.reasoning || "—"}
                 </div>
-                {sc.reasoning && (
-                  <div style={{ fontSize: 11, color: "#0f172a", marginTop: 6, lineHeight: 1.5 }}>
-                    {sc.reasoning}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+        </ChartCard>
+      )}
+
+      {/* ── Two col: Day of week + Status pie ── */}
+      {(charts.day_of_week || charts.status_breakdown) && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 10 }}>
+          {charts.day_of_week && charts.day_of_week.length > 0 && (
+            <ChartCard title="📅 דפוסי ימי שבוע — לידים והמרה" color="#7c3aed">
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={charts.day_of_week} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="day_name" tick={{ fontSize: 11, fill: "#475569" }} />
+                  <YAxis yAxisId="left"  tick={{ fontSize: 10, fill: "#94a3b8" }} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: "#94a3b8" }}
+                         tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} />
+                  <Tooltip
+                    formatter={(v, name) => name === "conv_rate" ? `${(v * 100).toFixed(1)}%` : fmtN(v)}
+                    contentStyle={{ fontSize: 12, direction: "rtl" }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar yAxisId="left"  dataKey="leads"     name="לידים"   fill="#3b82f6" radius={[4,4,0,0]} />
+                  <Bar yAxisId="left"  dataKey="enrolled"  name="נרשמים"  fill="#10b981" radius={[4,4,0,0]} />
+                  <Line yAxisId="right" type="monotone" dataKey="conv_rate" name="conv_rate" stroke="#f59e0b" />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          )}
+
+          {charts.status_breakdown && charts.status_breakdown.length > 0 && (
+            <ChartCard title="🥧 התפלגות status — איכות לידים" color="#0c4a6e">
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={charts.status_breakdown}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%" cy="50%"
+                    outerRadius={80}
+                    innerRadius={40}
+                    paddingAngle={2}
+                    label={(e) => e.name}
+                    labelLine={false}
+                  >
+                    {(charts.status_breakdown || []).map((_, i) => (
+                      <Cell key={i} fill={STATUS_COLORS[i % STATUS_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={fmtN} contentStyle={{ fontSize: 12, direction: "rtl" }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          )}
+        </div>
+      )}
+
+      {/* ── Two col: Platform×month + Irrelevant breakdown ── */}
+      {(charts.platform_month || charts.irrelevant_breakdown) && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 10 }}>
+          {charts.platform_month && charts.platform_month.length > 0 && (
+            <ChartCard title="📈 לידים לפי פלטפורמה × חודש" color="#1877f2">
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={_pivotPlatformMonth(charts.platform_month)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#475569" }} />
+                  <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} />
+                  <Tooltip formatter={fmtN} contentStyle={{ fontSize: 12, direction: "rtl" }} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {_uniquePlatforms(charts.platform_month).map((plat) => (
+                    <Line
+                      key={plat}
+                      type="monotone"
+                      dataKey={plat}
+                      stroke={PLATFORM_COLORS[plat] || "#64748b"}
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          )}
+
+          {charts.irrelevant_breakdown && charts.irrelevant_breakdown.length > 0 && (
+            <ChartCard title="❌ לידים לא רלוונטיים — פילוח" color="#991b1b">
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={charts.irrelevant_breakdown} layout="vertical" margin={{ top: 10, right: 10, left: 80, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: "#94a3b8" }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#475569" }} width={120} />
+                  <Tooltip formatter={fmtN} contentStyle={{ fontSize: 12, direction: "rtl" }} />
+                  <Bar dataKey="value" fill="#ef4444" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          )}
         </div>
       )}
 
