@@ -1014,27 +1014,41 @@ export default function MediaReportsPage() {
           </div>
         )}
 
-        {/* ── Totals ── */}
-        {totals && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 16 }}>
-            {mode === "daily" ? (
-              <>
-                <StatCard label="סה״כ לידים"   value={fmtNum(totals.total_leads ?? 0)} />
-                <StatCard label="רשומות 1006" value={fmtNum(totals.raw_records_count ?? 0)} />
-              </>
-            ) : mode === "weekly" ? (
-              <>
-                <StatCard label="סה״כ קמפיינים"  value={fmtNum(totals.campaigns)} />
-                <StatCard label="סה״כ לידים"     value={fmtNum(totals.leads_count)} />
-                <StatCard label="סה״כ הוצאה"     value={fmtMoney(totals.spend)} />
-                <StatCard label="סה״כ חשיפות"    value={fmtNum(totals.impressions)} />
-                <StatCard label="סה״כ קליקים"    value={fmtNum(totals.clicks)} />
-                <StatCard label="CTR כולל"       value={fmtPct(totals.ctr_pct)} />
-                <StatCard label="עלות לליד"      value={fmtMoney(totals.cpl)} />
-              </>
-            ) : null}
-          </div>
-        )}
+        {/* ── Totals / KPI strip ── */}
+        {(totals || (mode === "daily" && data)) && (() => {
+          // Daily: compute media totals from detail_rows
+          const detailRows = (data?.detail_rows || data?.rows || []).filter(r => !r.is_summary);
+          const metaRows   = detailRows.filter(r => (r.platform || "").toLowerCase().includes("meta"));
+          const gRows      = detailRows.filter(r => (r.platform || "").toLowerCase().includes("google"));
+          const totalSpend  = detailRows.reduce((s, r) => s + (r.spend || 0), 0);
+          const metaSpend   = metaRows.reduce((s, r) => s + (r.spend || 0), 0);
+          const gSpend      = gRows.reduce((s, r) => s + (r.spend || 0), 0);
+          const totalLeadsPaid = detailRows.reduce((s, r) => s + (r.leads_count || 0), 0);
+          const cpl = totalLeadsPaid > 0 ? totalSpend / totalLeadsPaid : null;
+          return (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
+              {mode === "daily" ? (
+                <>
+                  <StatCard color="#3b82f6" label="לידים היום (כולל)"  value={fmtNum(totals?.total_leads ?? 0)} />
+                  {metaSpend  > 0 && <StatCard color="#8b5cf6" label="ספנד Meta"    value={fmtMoney(metaSpend)}   sub="היום" />}
+                  {gSpend     > 0 && <StatCard color="#f59e0b" label="ספנד Google"  value={fmtMoney(gSpend)}      sub="היום" />}
+                  {totalSpend > 0 && <StatCard color="#1e3a5f" label="סה״כ ספנד"   value={fmtMoney(totalSpend)}  sub="כל הפלטפורמות" />}
+                  {cpl        != null && <StatCard color="#ef4444" label="עלות לליד (ממומן)" value={fmtMoney(cpl)} />}
+                  <StatCard color="#06b6d4" label="רשומות 1006" value={fmtNum(totals?.raw_records_count ?? 0)} />
+                </>
+              ) : mode === "weekly" ? (
+                <>
+                  <StatCard color="#3b82f6" label="סה״כ קמפיינים"  value={fmtNum(totals?.campaigns)}   />
+                  <StatCard color="#10b981" label="סה״כ לידים"     value={fmtNum(totals?.leads_count)}  />
+                  <StatCard color="#8b5cf6" label="סה״כ הוצאה"     value={fmtMoney(totals?.spend)}      />
+                  <StatCard color="#f59e0b" label="CTR כולל"       value={fmtPct(totals?.ctr_pct)}      />
+                  <StatCard color="#ef4444" label="עלות לליד"      value={fmtMoney(totals?.cpl)}        />
+                  <StatCard color="#06b6d4" label="חשיפות"         value={fmtNum(totals?.impressions)}  />
+                </>
+              ) : null}
+            </div>
+          );
+        })()}
 
         {/* ── Daily sub-tabs ── */}
         {mode === "daily" && (
@@ -2206,11 +2220,19 @@ function RecommendationsView({ platformFilter }) {
 
 // ─── Small components & styles ──────────────────────────────────────────────
 
-function StatCard({ label, value }) {
+function StatCard({ label, value, color = "#3b82f6", sub }) {
   return (
-    <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 14px" }}>
-      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{value}</div>
+    <div style={{
+      background: "#ffffff",
+      border: "1px solid #e8edf3",
+      borderTop: `3px solid ${color}`,
+      borderRadius: 12,
+      padding: "14px 16px",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+    }}>
+      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4, fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.5px" }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>{sub}</div>}
     </div>
   );
 }
