@@ -20,7 +20,7 @@ import EvidencePackView from "../components/forecasting/EvidencePackView.jsx";
 import SignalChip       from "../components/forecasting/SignalChip.jsx";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
-  PieChart, Pie, Cell, Legend, LineChart, Line,
+  PieChart, Pie, Cell, Legend, LineChart, Line, ComposedChart,
 } from "recharts";
 // PatternLibrary + Stage0Trigger הוסרו מהתצוגה — debug-only.
 
@@ -453,21 +453,21 @@ function ResultDisplay({ result }) {
               })()}
             >
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={charts.day_of_week} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <ComposedChart data={charts.day_of_week} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="day_name" tick={{ fontSize: 11, fill: "#475569" }} reversed />
                   <YAxis yAxisId="left"  orientation="right" tick={{ fontSize: 10, fill: "#94a3b8" }} />
                   <YAxis yAxisId="right" orientation="left"  tick={{ fontSize: 10, fill: "#94a3b8" }}
                          tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} />
                   <Tooltip
-                    formatter={(v, name) => name === "conv_rate" ? `${(v * 100).toFixed(1)}%` : fmtN(v)}
+                    formatter={(v, name) => name === "המרה %" ? `${(v * 100).toFixed(1)}%` : fmtN(v)}
                     contentStyle={{ fontSize: 12, direction: "rtl", textAlign: "right" }}
                   />
                   <Legend wrapperStyle={{ fontSize: 11, direction: "rtl" }} />
                   <Bar yAxisId="left"  dataKey="leads"     name="לידים"   fill="#3b82f6" radius={[4,4,0,0]} />
                   <Bar yAxisId="left"  dataKey="enrolled"  name="נרשמים"  fill="#10b981" radius={[4,4,0,0]} />
-                  <Line yAxisId="right" type="monotone" dataKey="conv_rate" name="conv_rate" stroke="#f59e0b" />
-                </BarChart>
+                  <Line yAxisId="right" type="monotone" dataKey="conv_rate" name="המרה %" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4 }} />
+                </ComposedChart>
               </ResponsiveContainer>
             </ChartCard>
           )}
