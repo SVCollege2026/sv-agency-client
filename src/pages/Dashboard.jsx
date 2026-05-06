@@ -32,8 +32,8 @@ const FACT_ORDER = {
   organic_deep_dive:           7,
   contact_count_distribution:  8,
   cross_course_enrollment:     9,
-  unclassified_breakdown:      10,
   leads_by_vendor:             80,
+  unclassified_breakdown:      85,  // טכני מדי לתחילה
   vendor_leads_deep:           81,
   vendor_quarterly:            82,
   // Enrollments
