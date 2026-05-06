@@ -21,8 +21,16 @@ const DEPARTMENTS = [
     id:     "media",
     icon:   "📣",
     label:  "מחלקת מדיה",
-    desc:   "דוחות יומיים/שבועיים · Meta · Google · לידים מ-Fireberry",
+    desc:   "דוחות · חקירות · תהליך פרסום · שאלות פתוחות",
     path:   "/media-reports",
+    active: true,
+  },
+  {
+    id:     "strategy",
+    icon:   "🧭",
+    label:  "מחלקת אסטרטגיה",
+    desc:   "חיזוי · יעדים · תרחישים · המלצות (חלקי בפיתוח)",
+    path:   "/strategy",
     active: true,
   },
   {
@@ -45,21 +53,6 @@ const DEPARTMENTS = [
     label:  "מסעות לקוח",
     desc:   "גיוס · אונבורדינג · סטודנט · בוגר",
     active: false,
-  },
-  {
-    id:     "strategy",
-    icon:   "🧭",
-    label:  "אסטרטגיה",
-    desc:   "תוכנית שנתית · מיתוג · יעדים",
-    active: false,
-  },
-  {
-    id:     "forecasting",
-    icon:   "🔮",
-    label:  "מחלקת חיזוי",
-    desc:   "תחזיות עתידיות · Pattern Memory · Self-Reflection · Stage 0",
-    path:   "/forecasting",
-    active: true,
   },
 ];
 

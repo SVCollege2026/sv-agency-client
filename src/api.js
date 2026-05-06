@@ -316,3 +316,40 @@ export async function getRecentSignals({ type = null, limit = 100 } = {}) {
   if (type) params.set("type", type);
   return request("GET", `/api/forecasting/signals/recent?${params.toString()}`);
 }
+
+// ─── Investigations (Phase 2) ─────────────────────────────────────────────────
+// חקירות אסטרטגיות שמורות מ-`media.investigations`. כל חקירה מכילה
+// summary, findings, data_gaps, evidence_sources.
+
+export async function getInvestigations({ platform = null, start = null, end = null, status = null, limit = 50 } = {}) {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (platform) params.set("platform", platform);
+  if (start)    params.set("start",    start);
+  if (end)      params.set("end",      end);
+  if (status)   params.set("status",   status);
+  return request("GET", `/api/media-reports/investigations?${params.toString()}`);
+}
+
+export async function getInvestigation(id) {
+  return request("GET", `/api/media-reports/investigations/${id}`);
+}
+
+export async function getInvestigationQuestions({ platform = null, limit = 100 } = {}) {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (platform) params.set("platform", platform);
+  return request("GET", `/api/media-reports/investigations-questions?${params.toString()}`);
+}
+
+export async function runInvestigation({ platform, question, extraData = [], start = null, end = null } = {}) {
+  // Backend endpoints (POST /investigate/{platform}) expect query params, not JSON body.
+  const params = new URLSearchParams();
+  params.set("question", question);
+  if (start) params.set("start", start);
+  if (end)   params.set("end",   end);
+  if (extraData && extraData.length) {
+    params.set("extra_data", extraData.join(","));
+  }
+  return request("POST", `/api/media-reports/investigate/${platform}?${params.toString()}`);
+}
