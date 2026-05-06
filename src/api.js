@@ -273,6 +273,10 @@ export async function getForecastResult(requestId) {
   return request("GET", `/api/forecasting/request/${requestId}/result`);
 }
 
+export async function getLatestForecast() {
+  return request("GET", "/api/forecasting/latest");
+}
+
 export async function listForecasts({ limit = 50, status = null, department = null } = {}) {
   const params = new URLSearchParams();
   params.set("limit", String(limit));

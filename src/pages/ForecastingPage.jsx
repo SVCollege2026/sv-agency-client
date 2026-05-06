@@ -14,7 +14,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   submitForecast, getForecastStatus, getForecastResult,
-  getForecastingCronStatus,
+  getForecastingCronStatus, getLatestForecast,
 } from "../api.js";
 import EvidencePackView from "../components/forecasting/EvidencePackView.jsx";
 import SignalChip       from "../components/forecasting/SignalChip.jsx";
@@ -60,6 +60,11 @@ export default function ForecastingPage() {
 
   useEffect(() => {
     getForecastingCronStatus().then(setCron).catch(() => {});
+    // טוענים אוטומטית את החיזוי האחרון — Stage 0 snapshot. הלקוחה לא צריכה
+    // לשאול שאלות כדי לראות חיזוי. הדוח מוצג ישר.
+    getLatestForecast()
+      .then(setResultData)
+      .catch(() => {});  // 404 אם אין דוח עדיין — תופיע הזמנה לייצר
   }, []);
 
   // poll על ריצה פעילה
@@ -140,71 +145,24 @@ export default function ForecastingPage() {
           )}
         </div>
 
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 6px" }}>🔮 חיזוי</h1>
-        <p style={{ color: "#64748b", fontSize: 13, margin: "0 0 28px" }}>
-          תחזיות עתידיות מבוססות-ראיות · ReAct + Self-Reflection · Pattern Memory ארגוני.
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 6px" }}>🔮 חיזוי — נקודת שלב 0</h1>
+        <p style={{ color: "#64748b", fontSize: 13, margin: "0 0 20px" }}>
+          תמונת המצב נכון לעכשיו. מתעדכן באופן יזום (כפתור למטה) או דרך ה-cron החודשי.
           <br/>
           <span style={{ fontSize: 12, color: "#94a3b8" }}>
-            עורכים יעדים בטאב <b>יעדים</b>. תרחישים פסימי/ריאלי/אופטימי = פלט של חיזוי מול היעדים.
+            תרחישים פסימי/ריאלי/אופטימי = פלט של חיזוי מול היעדים (טאב <b>יעדים</b>).
           </span>
         </p>
 
-        {/* ── סקציה 1: שאלה ── */}
-        <div style={cardStyle}>
-          <h2 style={h2Style}>📝 שאלת חיזוי</h2>
-          <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {/* dropdown של סוג שאלה הוסר — default 'forecast' */}
-            <div>
-              <label style={labelStyle}>השאלה</label>
-              <textarea
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                rows={3}
-                placeholder="לדוגמה: כמה לידים נצפה לקבל ביוני 2026? האם יש עלייה בביקוש לקורסי AI?"
-                style={{
-                  width: "100%", background: "#ffffff", color: "#0f172a",
-                  border: "1px solid #cbd5e1", borderRadius: 8,
-                  padding: "10px 12px", fontSize: 14, resize: "vertical",
-                  fontFamily: "inherit", boxSizing: "border-box",
-                }}
-                disabled={submitting || (requestId && !resultData)}
-              />
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                type="submit"
-                disabled={submitting || !question.trim() || (requestId && !resultData)}
-                style={{
-                  background: (submitting || !question.trim() || (requestId && !resultData)) ? "#475569" : "#3b82f6",
-                  color: "#fff", border: "none", borderRadius: 8,
-                  padding: "10px 22px", fontSize: 14, fontWeight: 600,
-                  cursor: (submitting || !question.trim() || (requestId && !resultData)) ? "default" : "pointer",
-                }}>
-                {submitting ? "שולח…" : "🚀 שלח לחיזוי"}
-              </button>
-              {requestId && (
-                <button
-                  type="button" onClick={reset}
-                  style={{
-                    background: "transparent", border: "1px solid #cbd5e1",
-                    color: "#475569", borderRadius: 8, padding: "10px 22px",
-                    fontSize: 14, cursor: "pointer",
-                  }}>
-                  שאלה חדשה
-                </button>
-              )}
-            </div>
-            {error && (
-              <div style={{ color: "#dc2626", fontSize: 13 }}>שגיאה: {error}</div>
-            )}
-          </form>
-        </div>
-
-        {/* ── סקציה 2: תוצאה ── */}
+        {/* ── סקציה ראשית: דשבורד החיזוי הנוכחי (auto-loaded) ── */}
         {(statusInfo || resultData) && (
           <div style={cardStyle}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <h2 style={h2Style}>📊 תוצאה</h2>
+              <h2 style={h2Style}>📊 חיזוי נוכחי {resultData?.created_at && (
+                <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 400, marginInlineStart: 8 }}>
+                  · נוצר {new Date(resultData.created_at).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" })}
+                </span>
+              )}</h2>
               {statusInfo && (
                 <span style={{ color: STATUS_HE[statusInfo.status]?.color || "#94a3b8", fontSize: 13, fontWeight: 600 }}>
                   ● {STATUS_HE[statusInfo.status]?.label || statusInfo.status}
@@ -234,8 +192,68 @@ export default function ForecastingPage() {
           </div>
         )}
 
-        {/* PatternLibrary + Stage0Trigger הוסרו לחלוטין מהתצוגה — debug
-            views, לא רלוונטי לתצוגת לקוחה. */}
+        {/* כשאין דוח עדיין */}
+        {!statusInfo && !resultData && (
+          <div style={{ ...cardStyle, textAlign: "center", padding: "32px 24px" }}>
+            <div style={{ fontSize: 14, color: "#475569", marginBottom: 8 }}>
+              עדיין לא הופק חיזוי שלב 0. לחצי על "הפק חיזוי חדש" למטה כדי לייצר.
+            </div>
+            <div style={{ fontSize: 12, color: "#94a3b8" }}>הפקה לוקחת כ-3-5 דקות.</div>
+          </div>
+        )}
+
+        {/* ── סקציה משנית: שאלה ממוקדת חדשה (collapsible) ── */}
+        <details style={{ ...cardStyle, padding: "12px 18px", marginTop: 14 }}>
+          <summary style={{ cursor: "pointer", fontSize: 14, fontWeight: 600, color: "#475569" }}>
+            🚀 הפק חיזוי חדש / שאלה ממוקדת
+          </summary>
+          <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 8, marginBottom: 12 }}>
+            רענון חיזוי שלב 0 (השאר ריק) או שאלה ממוקדת ספציפית.
+          </p>
+          <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <textarea
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              rows={3}
+              placeholder="ריק = רענון Stage 0. או שאלה ספציפית, למשל: 'מה צפוי בחגי תשרי?'"
+              style={{
+                width: "100%", background: "#ffffff", color: "#0f172a",
+                border: "1px solid #cbd5e1", borderRadius: 8,
+                padding: "10px 12px", fontSize: 14, resize: "vertical",
+                fontFamily: "inherit", boxSizing: "border-box",
+              }}
+              disabled={submitting || (requestId && !resultData)}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="submit"
+                disabled={submitting || (requestId && !resultData)}
+                onClick={(e) => { if (!question.trim()) setQuestion("הפק חיזוי שלב 0 — תמונת מצב כללית: לידים, נרשמים, CPL, איכות לפי פלטפורמה, ימי שבוע, סטטוסים, מסרים שעבדו, ותרחישים פסימי/ריאלי/אופטימי ל-3 חודשים קדימה."); }}
+                style={{
+                  background: (submitting || (requestId && !resultData)) ? "#475569" : "#3b82f6",
+                  color: "#fff", border: "none", borderRadius: 8,
+                  padding: "10px 22px", fontSize: 14, fontWeight: 600,
+                  cursor: (submitting || (requestId && !resultData)) ? "default" : "pointer",
+                }}>
+                {submitting ? "שולח…" : "🚀 שלח לחיזוי"}
+              </button>
+              {requestId && (
+                <button
+                  type="button" onClick={reset}
+                  style={{
+                    background: "transparent", border: "1px solid #cbd5e1",
+                    color: "#475569", borderRadius: 8, padding: "10px 22px",
+                    fontSize: 14, cursor: "pointer",
+                  }}>
+                  שאלה חדשה
+                </button>
+              )}
+            </div>
+            {error && (
+              <div style={{ color: "#dc2626", fontSize: 13 }}>שגיאה: {error}</div>
+            )}
+          </form>
+        </details>
 
         {/* ── Disclaimer ── */}
         <div style={{
