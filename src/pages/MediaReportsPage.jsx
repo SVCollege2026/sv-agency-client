@@ -147,19 +147,22 @@ function hebSourceKind(k) {
 // ─── Filter bar ──────────────────────────────────────────────────────────────
 
 const MODES = [
-  { id: "daily",          label: "יומי"   },
-  { id: "weekly",         label: "שבועי" },
-  { id: "range",          label: "טווח"   },
-  { id: "monthly",        label: "📈 חודשי Y-o-Y" },
-  { id: "investigations", label: "🔎 חקירות" },
-  { id: "timeline",       label: "🗓 תהליך פרסום" },
-  { id: "questions",      label: "❓ שאלות פתוחות" },
+  { id: "daily",           label: "יומי"   },
+  { id: "weekly",          label: "שבועי" },
+  { id: "range",           label: "טווח"   },
+  { id: "monthly",         label: "📈 חודשי Y-o-Y" },
+  { id: "investigations",  label: "🔎 חקירות" },
+  { id: "timeline",        label: "🗓 תהליך פרסום" },
   { id: "recommendations", label: "💡 המלצות מדיה" },
 ];
 
+// "שאלות פתוחות" הוסר — אגרגציית data_gaps הייתה פערים טכניים, לא שאלות
+// פוליסי למנכ"ל. שאלות פוליסי ("מתי להחליף קריאייטיב? מתי להסיט תקציב?")
+// יבואו דרך config של recommender — ראה המלצות מדיה.
+
 // המצבים החדשים אינם משתמשים ב-fetchMediaDaily/Weekly/Range/Monthly. כל אחד
 // מנהל את הfetching שלו פנימית.
-const _NEW_MODES = ["investigations", "timeline", "questions", "recommendations"];
+const _NEW_MODES = ["investigations", "timeline", "recommendations"];
 const _isLegacyMode = (m) => !_NEW_MODES.includes(m);
 
 // ─── Monthly KPI sub-component ─────────────────────────────────────────────
@@ -1083,8 +1086,6 @@ export default function MediaReportsPage() {
           <InvestigationsView platformFilter={platformFilter} />
         ) : mode === "timeline" ? (
           <TimelineView platformFilter={platformFilter} />
-        ) : mode === "questions" ? (
-          <QuestionsView platformFilter={platformFilter} />
         ) : mode === "recommendations" ? (
           <RecommendationsView platformFilter={platformFilter} />
         ) : mode === "monthly" ? (
