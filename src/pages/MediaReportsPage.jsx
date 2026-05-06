@@ -152,14 +152,15 @@ function hebSourceKind(k) {
 
 // ─── Filter bar ──────────────────────────────────────────────────────────────
 
-// מדיה = מציגה מה יש כרגע. זהו. ניתוח חכם / חקירת מגמות / חיזוי =
-// מחלקת חיזוי (Strategy → חיזוי).
+// מדיה = מציגה מה יש + חוקרת מה עבד/לא עבד + ממוצעים. **בלי חיפוש מגמות**
+// (זה תפקיד מחלקת חיזוי). המלצות מדיה = forward-looking, גם תפקיד חיזוי/recommender.
 const MODES = [
-  { id: "stage0",   label: "📑 דוח שלב 0" },
-  { id: "daily",    label: "יומי"   },
-  { id: "weekly",   label: "שבועי" },
-  { id: "range",    label: "טווח"   },
-  { id: "monthly",  label: "📈 חודשי Y-o-Y" },
+  { id: "stage0",         label: "📑 דוח שלב 0" },
+  { id: "daily",          label: "יומי"   },
+  { id: "weekly",         label: "שבועי" },
+  { id: "range",          label: "טווח"   },
+  { id: "monthly",        label: "📈 חודשי Y-o-Y" },
+  { id: "investigations", label: "🔎 חקירות" },
 ];
 
 // "שאלות פתוחות" הוסר — אגרגציית data_gaps הייתה פערים טכניים, לא שאלות
