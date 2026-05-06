@@ -261,6 +261,103 @@ const COURSE_METRICS = [
   { id: "frozen_ytd",    label: "מקפיאים (YTD)" },
 ];
 
+// ─── DailyChartsView ─────────────────────────────────────────────────────────
+// גרפי סיכום לדוח היומי: פילוח לידים+ספנד לפי פלטפורמה + טופ קמפיינים
+function DailyChartsView({ data }) {
+  const detailRows = useMemo(() =>
+    (data?.detail_rows || data?.rows || []).filter(r => !r.is_summary),
+    [data]
+  );
+
+  // סיכום לפי פלטפורמה (Meta / Google / TikTok …)
+  const platformData = useMemo(() => {
+    const map = {};
+    for (const r of detailRows) {
+      const raw = (r.platform || "לא ידוע");
+      // קיצור: Meta Ads / Meta / facebook → Meta
+      const key = /meta|facebook|instagram/i.test(raw)  ? "Meta"
+                : /google/i.test(raw)                    ? "Google"
+                : /tik.?tok/i.test(raw)                  ? "TikTok"
+                : raw.split(" ")[0];
+      if (!map[key]) map[key] = { platform: key, leads: 0, spend: 0 };
+      map[key].leads += r.leads_count || 0;
+      map[key].spend += r.spend       || 0;
+    }
+    return Object.values(map)
+      .filter(r => r.leads > 0 || r.spend > 0)
+      .sort((a, b) => b.leads - a.leads);
+  }, [detailRows]);
+
+  // טופ 7 קמפיינים לפי לידים
+  const topCampaigns = useMemo(() =>
+    [...detailRows]
+      .filter(r => (r.leads_count || 0) > 0)
+      .sort((a, b) => (b.leads_count || 0) - (a.leads_count || 0))
+      .slice(0, 7)
+      .map(r => ({
+        name: (r.adset_name || r.campaign_name || r.platform || "קמפיין").slice(0, 28),
+        leads: r.leads_count || 0,
+        spend: r.spend       || 0,
+      })),
+    [detailRows]
+  );
+
+  if (platformData.length === 0 && topCampaigns.length === 0) return null;
+
+  const axisTick  = { fontSize: 11, fill: "#64748b" };
+  const tipStyle  = { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12, direction: "rtl" };
+  const ChartCard = ({ title, color, children, height = 220 }) => (
+    <div style={{
+      background: "#fff", border: "1px solid #e2e8f0",
+      borderTop: `3px solid ${color}`, borderRadius: 10, padding: "14px 16px",
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>{title}</div>
+      <div style={{ width: "100%", height }}>
+        <ResponsiveContainer>{children}</ResponsiveContainer>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
+      {/* פילוח לפי פלטפורמה */}
+      {platformData.length > 0 && (
+        <ChartCard title="לידים וספנד לפי פלטפורמה" color="#3b82f6">
+          <BarChart data={platformData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
+            <CartesianGrid stroke="#f1f5f9" vertical={false} />
+            <XAxis dataKey="platform" tick={axisTick} />
+            <YAxis yAxisId="l" tick={axisTick} />
+            <YAxis yAxisId="s" orientation="right" tick={axisTick}
+                   tickFormatter={v => `₪${(v / 1000).toFixed(0)}K`} />
+            <Tooltip contentStyle={tipStyle}
+                     formatter={(v, name) => name === "ספנד ₪"
+                       ? `₪${Math.round(v).toLocaleString("he-IL")}` : v} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Bar yAxisId="l" dataKey="leads" name="לידים"  fill="#3b82f6" radius={[3, 3, 0, 0]} />
+            <Bar yAxisId="s" dataKey="spend" name="ספנד ₪" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+          </BarChart>
+        </ChartCard>
+      )}
+
+      {/* טופ קמפיינים */}
+      {topCampaigns.length > 0 && (
+        <ChartCard title="טופ קמפיינים — לידים" color="#10b981"
+                   height={Math.max(200, topCampaigns.length * 30)}>
+          <BarChart data={topCampaigns} layout="vertical"
+                    margin={{ top: 4, right: 30, bottom: 4, left: 130 }}>
+            <CartesianGrid stroke="#f1f5f9" horizontal={false} />
+            <XAxis type="number" tick={axisTick} />
+            <YAxis type="category" dataKey="name"
+                   tick={{ fontSize: 10, fill: "#64748b" }} width={120} />
+            <Tooltip contentStyle={tipStyle} />
+            <Bar dataKey="leads" name="לידים" fill="#10b981" radius={[0, 3, 3, 0]} />
+          </BarChart>
+        </ChartCard>
+      )}
+    </div>
+  );
+}
+
 // ─── SchoolKpiCharts ──────────────────────────────────────────────────────────
 // 3 bar charts above the table: leads YoY · registrations YoY · spend YoY
 function SchoolKpiCharts({ rows, currYear }) {
@@ -1296,6 +1393,11 @@ export default function MediaReportsPage() {
         ) : mode === "daily" && dailyView === "analytics" ? (
           <AnalyticsPanel analytics={data?.analytics} loading={loading} />
         ) : (
+          <>
+          {/* גרפי סיכום יומיים — רק בתצוגת ראשית */}
+          {mode === "daily" && dailyView === "master" && !loading && data && (
+            <DailyChartsView data={data} />
+          )}
           <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -1331,6 +1433,7 @@ export default function MediaReportsPage() {
               </table>
             </div>
           </div>
+          </>
         )}
 
         {/* ── Runs history panel ── */}

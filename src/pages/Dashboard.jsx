@@ -13,7 +13,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, Cell,
 } from "recharts";
-import { getBaselineFacts } from "../api.js";
+import { getBaselineFacts, getDashboardKpiLive } from "../api.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -86,55 +86,63 @@ function pickChartShape(fact) {
 }
 
 // Extract KPI values from well-known fact IDs for the header strip
-function extractKpis(groups) {
+// liveKpi (optional) — result of /api/dashboard/kpi-live — overrides enrollment/leads with real-time data
+function extractKpis(groups, liveKpi) {
   const allFacts = Object.values(groups || {}).flatMap(g => g?.facts || []);
   const byId = Object.fromEntries(allFacts.map(f => [f.fact_id, f]));
   const kpis = [];
-  // כל ה-baseline נכון ל-30/04/2026 — מסומן כך בכל tile
-  const SUB = "ינו'–אפר' 2026";
+  const BASELINE_SUB = "ינו'–אפר' 2026";  // ברירת מחדל כשאין נתון חי
 
-  let leads2026 = null, enroll2026 = null;
+  // ── נרשמים YTD: מועדף נתון חי מ-monthly_school_kpi, fallback ל-baseline ──
+  let enroll2026 = null;
+  if (liveKpi?.reg_total_ytd != null) {
+    enroll2026 = liveKpi.reg_total_ytd;
+    const liveMonth = liveKpi.month_ym
+      ? `נכון ל-${liveKpi.month_ym}`
+      : "עדכני";
+    kpis.push({ label: "נרשמים YTD", value: enroll2026, format: "num", color: "#10b981", sub: liveMonth });
+  } else {
+    const enrollFact = byId["enrollments_by_year"];
+    if (enrollFact?.rows?.length) {
+      const r = enrollFact.rows.find(r => String(r.year) === "2026") || enrollFact.rows.at(-1);
+      if (r?.enrolled_total != null) {
+        enroll2026 = r.enrolled_total;
+        kpis.push({ label: "נרשמים YTD", value: r.enrolled_total, format: "num", color: "#10b981", sub: BASELINE_SUB });
+      }
+    }
+  }
 
-  // Leads 2026 (or last available year)
+  // ── לידים YTD ──
+  let leads2026 = null;
   const leadsFact = byId["leads_by_year"];
   if (leadsFact?.rows?.length) {
     const r = leadsFact.rows.find(r => String(r.year) === "2026") || leadsFact.rows.at(-1);
     if (r?.total != null) {
       leads2026 = r.total;
-      kpis.push({ label: "לידים YTD", value: r.total, format: "num", color: "#3b82f6", sub: SUB });
+      kpis.push({ label: "לידים YTD", value: r.total, format: "num", color: "#3b82f6", sub: BASELINE_SUB });
     }
   }
 
-  // Enrollments 2026
-  const enrollFact = byId["enrollments_by_year"];
-  if (enrollFact?.rows?.length) {
-    const r = enrollFact.rows.find(r => String(r.year) === "2026") || enrollFact.rows.at(-1);
-    if (r?.enrolled_total != null) {
-      enroll2026 = r.enrolled_total;
-      kpis.push({ label: "נרשמים YTD", value: r.enrolled_total, format: "num", color: "#10b981", sub: SUB });
-    }
-  }
-
-  // Meta spend 2026
+  // ── ספנד Meta 2026 ──
   const spendFact = byId["media_spend_by_year"];
   if (spendFact?.rows?.length) {
     const metaRows = spendFact.rows.filter(r =>
       String(r.year) === "2026" && String(r.platform || "").toLowerCase().includes("meta"));
     const total = metaRows.reduce((s, r) => s + (r.spend || 0), 0);
     if (total > 0)
-      kpis.push({ label: "ספנד Meta", value: total, format: "money", color: "#8b5cf6", sub: SUB });
+      kpis.push({ label: "ספנד Meta", value: total, format: "money", color: "#8b5cf6", sub: BASELINE_SUB });
   }
 
-  // Google CPL 2026
+  // ── CPL Google 2026 ──
   const cplFact = byId["cpl_by_year_platform"];
   if (cplFact?.rows?.length) {
     const r = cplFact.rows.find(r =>
       String(r.year) === "2026" && String(r.platform || "").toLowerCase().includes("google"));
     if (r?.cpl != null)
-      kpis.push({ label: "CPL Google", value: r.cpl, format: "money", color: "#f59e0b", sub: SUB });
+      kpis.push({ label: "CPL Google", value: r.cpl, format: "money", color: "#f59e0b", sub: BASELINE_SUB });
   }
 
-  // המרה 2026 (נרשמים ÷ לידים) — מחושב מהנתונים שכבר שלפנו
+  // ── המרה 2026 ──
   if (leads2026 && enroll2026 && leads2026 > 0)
     kpis.push({
       label: "המרה 2026",
@@ -217,16 +225,14 @@ function PieChartView({ fact }) {
   const valueKey = cfg.value || (fact.columns || []).find((c) => c !== labelKey);
   const data = (fact.rows || []).filter((r) => r[valueKey] != null);
   return (
-    <div style={{ width: "100%", height: 300, marginTop: 8 }}>
+    <div style={{ width: "100%", height: 320, marginTop: 8 }}>
       <ResponsiveContainer>
         <PieChart>
           <Pie data={data} dataKey={valueKey} nameKey={labelKey}
-               cx="50%" cy="50%" outerRadius={110} innerRadius={50}
-               label={(e) => e[labelKey]}>
+               cx="50%" cy="50%" outerRadius={115} innerRadius={50}>
             {data.map((_, i) => <Cell key={i} fill={PAL[i % PAL.length]} />)}
           </Pie>
           <Tooltip content={<CustomTooltip />} />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
         </PieChart>
       </ResponsiveContainer>
     </div>
@@ -732,16 +738,21 @@ function KpiStrip({ kpis }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const [data,    setData]    = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(null);
-  const [activeTab, setTab]   = useState("context");
+  const [data,     setData]    = useState(null);
+  const [loading,  setLoading] = useState(true);
+  const [error,    setError]   = useState(null);
+  const [activeTab, setTab]    = useState("context");
+  const [liveKpi,  setLiveKpi] = useState(null);
 
   useEffect(() => {
     getBaselineFacts()
       .then(setData)
       .catch((e) => setError(e.message || String(e)))
       .finally(() => setLoading(false));
+    // נתון חי במקביל — לא חוסם את הטעינה
+    getDashboardKpiLive()
+      .then(setLiveKpi)
+      .catch(() => {});  // fail silently — fallback ל-baseline
   }, []);
 
   if (loading) return <PageShell><Center>טוען לוח בקרה…</Center></PageShell>;
@@ -756,7 +767,7 @@ export default function Dashboard() {
   });
 
   const active    = data.groups[activeTab] || tabs[0];
-  const kpis      = extractKpis(data.groups);
+  const kpis      = extractKpis(data.groups, liveKpi);
   const accent    = GROUP_COLORS[activeTab] || "#3b82f6";
   const totalFacts = Object.values(data.groups).reduce((s, g) => s + g.facts.length, 0);
 
