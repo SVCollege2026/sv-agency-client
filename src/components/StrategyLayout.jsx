@@ -14,14 +14,11 @@
 import React from "react";
 import { Outlet, NavLink, useLocation } from "react-router-dom";
 
-// אסטרטגיה במשרד פרסום מסורתי: חיזוי + יעדים + מותג + מסעות.
-// המלצות מדיה (תקציב, קמפיין, קריאייטיב) שייכות למחלקת מדיה — לא כאן.
-// תרחישים פסימי/ריאלי/אופטימי הם פלט של חיזוי, לא טאב נפרד.
+// אסטרטגיה: חיזוי + יעדים בלבד.
+// המלצות מדיה שייכות למחלקת מדיה. תרחישים = פלט של חיזוי.
 const TABS = [
   { id: "forecasting",   label: "🔮 חיזוי", path: "/strategy/forecasting", active: true  },
   { id: "goals",         label: "🎯 יעדים", path: "/strategy/goals",       active: true  },
-  { id: "branding",      label: "מיתוג",    path: "/strategy/branding",    active: false, why: "מחכה לתוצרי שלב 0 + מסקנות אסטרטגיות" },
-  { id: "journeys",      label: "מסעות לקוח", path: "/strategy/journeys",  active: false, why: "מצריך הרחבת Fireberry + spec ראשי" },
 ];
 
 export default function StrategyLayout() {
