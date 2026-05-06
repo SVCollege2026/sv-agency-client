@@ -258,12 +258,19 @@ function GroupedBarView({ fact }) {
     const exclude = new Set([xKey, ...(cfg.exclude || [])]);
     seriesKeys = (fact.columns || []).filter((c) => !exclude.has(c));
   }
+  // Auto-angle x-axis labels when average label length > 6 chars
+  const avgLen = data.length
+    ? data.reduce((s, r) => s + String(r[xKey] || "").length, 0) / data.length
+    : 0;
+  const angled = avgLen > 6;
   return (
-    <div style={{ width: "100%", height: 300, marginTop: 6 }}>
+    <div style={{ width: "100%", height: angled ? 340 : 300, marginTop: 6 }}>
       <ResponsiveContainer>
-        <BarChart data={data} margin={{ top: 6, right: 18, bottom: 6, left: 18 }}>
+        <BarChart data={data} margin={{ top: 6, right: 18, bottom: angled ? 60 : 6, left: 18 }}>
           <CartesianGrid stroke="#f1f5f9" />
-          <XAxis dataKey={xKey} tick={{ fontSize: 11, fill: "#475569" }} />
+          <XAxis dataKey={xKey} interval={0}
+                 tick={{ fontSize: 10, fill: "#475569", ...(angled ? { angle: -35, dy: 8 } : {}) }}
+                 height={angled ? 70 : 30} />
           <YAxis tick={{ fontSize: 11, fill: "#475569" }} />
           <Tooltip content={<CustomTooltip />} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
@@ -272,6 +279,130 @@ function GroupedBarView({ fact }) {
           ))}
         </BarChart>
       </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ─── Sankey (pure-SVG, no external lib) ──────────────────────────────────────
+function SankeyChartView({ fact }) {
+  const cfg = fact.chart_config || {};
+  const srcKey = cfg.source || "interested_in";
+  const dstKey = cfg.target || "enrolled_in";
+  const valKey = cfg.value  || "n";
+
+  // Only cross-course flows (filter out same→same)
+  const flows = (fact.rows || []).filter((r) => r.is_cross === true || r.is_cross === "true");
+  if (!flows.length) return null;
+
+  // Aggregate totals
+  const srcTotals = {}, dstTotals = {};
+  let totalFlow = 0;
+  flows.forEach((f) => {
+    srcTotals[f[srcKey]] = (srcTotals[f[srcKey]] || 0) + Number(f[valKey]);
+    dstTotals[f[dstKey]] = (dstTotals[f[dstKey]] || 0) + Number(f[valKey]);
+    totalFlow += Number(f[valKey]);
+  });
+  if (!totalFlow) return null;
+
+  // Layout helpers
+  const PAD = 8, MIN_H = 6;
+  function layoutNodes(totalsMap) {
+    const sorted = Object.entries(totalsMap).sort((a, b) => b[1] - a[1]);
+    const usableH = 360 - PAD * (sorted.length - 1);
+    let y = 14;
+    return sorted.map(([name, total]) => {
+      const h = Math.max(MIN_H, (total / totalFlow) * usableH);
+      const node = { name, total, y, h };
+      y += h + PAD;
+      return node;
+    });
+  }
+
+  const srcNodes = layoutNodes(srcTotals);
+  const dstNodes = layoutNodes(dstTotals);
+
+  const svgH = Math.max(
+    (srcNodes.at(-1)?.y ?? 0) + (srcNodes.at(-1)?.h ?? 0),
+    (dstNodes.at(-1)?.y ?? 0) + (dstNodes.at(-1)?.h ?? 0),
+  ) + 20;
+
+  const W = 520, nodeW = 14;
+  const leftX = 140, rightX = W - 140 - nodeW;
+  const cx = (leftX + nodeW + rightX) / 2;
+
+  const srcMap = Object.fromEntries(srcNodes.map((n) => [n.name, n]));
+  const dstMap = Object.fromEntries(dstNodes.map((n) => [n.name, n]));
+  const srcOff = Object.fromEntries(srcNodes.map((n) => [n.name, 0]));
+  const dstOff = Object.fromEntries(dstNodes.map((n) => [n.name, 0]));
+  const srcColors = Object.fromEntries(srcNodes.map((n, i) => [n.name, PAL[i % PAL.length]]));
+
+  // Scale factor shared with layoutNodes
+  const usableH = 360 - PAD * (srcNodes.length - 1);
+  const scaleH = (v) => Math.max(1.5, (v / totalFlow) * usableH);
+
+  const sortedFlows = [...flows].sort((a, b) => {
+    const sd = srcTotals[b[srcKey]] - srcTotals[a[srcKey]];
+    return sd !== 0 ? sd : b[valKey] - a[valKey];
+  });
+
+  const links = sortedFlows.map((f) => {
+    const src = srcMap[f[srcKey]], dst = dstMap[f[dstKey]];
+    if (!src || !dst) return null;
+    const fH = scaleH(Number(f[valKey]));
+    const sy0 = src.y + srcOff[f[srcKey]];
+    const dy0 = dst.y + dstOff[f[dstKey]];
+    srcOff[f[srcKey]] += fH;
+    dstOff[f[dstKey]] += fH;
+    return { ...f, sy0, dy0, fH, color: srcColors[f[srcKey]] };
+  }).filter(Boolean);
+
+  return (
+    <div style={{ width: "100%", marginTop: 10, overflowX: "auto" }}>
+      <svg width="100%" viewBox={`0 0 ${W} ${svgH}`} style={{ display: "block" }}>
+        {/* Flows */}
+        {links.map((l, i) => {
+          const d = [
+            `M ${leftX + nodeW} ${l.sy0}`,
+            `C ${cx} ${l.sy0}, ${cx} ${l.dy0}, ${rightX} ${l.dy0}`,
+            `L ${rightX} ${l.dy0 + l.fH}`,
+            `C ${cx} ${l.dy0 + l.fH}, ${cx} ${l.sy0 + l.fH}, ${leftX + nodeW} ${l.sy0 + l.fH}`,
+            "Z",
+          ].join(" ");
+          return (
+            <path key={i} d={d} fill={l.color} opacity={0.42}>
+              <title>{l[srcKey]} ← {l[dstKey]}: {l[valKey]}</title>
+            </path>
+          );
+        })}
+        {/* Source nodes + labels */}
+        {srcNodes.map((n) => (
+          <g key={n.name}>
+            <rect x={leftX} y={n.y} width={nodeW} height={n.h}
+                  fill={srcColors[n.name]} rx={2} />
+            <text x={leftX - 6} y={n.y + n.h / 2}
+                  textAnchor="end" dominantBaseline="middle"
+                  fontSize={11} fill="#1e293b">
+              {n.name}
+            </text>
+          </g>
+        ))}
+        {/* Target nodes + labels */}
+        {dstNodes.map((n) => (
+          <g key={n.name}>
+            <rect x={rightX} y={n.y} width={nodeW} height={n.h}
+                  fill="#64748b" rx={2} />
+            <text x={rightX + nodeW + 6} y={n.y + n.h / 2}
+                  textAnchor="start" dominantBaseline="middle"
+                  fontSize={11} fill="#1e293b">
+              {n.name}{" "}
+              <tspan fontSize={10} fill="#64748b">({n.total})</tspan>
+            </text>
+          </g>
+        ))}
+      </svg>
+      <p style={{ fontSize: 11, color: "#94a3b8", margin: "4px 0 0", textAlign: "center" }}>
+        מציג מעברים בין קורסים בלבד (ללא רישום לאותו קורס שהתעניינו בו)
+      </p>
     </div>
   );
 }
@@ -285,6 +416,7 @@ function FactChart({ fact }) {
   if (t === "line")         return <LineChartView fact={fact} />;
   if (t === "stacked_bar")  return <StackedBarView fact={fact} />;
   if (t === "grouped_bar")  return <GroupedBarView fact={fact} />;
+  if (t === "sankey")       return <SankeyChartView fact={fact} />;
   if (t === "table" || t === "metric") return null; // nothing — table is rendered below
 
   // auto fallback (legacy)
