@@ -21,15 +21,8 @@ import SignalChip       from "../components/forecasting/SignalChip.jsx";
 import PatternLibrary   from "../components/forecasting/PatternLibrary.jsx";
 import Stage0Trigger    from "../components/forecasting/Stage0Trigger.jsx";
 
-// "מי מבקש את החיזוי" — metadata לתיעוד + סינון בעתיד.
-// ⚠ לא ניווט בין מחלקות, רק תיוג מקור הבקשה.
-const DEPARTMENTS = [
-  { value: "manual",    label: "אני (לקוח / מנהלת שיווק)" },
-  { value: "strategy",  label: "מחלקת אסטרטגיה" },
-  { value: "media",     label: "מחלקת מדיה" },
-  { value: "analytics", label: "מחלקת אנליזה" },
-  { value: "sales",     label: "מכירות" },
-];
+// "מי מבקש" dropdown הוסר — היה metadata שבילבל. ברירת המחדל "manual"
+// נשלחת אוטומטית מ-state.
 
 const QUESTION_KINDS = [
   { value: "forecast",       label: "תחזית" },
@@ -158,13 +151,6 @@ export default function ForecastingPage() {
           <h2 style={h2Style}>📝 שאלת חיזוי</h2>
           <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ flex: 1, minWidth: 200 }}>
-                <label style={labelStyle}>מי מבקש</label>
-                <select value={department} onChange={(e) => setDepartment(e.target.value)}
-                        style={selectStyle}>
-                  {DEPARTMENTS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-                </select>
-              </div>
               <div style={{ flex: 1, minWidth: 200 }}>
                 <label style={labelStyle}>סוג שאלה</label>
                 <select value={questionKind} onChange={(e) => setKind(e.target.value)}
