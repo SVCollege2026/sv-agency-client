@@ -17,8 +17,31 @@ import { getBaselineFacts, getDashboardKpiLive } from "../api.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-// סדר טאבים: לידים ראשון מימין (כמו המקור), ברירת מחדל = context (מאקרו)
+// סדר טאבים: לידים ראשון מימין, ברירת מחדל = enrollments (סקירה כללית של בית הספר)
 const GROUP_ORDER = ["leads", "media", "enrollments", "cancellations", "context", "analytics"];
+
+// סדר facts בתוך כל קבוצה — ברירת מחדל 50, ספקים ספציפיים בסוף
+const FACT_ORDER = {
+  // Leads — מאקרו ראשון: סה"כ לידים לפי שנה, אח"כ אורגני, בסוף ספקים
+  leads_by_year:               1,
+  contact_count_by_year:       2,
+  organic_traffic_yoy:         3,
+  organic_quarterly:           4,
+  organic_enrolled_status_yoy: 5,
+  organic_not_closed_qs:       6,
+  organic_deep_dive:           7,
+  contact_count_distribution:  8,
+  cross_course_enrollment:     9,
+  unclassified_breakdown:      10,
+  leads_by_vendor:             80,
+  vendor_leads_deep:           81,
+  vendor_quarterly:            82,
+  // Enrollments
+  enrollments_by_year:         1,
+  enrollments_by_course:       2,
+  courses_by_year:             3,
+  starting_to_study_by_year:   4,
+};
 
 const GROUP_COLORS = {
   leads:         "#3b82f6",
@@ -742,7 +765,7 @@ export default function Dashboard() {
   const [data,     setData]    = useState(null);
   const [loading,  setLoading] = useState(true);
   const [error,    setError]   = useState(null);
-  const [activeTab, setTab]    = useState("context");
+  const [activeTab, setTab]    = useState("enrollments");
   const [liveKpi,  setLiveKpi] = useState(null);
 
   useEffect(() => {
@@ -854,7 +877,9 @@ export default function Dashboard() {
         gap: 20,
         alignItems: "start",
       }}>
-        {active?.facts.map((f) => (
+        {[...(active?.facts || [])].sort((a, b) =>
+          (FACT_ORDER[a.fact_id] ?? 50) - (FACT_ORDER[b.fact_id] ?? 50)
+        ).map((f) => (
           <div
             key={f.fact_id}
             style={{
