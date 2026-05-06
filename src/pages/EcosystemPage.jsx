@@ -125,7 +125,7 @@ export default function EcosystemPage() {
       {briefs.length > 0 && (
         <Block title="ממצאים ומשימות לחקירה" emoji="🔎" tone="neutral">
           <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 16px" }}>
-            ממוינים לפי מחלקה — כל ממצא כולל ראיה, הקשר ושאלות לחקירה.
+            ממוינים לפי מחלקה — כל ממצא כולל ראיה והקשר.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {briefs.map((b, i) => (
