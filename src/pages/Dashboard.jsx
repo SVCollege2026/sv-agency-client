@@ -254,6 +254,8 @@ function GroupedBarView({ fact }) {
     const piv = pivotByGroup(fact.rows, xKey, cfg.group_by, cfg.value);
     data = piv.data;
     seriesKeys = piv.seriesKeys;
+  } else if (Array.isArray(cfg.series) && cfg.series.length) {
+    seriesKeys = cfg.series;
   } else {
     const exclude = new Set([xKey, ...(cfg.exclude || [])]);
     seriesKeys = (fact.columns || []).filter((c) => !exclude.has(c));
