@@ -262,14 +262,10 @@ const COURSE_METRICS = [
   { id: "frozen_ytd",    label: "מקפיאים (YTD)" },
 ];
 
-// ─── DailyChartsView ─────────────────────────────────────────────────────────
-// דשבורד יומי: KPI tiles + לידים לפי פלטפורמה + CPL + טופ קמפיינים
-function DailyChartsView({ data }) {
-  const detailRows = useMemo(() =>
-    (data?.detail_rows || data?.rows || []).filter(r => !r.is_summary),
-    [data]
-  );
-
+// ─── MediaSummaryCharts ───────────────────────────────────────────────────────
+// גרפי סיכום כלליים: KPI tiles + לידים לפי פלטפורמה + CPL + טופ קמפיינים.
+// משמש יומי / שבועי / טווח — מקבל rows ישירות.
+function MediaSummaryCharts({ rows: detailRows = [] }) {
   // ── Platform aggregation ──
   const platformData = useMemo(() => {
     const map = {};
@@ -424,6 +420,21 @@ function DailyChartsView({ data }) {
       )}
     </div>
   );
+}
+
+// Thin wrappers — pull the right rows out of the raw API response
+function DailyChartsView({ data }) {
+  const rows = useMemo(
+    () => (data?.detail_rows || data?.rows || []).filter(r => !r.is_summary),
+    [data]
+  );
+  return <MediaSummaryCharts rows={rows} />;
+}
+function WeeklyChartsView({ data }) {
+  return <MediaSummaryCharts rows={data?.weekly_summary || []} />;
+}
+function RangeChartsView({ data }) {
+  return <MediaSummaryCharts rows={data?.rows || []} />;
 }
 
 // ─── SchoolKpiCharts ──────────────────────────────────────────────────────────
@@ -1361,41 +1372,15 @@ export default function MediaReportsPage() {
           </div>
         )}
 
-        {/* ── Totals / KPI strip ── */}
-        {(totals || (mode === "daily" && data)) && (() => {
-          // Daily: compute media totals from detail_rows
-          const detailRows = (data?.detail_rows || data?.rows || []).filter(r => !r.is_summary);
-          const metaRows   = detailRows.filter(r => (r.platform || "").toLowerCase().includes("meta"));
-          const gRows      = detailRows.filter(r => (r.platform || "").toLowerCase().includes("google"));
-          const totalSpend  = detailRows.reduce((s, r) => s + (r.spend || 0), 0);
-          const metaSpend   = metaRows.reduce((s, r) => s + (r.spend || 0), 0);
-          const gSpend      = gRows.reduce((s, r) => s + (r.spend || 0), 0);
-          const totalLeadsPaid = detailRows.reduce((s, r) => s + (r.leads_count || 0), 0);
-          const cpl = totalLeadsPaid > 0 ? totalSpend / totalLeadsPaid : null;
-          return (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
-              {mode === "daily" ? (
-                <>
-                  <StatCard color="#3b82f6" label="לידים היום (כולל)"  value={fmtNum(totals?.total_leads ?? 0)} />
-                  {metaSpend  > 0 && <StatCard color="#8b5cf6" label="ספנד Meta"    value={fmtMoney(metaSpend)}   sub="היום" />}
-                  {gSpend     > 0 && <StatCard color="#f59e0b" label="ספנד Google"  value={fmtMoney(gSpend)}      sub="היום" />}
-                  {totalSpend > 0 && <StatCard color="#1e3a5f" label="סה״כ ספנד"   value={fmtMoney(totalSpend)}  sub="כל הפלטפורמות" />}
-                  {cpl        != null && <StatCard color="#ef4444" label="עלות לליד (ממומן)" value={fmtMoney(cpl)} />}
-                  <StatCard color="#06b6d4" label="רשומות 1006" value={fmtNum(totals?.raw_records_count ?? 0)} />
-                </>
-              ) : mode === "weekly" ? (
-                <>
-                  <StatCard color="#3b82f6" label="סה״כ קמפיינים"  value={fmtNum(totals?.campaigns)}   />
-                  <StatCard color="#10b981" label="סה״כ לידים"     value={fmtNum(totals?.leads_count)}  />
-                  <StatCard color="#8b5cf6" label="סה״כ הוצאה"     value={fmtMoney(totals?.spend)}      />
-                  <StatCard color="#f59e0b" label="CTR כולל"       value={fmtPct(totals?.ctr_pct)}      />
-                  <StatCard color="#ef4444" label="עלות לליד"      value={fmtMoney(totals?.cpl)}        />
-                  <StatCard color="#06b6d4" label="חשיפות"         value={fmtNum(totals?.impressions)}  />
-                </>
-              ) : null}
-            </div>
-          );
-        })()}
+        {/* ── Totals / KPI strip — range-only (יומי ושבועי מקבלים tiles מ-MediaSummaryCharts) ── */}
+        {mode === "range" && totals && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
+            <StatCard color="#10b981" label="סה״כ לידים"  value={fmtNum(totals?.leads_count)} />
+            <StatCard color="#8b5cf6" label="סה״כ הוצאה"  value={fmtMoney(totals?.spend)}     />
+            <StatCard color="#f59e0b" label="CTR"          value={fmtPct(totals?.ctr_pct)}     />
+            <StatCard color="#ef4444" label="עלות לליד"   value={fmtMoney(totals?.cpl)}       />
+          </div>
+        )}
 
         {/* ── Daily sub-tabs ── */}
         {mode === "daily" && (
@@ -1463,8 +1448,15 @@ export default function MediaReportsPage() {
         ) : (
           <>
           {/* גרפי סיכום יומיים — רק בתצוגת ראשית */}
-          {mode === "daily" && dailyView === "master" && !loading && data && (
+          {/* ── גרפי סיכום: יומי / שבועי / טווח ── */}
+          {mode === "daily"  && dailyView === "master" && !loading && data && (
             <DailyChartsView data={data} />
+          )}
+          {mode === "weekly" && !loading && data && (
+            <WeeklyChartsView data={data} />
+          )}
+          {mode === "range"  && !loading && data && (
+            <RangeChartsView data={data} />
           )}
           <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
             <div style={{ overflowX: "auto" }}>
