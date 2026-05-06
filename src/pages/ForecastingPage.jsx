@@ -362,7 +362,9 @@ function ResultDisplay({ result }) {
   const convRate = totals.records ? (totals.enrolled / totals.records) : null;
   const irrelevantPct = totals.records ? (totals.irrelevant / totals.records) : null;
   const dowData = charts.day_of_week || [];
-  const bestDow = dowData.length ? [...dowData].sort((a, b) => (b.conv_rate || 0) - (a.conv_rate || 0))[0] : null;
+  // שבת = יום מנוחה בישראל, אין רישום מקוון. מסננים מ"יום חזק בשבוע".
+  const dowBusiness = dowData.filter(d => d.day_name !== "שבת");
+  const bestDow = dowBusiness.length ? [...dowBusiness].sort((a, b) => (b.conv_rate || 0) - (a.conv_rate || 0))[0] : null;
 
   return (
     <div dir="rtl" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
