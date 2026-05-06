@@ -9,7 +9,8 @@
  */
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, Cell,
 } from "recharts";
 import { useNavigate } from "react-router-dom";
 import {
@@ -262,51 +263,84 @@ const COURSE_METRICS = [
 ];
 
 // ─── DailyChartsView ─────────────────────────────────────────────────────────
-// גרפי סיכום לדוח היומי: פילוח לידים+ספנד לפי פלטפורמה + טופ קמפיינים
+// דשבורד יומי: KPI tiles + לידים לפי פלטפורמה + CPL + טופ קמפיינים
 function DailyChartsView({ data }) {
   const detailRows = useMemo(() =>
     (data?.detail_rows || data?.rows || []).filter(r => !r.is_summary),
     [data]
   );
 
-  // סיכום לפי פלטפורמה (Meta / Google / TikTok …)
+  // ── Platform aggregation ──
   const platformData = useMemo(() => {
     const map = {};
     for (const r of detailRows) {
-      const raw = (r.platform || "לא ידוע");
-      // קיצור: Meta Ads / Meta / facebook → Meta
-      const key = /meta|facebook|instagram/i.test(raw)  ? "Meta"
-                : /google/i.test(raw)                    ? "Google"
-                : /tik.?tok/i.test(raw)                  ? "TikTok"
+      const raw = r.platform || "לא ידוע";
+      const key = /meta|facebook|instagram/i.test(raw) ? "Meta"
+                : /google/i.test(raw)                   ? "Google"
+                : /tik.?tok/i.test(raw)                 ? "TikTok"
                 : raw.split(" ")[0];
       if (!map[key]) map[key] = { platform: key, leads: 0, spend: 0 };
       map[key].leads += r.leads_count || 0;
       map[key].spend += r.spend       || 0;
     }
     return Object.values(map)
-      .filter(r => r.leads > 0 || r.spend > 0)
+      .map(p => ({ ...p, cpl: p.leads > 0 ? Math.round(p.spend / p.leads) : 0 }))
+      .filter(p => p.leads > 0 || p.spend > 0)
       .sort((a, b) => b.leads - a.leads);
   }, [detailRows]);
 
-  // טופ 7 קמפיינים לפי לידים
-  const topCampaigns = useMemo(() =>
-    [...detailRows]
+  // ── KPI totals ──
+  const totals = useMemo(() => {
+    const byP = Object.fromEntries(platformData.map(p => [p.platform, p]));
+    const leads = platformData.reduce((s, p) => s + p.leads, 0);
+    const spend = platformData.reduce((s, p) => s + p.spend, 0);
+    return { leads, spend, cpl: leads > 0 ? Math.round(spend / leads) : null,
+             meta: byP["Meta"] || null, google: byP["Google"] || null };
+  }, [platformData]);
+
+  // ── Top campaigns — strip common prefix ──
+  const topCampaigns = useMemo(() => {
+    const strip = (s) => (s || "")
+      .replace(/^SV\s*College\s*[\/|–-]+\s*Israel\s*[\/|–-]?\s*/i, "")
+      .replace(/^SV\s*College\s*[\/|–-]+\s*/i, "")
+      .replace(/^SV\s*College\s*/i, "")
+      .trim();
+    return [...detailRows]
       .filter(r => (r.leads_count || 0) > 0)
       .sort((a, b) => (b.leads_count || 0) - (a.leads_count || 0))
-      .slice(0, 7)
-      .map(r => ({
-        name: (r.adset_name || r.campaign_name || r.platform || "קמפיין").slice(0, 28),
-        leads: r.leads_count || 0,
-        spend: r.spend       || 0,
-      })),
-    [detailRows]
-  );
+      .slice(0, 8)
+      .map(r => {
+        const raw = r.adset_name || r.campaign_name || r.platform || "—";
+        const name = (strip(raw) || raw).slice(0, 32);
+        return { name, leads: r.leads_count || 0, spend: r.spend || 0 };
+      });
+  }, [detailRows]);
 
   if (platformData.length === 0 && topCampaigns.length === 0) return null;
 
-  const axisTick  = { fontSize: 11, fill: "#64748b" };
-  const tipStyle  = { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12, direction: "rtl" };
-  const ChartCard = ({ title, color, children, height = 220 }) => (
+  const COLORS = ["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"];
+  const axisTick = { fontSize: 11, fill: "#64748b" };
+  const tipStyle = {
+    background: "#fff", border: "1px solid #e2e8f0",
+    borderRadius: 8, fontSize: 12, direction: "rtl",
+  };
+
+  const KpiTile = ({ label, value, sub, color, icon }) => (
+    <div style={{
+      background: "#fff", border: "1px solid #e2e8f0",
+      borderTop: `3px solid ${color}`, borderRadius: 10,
+      padding: "14px 18px", display: "flex", flexDirection: "column", gap: 3,
+      minWidth: 0,
+    }}>
+      <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, whiteSpace: "nowrap" }}>
+        {icon && <span style={{ marginLeft: 4 }}>{icon}</span>}{label}
+      </div>
+      <div style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", lineHeight: 1.15 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: "#94a3b8" }}>{sub}</div>}
+    </div>
+  );
+
+  const ChartCard = ({ title, color, children, height = 210 }) => (
     <div style={{
       background: "#fff", border: "1px solid #e2e8f0",
       borderTop: `3px solid ${color}`, borderRadius: 10, padding: "14px 16px",
@@ -318,39 +352,73 @@ function DailyChartsView({ data }) {
     </div>
   );
 
+  const kpis = [
+    { label: "לידים היום",   value: fmtNum(totals.leads), color: "#3b82f6", icon: "📥" },
+    { label: "הוצאה",        value: fmtMoney(totals.spend), color: "#8b5cf6", icon: "💰" },
+    totals.cpl != null
+      ? { label: "CPL ממוצע", value: fmtMoney(totals.cpl), color: "#f59e0b", icon: "🎯",
+          sub: "הוצאה ÷ לידים" }
+      : null,
+    totals.meta
+      ? { label: "Meta — לידים", value: fmtNum(totals.meta.leads), color: "#3b82f6", icon: "📘",
+          sub: `${fmtMoney(totals.meta.spend)} · CPL ${fmtMoney(totals.meta.cpl)}` }
+      : null,
+    totals.google
+      ? { label: "Google — לידים", value: fmtNum(totals.google.leads), color: "#10b981", icon: "🔍",
+          sub: `${fmtMoney(totals.google.spend)} · CPL ${fmtMoney(totals.google.cpl)}` }
+      : null,
+  ].filter(Boolean);
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
-      {/* פילוח לפי פלטפורמה */}
-      {platformData.length > 0 && (
-        <ChartCard title="לידים וספנד לפי פלטפורמה" color="#3b82f6">
-          <BarChart data={platformData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 }}>
+
+      {/* ── שורה 1: KPI tiles ── */}
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${kpis.length}, 1fr)`, gap: 10 }}>
+        {kpis.map((k, i) => <KpiTile key={i} {...k} />)}
+      </div>
+
+      {/* ── שורה 2: לידים לפי פלטפורמה + CPL לפי פלטפורמה ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <ChartCard title="לידים לפי פלטפורמה" color="#3b82f6">
+          <BarChart data={platformData} margin={{ top: 4, right: 12, bottom: 4, left: 8 }}>
             <CartesianGrid stroke="#f1f5f9" vertical={false} />
             <XAxis dataKey="platform" tick={axisTick} />
-            <YAxis yAxisId="l" tick={axisTick} />
-            <YAxis yAxisId="s" orientation="right" tick={axisTick}
-                   tickFormatter={v => `₪${(v / 1000).toFixed(0)}K`} />
-            <Tooltip contentStyle={tipStyle}
-                     formatter={(v, name) => name === "ספנד ₪"
-                       ? `₪${Math.round(v).toLocaleString("he-IL")}` : v} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar yAxisId="l" dataKey="leads" name="לידים"  fill="#3b82f6" radius={[3, 3, 0, 0]} />
-            <Bar yAxisId="s" dataKey="spend" name="ספנד ₪" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+            <YAxis tick={axisTick} allowDecimals={false} />
+            <Tooltip contentStyle={tipStyle} />
+            <Bar dataKey="leads" name="לידים" radius={[5, 5, 0, 0]}>
+              {platformData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+            </Bar>
           </BarChart>
         </ChartCard>
-      )}
 
-      {/* טופ קמפיינים */}
+        <ChartCard title="CPL לפי פלטפורמה (₪)" color="#f59e0b">
+          <BarChart data={platformData.filter(p => p.cpl > 0)}
+                    margin={{ top: 4, right: 12, bottom: 4, left: 8 }}>
+            <CartesianGrid stroke="#f1f5f9" vertical={false} />
+            <XAxis dataKey="platform" tick={axisTick} />
+            <YAxis tick={axisTick} tickFormatter={v => `₪${v}`} />
+            <Tooltip contentStyle={tipStyle}
+                     formatter={(v) => [`₪${fmtNum(v)}`, "CPL"]} />
+            <Bar dataKey="cpl" name="CPL ₪" radius={[5, 5, 0, 0]}>
+              {platformData.filter(p => p.cpl > 0).map((_, i) =>
+                <Cell key={i} fill={["#f59e0b", "#f97316", "#ef4444"][i % 3]} />)}
+            </Bar>
+          </BarChart>
+        </ChartCard>
+      </div>
+
+      {/* ── שורה 3: טופ קמפיינים ── */}
       {topCampaigns.length > 0 && (
         <ChartCard title="טופ קמפיינים — לידים" color="#10b981"
-                   height={Math.max(200, topCampaigns.length * 30)}>
+                   height={Math.max(180, topCampaigns.length * 34)}>
           <BarChart data={topCampaigns} layout="vertical"
-                    margin={{ top: 4, right: 30, bottom: 4, left: 130 }}>
+                    margin={{ top: 4, right: 50, bottom: 4, left: 180 }}>
             <CartesianGrid stroke="#f1f5f9" horizontal={false} />
-            <XAxis type="number" tick={axisTick} />
-            <YAxis type="category" dataKey="name"
-                   tick={{ fontSize: 10, fill: "#64748b" }} width={120} />
+            <XAxis type="number" tick={axisTick} allowDecimals={false} />
+            <YAxis type="category" dataKey="name" width={172}
+                   tick={{ fontSize: 10, fill: "#334155" }} />
             <Tooltip contentStyle={tipStyle} />
-            <Bar dataKey="leads" name="לידים" fill="#10b981" radius={[0, 3, 3, 0]} />
+            <Bar dataKey="leads" name="לידים" fill="#10b981" radius={[0, 5, 5, 0]} />
           </BarChart>
         </ChartCard>
       )}

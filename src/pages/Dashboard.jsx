@@ -6,7 +6,7 @@
  *
  * מקור: GET /api/dashboard/baseline-facts (public.stage0_baseline_facts)
  */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   BarChart, Bar, LineChart, Line,
   PieChart, Pie,
@@ -410,6 +410,73 @@ function GroupedBarView({ fact }) {
   );
 }
 
+// ─── Year-filtered grouped bar (for unclassified_breakdown and similar) ──────
+// Renders a year selector + pivoted grouped bar. Activates when cfg.year_filter=true.
+function YearFilteredGroupedBarView({ fact }) {
+  const cfg = fact.chart_config || {};
+  const xKey     = cfg.x       || (fact.columns || [])[0];
+  const groupKey = cfg.group_by;
+  const valueKey = (cfg.series && cfg.series[0]) || "leads";
+
+  // Available years, sorted desc
+  const years = useMemo(() => {
+    const s = new Set((fact.rows || []).map(r => r.year).filter(Boolean));
+    return [...s].sort((a, b) => b - a);
+  }, [fact.rows]);
+
+  const [selectedYear, setSelectedYear] = React.useState(() => years[0] ?? null);
+
+  const { data, seriesKeys } = useMemo(() => {
+    const filtered = (fact.rows || []).filter(r => r.year === selectedYear);
+    if (groupKey) return pivotByGroup(filtered, xKey, groupKey, valueKey);
+    // No group_by: just use filtered rows directly
+    return { data: filtered, seriesKeys: [valueKey] };
+  }, [fact.rows, selectedYear, xKey, groupKey, valueKey]);
+
+  if (!data.length) return null;
+  const avgLen = data.reduce((s, r) => s + String(r[xKey] || "").length, 0) / data.length;
+  const angled = avgLen > 7;
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      {/* Year selector */}
+      {years.length > 1 && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 10, justifyContent: "flex-end" }}>
+          {years.map(y => (
+            <button
+              key={y}
+              onClick={() => setSelectedYear(y)}
+              style={{
+                padding: "3px 10px", fontSize: 12, fontWeight: 600, borderRadius: 6,
+                cursor: "pointer", transition: "all 0.15s",
+                background: selectedYear === y ? "#1e40af" : "#f1f5f9",
+                color:      selectedYear === y ? "#fff"    : "#475569",
+                border:     selectedYear === y ? "1px solid #1e40af" : "1px solid #e2e8f0",
+              }}
+            >{y}</button>
+          ))}
+        </div>
+      )}
+      <div style={{ width: "100%", height: angled ? 340 : 300 }}>
+        <ResponsiveContainer>
+          <BarChart data={data} margin={{ top: 6, right: 18, bottom: angled ? 60 : 6, left: 18 }}>
+            <CartesianGrid stroke="#f1f5f9" vertical={false} />
+            <XAxis dataKey={xKey} interval={0}
+                   tick={{ fontSize: 10, fill: "#64748b", ...(angled ? { angle: -30, dy: 8 } : {}) }}
+                   height={angled ? 70 : 30} />
+            <YAxis tick={{ fontSize: 11, fill: "#64748b" }} />
+            <Tooltip content={<CustomTooltip />} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            {seriesKeys.map((k, i) => (
+              <Bar key={k} dataKey={k} fill={PAL[i % PAL.length]} radius={[4, 4, 0, 0]} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
 // ─── Sankey (pure-SVG) ────────────────────────────────────────────────────────
 
 function SankeyChartView({ fact }) {
@@ -528,6 +595,8 @@ function FactChart({ fact }) {
   const t = fact.chart_type || "auto";
   if (t === "pie")          return <PieChartView fact={fact} />;
   if (t === "hbar")         return <HBarChartView fact={fact} />;
+  if (t === "bar" && (fact.chart_config?.year_filter || fact.chart_config?.group_by))
+                            return <YearFilteredGroupedBarView fact={fact} />;
   if (t === "bar")          return <BarChartView fact={fact} />;
   if (t === "line")         return <LineChartView fact={fact} />;
   if (t === "stacked_bar")  return <StackedBarView fact={fact} />;
