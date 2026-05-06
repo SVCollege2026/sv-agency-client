@@ -9,6 +9,7 @@ import ReportsPage from "./pages/ReportsPage.jsx";
 import EcosystemPage from "./pages/EcosystemPage.jsx";
 import MediaReportsPage from "./pages/MediaReportsPage.jsx";
 import ForecastingPage from "./pages/ForecastingPage.jsx";
+import GoalsPage from "./pages/GoalsPage.jsx";
 
 export default function App() {
   return (
@@ -31,10 +32,11 @@ export default function App() {
         {/* Media department — דוחות + חקירות + תהליך + שאלות */}
         <Route path="/media-reports" element={<MediaReportsPage />} />
 
-        {/* Strategy department — חיזוי כיום פעיל; יעדים/תרחישים/המלצות בהמשך */}
+        {/* Strategy department — חיזוי + יעדים פעילים */}
         <Route path="/strategy" element={<StrategyLayout />}>
           <Route index element={<Navigate to="forecasting" replace />} />
           <Route path="forecasting" element={<ForecastingPage />} />
+          <Route path="goals"       element={<GoalsPage />} />
         </Route>
 
         {/* Legacy redirects — old bookmarks → לעמודים הקיימים */}
