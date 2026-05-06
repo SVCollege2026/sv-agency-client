@@ -559,7 +559,7 @@ function ResultDisplay({ result }) {
             </ChartCard>
           )}
 
-          {charts.irrelevant_breakdown && charts.irrelevant_breakdown.length > 0 && (
+          {charts.irrelevant_breakdown && charts.irrelevant_breakdown.length >= 3 && (
             <ChartCard
               title="❌ לידים לא רלוונטיים — פילוח"
               subtitle="כל ה-sub_status שמסומנים כ'לא רלוונטי / פסול / מכחיש'. מזהה איפה הצמצום אפשרי."
