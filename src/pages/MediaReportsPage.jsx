@@ -159,7 +159,6 @@ const MODES = [
   { id: "range",           label: "טווח"   },
   { id: "monthly",         label: "📈 חודשי Y-o-Y" },
   { id: "investigations",  label: "🔎 חקירות" },
-  { id: "timeline",        label: "🗓 תהליך פרסום" },
   { id: "recommendations", label: "💡 המלצות מדיה" },
 ];
 
