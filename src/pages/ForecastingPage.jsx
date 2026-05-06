@@ -362,8 +362,10 @@ function ResultDisplay({ result }) {
   const convRate = totals.records ? (totals.enrolled / totals.records) : null;
   const irrelevantPct = totals.records ? (totals.irrelevant / totals.records) : null;
   const dowData = charts.day_of_week || [];
-  // שבת = יום מנוחה בישראל, אין רישום מקוון. מסננים מ"יום חזק בשבוע".
-  const dowBusiness = dowData.filter(d => d.day_name !== "שבת");
+  // ימי שישי+שבת = סוף שבוע בישראל, מוקד מכירות סגור — אין רישום בפועל.
+  // לידים כן נכנסים (טפסים אוטומטיים), אבל הרישום עצמו רק בימי חול.
+  // מסננים מ"יום חזק בשבוע" כי conv_rate שלהם משקף לידים-מסופ"ש שנרשמו אחר-כך.
+  const dowBusiness = dowData.filter(d => d.day_name !== "שבת" && d.day_name !== "שישי");
   const bestDow = dowBusiness.length ? [...dowBusiness].sort((a, b) => (b.conv_rate || 0) - (a.conv_rate || 0))[0] : null;
 
   return (
@@ -460,20 +462,23 @@ function ResultDisplay({ result }) {
       {/* ── Two col: Day of week + Status pie ── */}
       {(charts.day_of_week || charts.status_breakdown) && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 10 }}>
-          {charts.day_of_week && charts.day_of_week.length > 0 && (
+          {charts.day_of_week && charts.day_of_week.length > 0 && (() => {
+            // שבת = יום מנוחה בישראל, אין רישום מקוון. מסננים מהגרף ומה-footer.
+            const dowBiz = (charts.day_of_week || []).filter(d => d.day_name !== "שבת");
+            return (
             <ChartCard
               title="📅 דפוסי ימי שבוע"
-              subtitle="לידים, נרשמים, ושיעור המרה לפי יום בשבוע (ראשון-שבת). מזהה ימים חזקים/חלשים לתזמון קמפיינים."
+              subtitle="לידים, נרשמים, ושיעור המרה לפי יום בשבוע (ראשון-שישי). שבת לא נכללת — אין רישום מקוון בשבת."
               color="#7c3aed"
               footer={(() => {
-                const sorted = [...charts.day_of_week].sort((a, b) => (b.conv_rate || 0) - (a.conv_rate || 0));
+                const sorted = [...dowBiz].sort((a, b) => (b.conv_rate || 0) - (a.conv_rate || 0));
                 const best = sorted[0]; const worst = sorted[sorted.length - 1];
                 if (!best || !worst) return null;
                 return <span>היום החזק: <b>{best.day_name}</b> ({fmtPctV(best.conv_rate)}). החלש: <b>{worst.day_name}</b> ({fmtPctV(worst.conv_rate)}).</span>;
               })()}
             >
               <ResponsiveContainer width="100%" height={220}>
-                <ComposedChart data={charts.day_of_week} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <ComposedChart data={dowBiz} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="day_name" tick={{ fontSize: 11, fill: "#475569" }} reversed />
                   <YAxis yAxisId="left"  orientation="right" tick={{ fontSize: 10, fill: "#94a3b8" }} />
@@ -490,9 +495,10 @@ function ResultDisplay({ result }) {
                 </ComposedChart>
               </ResponsiveContainer>
             </ChartCard>
-          )}
+            );
+          })()}
 
-          {charts.status_breakdown && charts.status_breakdown.length > 0 && (
+          {charts.status_breakdown && charts.status_breakdown.filter(x => x.name && x.name !== "—" && x.name !== "").length >= 2 && (
             <ChartCard
               title="🥧 התפלגות status — איכות לידים"
               subtitle="פילוח כל הלידים לפי סטטוס. מזהה כמה הם 'נרשם', 'פתוח', 'לא רלוונטי' וכד'."
