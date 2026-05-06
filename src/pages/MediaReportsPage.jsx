@@ -154,11 +154,12 @@ const MODES = [
   { id: "investigations", label: "🔎 חקירות" },
   { id: "timeline",       label: "🗓 תהליך פרסום" },
   { id: "questions",      label: "❓ שאלות פתוחות" },
+  { id: "recommendations", label: "💡 המלצות מדיה" },
 ];
 
 // המצבים החדשים אינם משתמשים ב-fetchMediaDaily/Weekly/Range/Monthly. כל אחד
 // מנהל את הfetching שלו פנימית.
-const _NEW_MODES = ["investigations", "timeline", "questions"];
+const _NEW_MODES = ["investigations", "timeline", "questions", "recommendations"];
 const _isLegacyMode = (m) => !_NEW_MODES.includes(m);
 
 // ─── Monthly KPI sub-component ─────────────────────────────────────────────
@@ -1084,6 +1085,8 @@ export default function MediaReportsPage() {
           <TimelineView platformFilter={platformFilter} />
         ) : mode === "questions" ? (
           <QuestionsView platformFilter={platformFilter} />
+        ) : mode === "recommendations" ? (
+          <RecommendationsView platformFilter={platformFilter} />
         ) : mode === "monthly" ? (
           <MonthlyKpiView />
         ) : mode === "daily" && dailyView === "sub_status" ? (
@@ -1959,6 +1962,56 @@ function QuestionsView({ platformFilter }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function RecommendationsView({ platformFilter }) {
+  // המלצות מדיה — סוכן ההמלצות עצמו עוד לא פרוס. כשיהיה — יקרא חקירות
+  // + facts + יעדים → ייצור פעולות מומלצות (תקציב, קמפיינים, מסרים) שדורשות
+  // אישור מנהלת השיווק לפני ביצוע.
+  return (
+    <div>
+      <div style={{
+        background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10,
+        padding: "20px 24px", marginBottom: 14,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <span style={{ fontSize: 28 }}>💡</span>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
+            המלצות מדיה — סוכן ההמלצות
+          </h3>
+        </div>
+        <p style={{ margin: "0 0 14px", fontSize: 13, color: "#475569", lineHeight: 1.8 }}>
+          כל פעולה מבצעית במדיה (הסטת תקציב, פתיחה/סגירת קמפיין, רענון קריאייטיב)
+          תופיע כאן כהמלצה לאישור. ההמלצות נבנות על בסיס:
+        </p>
+        <ul style={{ margin: "0 0 14px", paddingInlineStart: 22, fontSize: 13, color: "#475569", lineHeight: 1.9 }}>
+          <li>חקירות מדיה (טאב "🔎 חקירות")</li>
+          <li>נתוני דוחות יומיים+שבועיים (Stage 0 facts × נתונים שוטפים)</li>
+          <li>יעדים שמוגדרים ב-<b>אסטרטגיה → יעדים</b> (פער מול המצב בפועל)</li>
+          <li>שאלות פתוחות שהלקוחה ענתה עליהן</li>
+        </ul>
+        <div style={{
+          background: "#fef3c7", border: "1px solid #fde68a",
+          borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#92400e",
+        }}>
+          <b>סטטוס בנייה:</b> סוכן ההמלצות (Stage 3 ב-Planning spec) דורש: (1) חקירות
+          מתועדות עם מסקנות + (2) יעדים מוגדרים + (3) זרימת אישור→ביצוע.
+          הראיות (1) קיימות עכשיו דרך טאב חקירות. (2) יוגדר ב-<b>/strategy/goals</b>.
+          (3) נבנה אחרי שיש דאטה בסיסי בשני הראשונים.
+        </div>
+      </div>
+
+      <div style={{
+        background: "#fff", border: "1px dashed #cbd5e1", borderRadius: 10,
+        padding: "32px 24px", textAlign: "center", color: "#64748b",
+      }}>
+        <p style={{ margin: 0, fontSize: 13 }}>
+          אין המלצות אקטיביות. לאחר שיוגדרו יעדים + יותר חקירות, ההמלצות יופיעו כאן
+          לאישור מנהלת השיווק לפני ביצוע.
+        </p>
+      </div>
     </div>
   );
 }

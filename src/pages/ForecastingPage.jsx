@@ -21,12 +21,14 @@ import SignalChip       from "../components/forecasting/SignalChip.jsx";
 import PatternLibrary   from "../components/forecasting/PatternLibrary.jsx";
 import Stage0Trigger    from "../components/forecasting/Stage0Trigger.jsx";
 
+// "מי מבקש את החיזוי" — metadata לתיעוד + סינון בעתיד.
+// ⚠ לא ניווט בין מחלקות, רק תיוג מקור הבקשה.
 const DEPARTMENTS = [
-  { value: "strategy",  label: "אסטרטגיה" },
-  { value: "media",     label: "מדיה" },
-  { value: "analytics", label: "אנליזה" },
+  { value: "manual",    label: "אני (לקוח / מנהלת שיווק)" },
+  { value: "strategy",  label: "מחלקת אסטרטגיה" },
+  { value: "media",     label: "מחלקת מדיה" },
+  { value: "analytics", label: "מחלקת אנליזה" },
   { value: "sales",     label: "מכירות" },
-  { value: "manual",    label: "ידני / לקוח" },
 ];
 
 const QUESTION_KINDS = [
@@ -48,7 +50,7 @@ const STATUS_HE = {
 
 export default function ForecastingPage() {
   const navigate = useNavigate();
-  const [department, setDepartment]     = useState("strategy");
+  const [department, setDepartment]     = useState("manual");
   const [questionKind, setKind]         = useState("forecast");
   const [question, setQuestion]         = useState("");
   const [submitting, setSubmitting]     = useState(false);
@@ -142,9 +144,13 @@ export default function ForecastingPage() {
           )}
         </div>
 
-        <h1 style={{ fontSize: 26, fontWeight: 700, margin: "0 0 6px" }}>🔮 מחלקת חיזוי</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 6px" }}>🔮 חיזוי</h1>
         <p style={{ color: "#64748b", fontSize: 13, margin: "0 0 28px" }}>
-          תחזיות עתידיות מבוססות-ראיות · ReAct + Self-Reflection · Pattern Memory ארגוני
+          תחזיות עתידיות מבוססות-ראיות · ReAct + Self-Reflection · Pattern Memory ארגוני.
+          <br/>
+          <span style={{ fontSize: 12, color: "#94a3b8" }}>
+            עורכים יעדים בטאב <b>יעדים</b>. תרחישים פסימי/ריאלי/אופטימי = פלט של חיזוי מול היעדים.
+          </span>
         </p>
 
         {/* ── סקציה 1: שאלה ── */}
@@ -153,7 +159,7 @@ export default function ForecastingPage() {
           <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: 200 }}>
-                <label style={labelStyle}>מחלקה</label>
+                <label style={labelStyle}>מי מבקש</label>
                 <select value={department} onChange={(e) => setDepartment(e.target.value)}
                         style={selectStyle}>
                   {DEPARTMENTS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
