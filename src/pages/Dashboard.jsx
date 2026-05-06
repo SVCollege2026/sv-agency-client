@@ -17,7 +17,8 @@ import { getBaselineFacts, getDashboardKpiLive } from "../api.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const GROUP_ORDER = ["context", "media", "enrollments", "cancellations", "leads", "analytics"];
+// סדר טאבים: לידים ראשון מימין (כמו המקור), ברירת מחדל = context (מאקרו)
+const GROUP_ORDER = ["leads", "media", "enrollments", "cancellations", "context", "analytics"];
 
 const GROUP_COLORS = {
   leads:         "#3b82f6",
@@ -612,7 +613,7 @@ function FactCard({ fact, accentColor }) {
       ? true
       : !!pickChartShape(fact)
   );
-  const [tableOpen,   setTableOpen]   = useState(isTable);
+  const [tableOpen,   setTableOpen]   = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
 
   const accent = accentColor || "#3b82f6";
