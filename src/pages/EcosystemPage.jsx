@@ -225,7 +225,6 @@ export default function EcosystemPage() {
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 function BriefRow({ brief, index }) {
-  const [open, setOpen] = useState(false);
   const dm = deptMeta(brief.dept);
 
   return (
@@ -235,7 +234,6 @@ function BriefRow({ brief, index }) {
       borderRadius: 8, overflow: "hidden",
       background: "#ffffff",
     }}>
-      {/* Row header — always visible */}
       <div style={{
         padding: "12px 16px",
         display: "flex", gap: 12, alignItems: "flex-start",
@@ -286,43 +284,7 @@ function BriefRow({ brief, index }) {
             </div>
           )}
         </div>
-
-        {/* Toggle questions */}
-        {brief.next_questions?.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setOpen(o => !o)}
-            style={{
-              flexShrink: 0, background: open ? dm.bg : "#f1f5f9",
-              border: `1px solid ${open ? dm.color : "#e2e8f0"}`,
-              borderRadius: 7, padding: "4px 10px",
-              fontSize: 11, fontWeight: 600,
-              color: open ? dm.color : "#64748b",
-              cursor: "pointer", transition: "all 0.15s",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {open ? "▲ " : "▼ "}{brief.next_questions.length} שאלות
-          </button>
-        )}
       </div>
-
-      {/* Questions — collapsible */}
-      {open && brief.next_questions?.length > 0 && (
-        <div style={{
-          borderTop: `1px solid ${dm.bg}`,
-          background: "#fafbfc", padding: "10px 16px 12px",
-        }}>
-          <p style={{ fontSize: 11, fontWeight: 700, color: dm.color,
-                       margin: "0 0 8px" }}>שאלות לחקירה:</p>
-          <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 13,
-                        lineHeight: 1.75, color: "#1e293b" }}>
-            {brief.next_questions.map((q, i) => (
-              <li key={i} style={{ marginBottom: 5 }}>{q}</li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }
