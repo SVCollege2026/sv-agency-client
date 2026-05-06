@@ -301,16 +301,31 @@ function ForecastStatCard({ label, value, sub, color }) {
 }
 
 // ─── Section card ──────────────────────────────────────────────────────────
-function ChartCard({ title, children, color }) {
+function ChartCard({ title, subtitle, children, color, footer }) {
   return (
-    <div style={{
+    <div dir="rtl" style={{
       background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10,
       padding: "14px 16px", minHeight: 260,
     }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: color || "#0f172a", marginBottom: 10 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: color || "#0f172a", marginBottom: 2 }}>
         {title}
       </div>
-      {children}
+      {subtitle && (
+        <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 10, lineHeight: 1.5 }}>
+          {subtitle}
+        </div>
+      )}
+      <div style={{ marginTop: subtitle ? 0 : 6 }}>
+        {children}
+      </div>
+      {footer && (
+        <div style={{
+          fontSize: 11, color: "#475569", marginTop: 10, paddingTop: 8,
+          borderTop: "1px solid #f1f5f9", lineHeight: 1.6,
+        }}>
+          {footer}
+        </div>
+      )}
     </div>
   );
 }
@@ -381,15 +396,36 @@ function ResultDisplay({ result }) {
 
       {/* ── Scenarios bar chart — פסימי / ריאלי / אופטימי ── */}
       {(charts.scenarios_chart || []).some(s => s.point != null) && (
-        <ChartCard title="🎯 תרחישים — פסימי / ריאלי / אופטימי" color="#1e40af">
-          <ResponsiveContainer width="100%" height={220}>
+        <ChartCard
+          title="🎯 תרחישים — פסימי / ריאלי / אופטימי"
+          subtitle="3 תרחישים מבוססי-AI מול ה-prediction. כל אחד עם הנמקה משלו."
+          color="#1e40af"
+          footer={
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+              {["pessimistic", "realistic", "optimistic"].map((k, i) => {
+                const sc = scenarios[k] || {};
+                const labels = ["פסימי", "ריאלי", "אופטימי"];
+                const colors = ["#dc2626", "#ca8a04", "#16a34a"];
+                return (
+                  <div key={k} style={{ borderTop: `3px solid ${colors[i]}`, paddingTop: 6 }}>
+                    <div style={{ fontWeight: 700, color: colors[i], marginBottom: 2 }}>
+                      {labels[i]}{sc.point != null && ` · ${fmtN(Math.round(sc.point))}`}
+                    </div>
+                    <div>{sc.reasoning || "—"}</div>
+                  </div>
+                );
+              })}
+            </div>
+          }
+        >
+          <ResponsiveContainer width="100%" height={200}>
             <BarChart data={charts.scenarios_chart} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#475569" }} />
-              <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} />
+              <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#475569" }} reversed />
+              <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} orientation="right" />
               <Tooltip
                 formatter={(v) => fmtN(Math.round(v))}
-                contentStyle={{ fontSize: 12, direction: "rtl" }}
+                contentStyle={{ fontSize: 12, direction: "rtl", textAlign: "right" }}
               />
               <Bar dataKey="point" radius={[8, 8, 0, 0]}>
                 {(charts.scenarios_chart || []).map((entry, i) => (
@@ -398,18 +434,6 @@ function ResultDisplay({ result }) {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-          {/* Reasoning under chart */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 10, fontSize: 11, color: "#475569" }}>
-            {["pessimistic", "realistic", "optimistic"].map((k, i) => {
-              const sc = scenarios[k] || {};
-              const colors = ["#dc2626", "#ca8a04", "#16a34a"];
-              return (
-                <div key={k} style={{ borderTop: `2px solid ${colors[i]}`, paddingTop: 6 }}>
-                  {sc.reasoning || "—"}
-                </div>
-              );
-            })}
-          </div>
         </ChartCard>
       )}
 
@@ -417,19 +441,29 @@ function ResultDisplay({ result }) {
       {(charts.day_of_week || charts.status_breakdown) && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 10 }}>
           {charts.day_of_week && charts.day_of_week.length > 0 && (
-            <ChartCard title="📅 דפוסי ימי שבוע — לידים והמרה" color="#7c3aed">
+            <ChartCard
+              title="📅 דפוסי ימי שבוע"
+              subtitle="לידים, נרשמים, ושיעור המרה לפי יום בשבוע (ראשון-שבת). מזהה ימים חזקים/חלשים לתזמון קמפיינים."
+              color="#7c3aed"
+              footer={(() => {
+                const sorted = [...charts.day_of_week].sort((a, b) => (b.conv_rate || 0) - (a.conv_rate || 0));
+                const best = sorted[0]; const worst = sorted[sorted.length - 1];
+                if (!best || !worst) return null;
+                return <span>היום החזק: <b>{best.day_name}</b> ({fmtPctV(best.conv_rate)}). החלש: <b>{worst.day_name}</b> ({fmtPctV(worst.conv_rate)}).</span>;
+              })()}
+            >
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={charts.day_of_week} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="day_name" tick={{ fontSize: 11, fill: "#475569" }} />
-                  <YAxis yAxisId="left"  tick={{ fontSize: 10, fill: "#94a3b8" }} />
-                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: "#94a3b8" }}
+                  <XAxis dataKey="day_name" tick={{ fontSize: 11, fill: "#475569" }} reversed />
+                  <YAxis yAxisId="left"  orientation="right" tick={{ fontSize: 10, fill: "#94a3b8" }} />
+                  <YAxis yAxisId="right" orientation="left"  tick={{ fontSize: 10, fill: "#94a3b8" }}
                          tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} />
                   <Tooltip
                     formatter={(v, name) => name === "conv_rate" ? `${(v * 100).toFixed(1)}%` : fmtN(v)}
-                    contentStyle={{ fontSize: 12, direction: "rtl" }}
+                    contentStyle={{ fontSize: 12, direction: "rtl", textAlign: "right" }}
                   />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Legend wrapperStyle={{ fontSize: 11, direction: "rtl" }} />
                   <Bar yAxisId="left"  dataKey="leads"     name="לידים"   fill="#3b82f6" radius={[4,4,0,0]} />
                   <Bar yAxisId="left"  dataKey="enrolled"  name="נרשמים"  fill="#10b981" radius={[4,4,0,0]} />
                   <Line yAxisId="right" type="monotone" dataKey="conv_rate" name="conv_rate" stroke="#f59e0b" />
@@ -439,7 +473,17 @@ function ResultDisplay({ result }) {
           )}
 
           {charts.status_breakdown && charts.status_breakdown.length > 0 && (
-            <ChartCard title="🥧 התפלגות status — איכות לידים" color="#0c4a6e">
+            <ChartCard
+              title="🥧 התפלגות status — איכות לידים"
+              subtitle="פילוח כל הלידים לפי סטטוס. מזהה כמה הם 'נרשם', 'פתוח', 'לא רלוונטי' וכד'."
+              color="#0c4a6e"
+              footer={(() => {
+                const total = (charts.status_breakdown || []).reduce((s, x) => s + (x.value || 0), 0);
+                const top = (charts.status_breakdown || [])[0];
+                if (!top || !total) return null;
+                return <span>הסטטוס הדומיננטי: <b>{top.name}</b> — {fmtN(top.value)} מתוך {fmtN(total)} ({((top.value / total) * 100).toFixed(0)}%).</span>;
+              })()}
+            >
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
                   <Pie
@@ -457,7 +501,7 @@ function ResultDisplay({ result }) {
                       <Cell key={i} fill={STATUS_COLORS[i % STATUS_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={fmtN} contentStyle={{ fontSize: 12, direction: "rtl" }} />
+                  <Tooltip formatter={fmtN} contentStyle={{ fontSize: 12, direction: "rtl", textAlign: "right" }} />
                 </PieChart>
               </ResponsiveContainer>
             </ChartCard>
@@ -469,14 +513,19 @@ function ResultDisplay({ result }) {
       {(charts.platform_month || charts.irrelevant_breakdown) && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 10 }}>
           {charts.platform_month && charts.platform_month.length > 0 && (
-            <ChartCard title="📈 לידים לפי פלטפורמה × חודש" color="#1877f2">
+            <ChartCard
+              title="📈 לידים לפי פלטפורמה × חודש"
+              subtitle="מגמת לידים חודשית פר פלטפורמה (Meta, Google, אורגני, ספקי לידים)."
+              color="#1877f2"
+              footer="כל קו = פלטפורמה. ההיפוך בין Meta ל-Google משוקף לאורך הזמן."
+            >
               <ResponsiveContainer width="100%" height={240}>
                 <LineChart data={_pivotPlatformMonth(charts.platform_month)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#475569" }} />
-                  <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} />
-                  <Tooltip formatter={fmtN} contentStyle={{ fontSize: 12, direction: "rtl" }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#475569" }} reversed />
+                  <YAxis orientation="right" tick={{ fontSize: 10, fill: "#94a3b8" }} />
+                  <Tooltip formatter={fmtN} contentStyle={{ fontSize: 12, direction: "rtl", textAlign: "right" }} />
+                  <Legend wrapperStyle={{ fontSize: 11, direction: "rtl" }} />
                   {_uniquePlatforms(charts.platform_month).map((plat) => (
                     <Line
                       key={plat}
@@ -493,14 +542,23 @@ function ResultDisplay({ result }) {
           )}
 
           {charts.irrelevant_breakdown && charts.irrelevant_breakdown.length > 0 && (
-            <ChartCard title="❌ לידים לא רלוונטיים — פילוח" color="#991b1b">
+            <ChartCard
+              title="❌ לידים לא רלוונטיים — פילוח"
+              subtitle="כל ה-sub_status שמסומנים כ'לא רלוונטי / פסול / מכחיש'. מזהה איפה הצמצום אפשרי."
+              color="#991b1b"
+              footer={(() => {
+                const top = (charts.irrelevant_breakdown || [])[0];
+                if (!top) return null;
+                return <span>סוג הפסילה הדומיננטי: <b>{top.name}</b> ({fmtN(top.value)} לידים).</span>;
+              })()}
+            >
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={charts.irrelevant_breakdown} layout="vertical" margin={{ top: 10, right: 10, left: 80, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis type="number" tick={{ fontSize: 10, fill: "#94a3b8" }} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#475569" }} width={120} />
-                  <Tooltip formatter={fmtN} contentStyle={{ fontSize: 12, direction: "rtl" }} />
-                  <Bar dataKey="value" fill="#ef4444" radius={[0, 4, 4, 0]} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: "#94a3b8" }} orientation="top" />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#475569" }} width={120} orientation="right" />
+                  <Tooltip formatter={fmtN} contentStyle={{ fontSize: 12, direction: "rtl", textAlign: "right" }} />
+                  <Bar dataKey="value" fill="#ef4444" radius={[4, 0, 0, 4]} />
                 </BarChart>
               </ResponsiveContainer>
             </ChartCard>
