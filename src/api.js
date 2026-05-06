@@ -277,6 +277,10 @@ export async function getLatestForecast() {
   return request("GET", "/api/forecasting/latest");
 }
 
+export async function getDeterministicForecast(year = 2026) {
+  return request("GET", `/api/forecasting/deterministic?year=${year}`);
+}
+
 export async function listForecasts({ limit = 50, status = null, department = null } = {}) {
   const params = new URLSearchParams();
   params.set("limit", String(limit));

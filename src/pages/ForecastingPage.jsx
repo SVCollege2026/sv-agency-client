@@ -14,7 +14,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   submitForecast, getForecastStatus, getForecastResult,
-  getForecastingCronStatus, getLatestForecast,
+  getForecastingCronStatus, getLatestForecast, getDeterministicForecast,
 } from "../api.js";
 import EvidencePackView from "../components/forecasting/EvidencePackView.jsx";
 import SignalChip       from "../components/forecasting/SignalChip.jsx";
@@ -56,6 +56,7 @@ export default function ForecastingPage() {
   const [resultData, setResultData]     = useState(null);
   const [error, setError]               = useState(null);
   const [cron, setCron]                 = useState(null);
+  const [detForecast, setDetForecast]   = useState(null);
   const pollTimer = useRef(null);
 
   useEffect(() => {
@@ -65,6 +66,10 @@ export default function ForecastingPage() {
     getLatestForecast()
       .then(setResultData)
       .catch(() => {});  // 404 אם אין דוח עדיין — תופיע הזמנה לייצר
+    // חיזוי דטרמיניסטי — חישוב מתמטי מ-monthly_school_kpi, רץ תוך שנייה
+    getDeterministicForecast(2026)
+      .then(setDetForecast)
+      .catch(() => {});
   }, []);
 
   // poll על ריצה פעילה
@@ -153,6 +158,11 @@ export default function ForecastingPage() {
             תרחישים פסימי/ריאלי/אופטימי = פלט של חיזוי מול היעדים (טאב <b>יעדים</b>).
           </span>
         </p>
+
+        {/* ── חיזוי דטרמיניסטי — חישוב מתמטי על monthly_school_kpi ── */}
+        {detForecast && detForecast.metrics && (
+          <DeterministicForecastSection data={detForecast} />
+        )}
 
         {/* ── סקציה ראשית: דשבורד החיזוי הנוכחי (auto-loaded) ── */}
         {(statusInfo || resultData) && (
@@ -302,6 +312,116 @@ function fmtN(v) {
 function fmtPctV(v) {
   if (v == null) return "—";
   return `${(Number(v) * 100).toFixed(1)}%`;
+}
+
+// ─── Deterministic forecast section ────────────────────────────────────────
+function DeterministicForecastSection({ data }) {
+  const [showAll, setShowAll] = useState(false);
+  const m = data.metrics || {};
+  const fmtN = (v) => (v == null ? "—" : new Intl.NumberFormat("he-IL").format(Math.round(v)));
+  const fmtMoney = (v) => (v == null ? "—" : "₪" + new Intl.NumberFormat("he-IL").format(Math.round(v)));
+
+  const KEY_METRICS = [
+    { key: "reg_action_total", label: "נרשמים סה\"כ", money: false },
+    { key: "leads_total",      label: "לידים סה\"כ", money: false },
+    { key: "reg_action_meta",  label: "נרשמים מ-Meta", money: false },
+    { key: "reg_action_google",label: "נרשמים מ-Google", money: false },
+    { key: "leads_meta",       label: "לידים Meta", money: false },
+    { key: "leads_google",     label: "לידים Google", money: false },
+    { key: "spend_meta",       label: "ספנד Meta", money: true },
+    { key: "spend_google",     label: "ספנד Google", money: true },
+    { key: "canc_action",      label: "ביטולים", money: false },
+  ];
+  const visibleMetrics = showAll ? KEY_METRICS : KEY_METRICS.slice(0, 4);
+
+  const fmt = (v, money) => (money ? fmtMoney(v) : fmtN(v));
+
+  return (
+    <div dir="rtl" style={{
+      background: "#f0f9ff", border: "2px solid #0284c7", borderRadius: 12,
+      padding: "16px 18px", marginBottom: 14,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 700, color: "#0c4a6e", margin: 0 }}>
+          🧮 חיזוי דטרמיניסטי {data.target_year} — חישוב מתמטי על monthly_school_kpi
+        </h2>
+        <span style={{ fontSize: 11, color: "#475569" }}>
+          YTD: {data.ytd_through_month} חודשים · השוואה ל-{data.prior_year_compared}
+        </span>
+      </div>
+      <div style={{ fontSize: 11, color: "#475569", marginBottom: 12, lineHeight: 1.5 }}>
+        מתודולוגיה: ratio = YTD {data.target_year} / YTD {data.prior_year_compared} (אותם חודשים) × ממוצע 2025 לחודשים נותרים. <b>פסימי</b> ×0.80 (אם השפעת מלחמה ממשיכה), <b>ריאלי</b> ×1.00, <b>אופטימי</b> ×1.15 (bounce-back).
+      </div>
+
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, background: "#fff", borderRadius: 6, overflow: "hidden" }}>
+        <thead>
+          <tr style={{ background: "#0c4a6e", color: "#f0f9ff" }}>
+            <th style={{ padding: "8px 10px", textAlign: "right", fontWeight: 600 }}>מטריקה</th>
+            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: 600 }}>YTD בפועל</th>
+            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: 600 }}>{data.prior_year_compared} שנה מלאה</th>
+            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: 600, color: "#fca5a5" }}>פסימי</th>
+            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#fef3c7" }}>ריאלי</th>
+            <th style={{ padding: "8px 10px", textAlign: "left", fontWeight: 600, color: "#86efac" }}>אופטימי</th>
+            <th style={{ padding: "8px 10px", textAlign: "right", fontWeight: 600 }}>מגמה</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visibleMetrics.map((row, i) => {
+            const v = m[row.key];
+            if (!v) return null;
+            const tr = v.patterns?.trend || {};
+            return (
+              <tr key={row.key} style={{ borderBottom: "1px solid #e0f2fe", background: i % 2 ? "#f8fafc" : "#fff" }}>
+                <td style={{ padding: "8px 10px", fontWeight: 600, color: "#0f172a" }}>{row.label}</td>
+                <td style={{ padding: "8px 10px", textAlign: "left", color: "#475569" }}>{fmt(v.ytd_actual, row.money)}</td>
+                <td style={{ padding: "8px 10px", textAlign: "left", color: "#475569" }}>{fmt(v.prior_year_actual, row.money)}</td>
+                <td style={{ padding: "8px 10px", textAlign: "left", color: "#dc2626" }}>{fmt(v.scenarios?.pessimistic?.point, row.money)}</td>
+                <td style={{ padding: "8px 10px", textAlign: "left", color: "#0c4a6e", fontWeight: 700 }}>{fmt(v.scenarios?.realistic?.point, row.money)}</td>
+                <td style={{ padding: "8px 10px", textAlign: "left", color: "#16a34a" }}>{fmt(v.scenarios?.optimistic?.point, row.money)}</td>
+                <td style={{ padding: "8px 10px", textAlign: "right", color: "#475569" }}>{tr.emoji} {tr.label}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <div style={{ marginTop: 8, textAlign: "center" }}>
+        <button onClick={() => setShowAll(!showAll)} style={{
+          background: "transparent", border: "1px solid #0284c7", color: "#0c4a6e",
+          padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11,
+        }}>
+          {showAll ? "▲ הצג רק עיקריות" : "▼ הצג את כל 9 המטריקות"}
+        </button>
+      </div>
+
+      {/* Patterns block — for the most important metric (enrollments) */}
+      {m.reg_action_total?.patterns && (
+        <div style={{ marginTop: 14, padding: "10px 12px", background: "#fff", border: "1px solid #bae6fd", borderRadius: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#0c4a6e", marginBottom: 6 }}>
+            🔬 דפוסים על נרשמים סה"כ (40 חודשים היסטוריים):
+          </div>
+          <div style={{ fontSize: 11, color: "#0f172a", lineHeight: 1.7 }}>
+            <div><b>מגמה:</b> {m.reg_action_total.patterns.trend?.summary}</div>
+            <div><b>עונתיות:</b> {m.reg_action_total.patterns.seasonality?.summary}</div>
+            {m.reg_action_total.patterns.inflection && (
+              <div><b>נקודת שבר:</b> {m.reg_action_total.patterns.inflection.label} (סביב {m.reg_action_total.patterns.inflection.around_month})</div>
+            )}
+            {m.reg_action_total.patterns.anomalies?.length > 0 && (
+              <div><b>חודשים חריגים (|z|&gt;1.5):</b> {
+                m.reg_action_total.patterns.anomalies.slice(0, 3).map(a =>
+                  `${a.month}=${a.value} (${a.type === "high" ? "↑" : "↓"} z=${a.z})`
+                ).join(" · ")
+              }</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div style={{ fontSize: 10, color: "#64748b", marginTop: 8, textAlign: "center" }}>
+        מקור: {data.source} · מחושב ב-{data.computed_at?.slice(11, 16)} UTC · רץ תוך &lt;1 שנייה
+      </div>
+    </div>
+  );
 }
 
 // ─── Stat card ─────────────────────────────────────────────────────────────
