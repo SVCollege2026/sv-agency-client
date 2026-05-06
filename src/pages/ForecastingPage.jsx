@@ -239,11 +239,21 @@ export default function ForecastingPage() {
           </div>
         )}
 
-        {/* ── סקציה 3: ספריית דפוסים ── */}
-        <PatternLibrary />
-
-        {/* ── סקציה 4: Stage 0 ── */}
-        <Stage0Trigger />
+        {/* ── כלים פנימיים — מוסתר ברירת-מחדל. ספריית דפוסים = pattern_memory
+            גולמי (debug); Stage 0 trigger = הפעלה ידנית של הריצה הראשונית.
+            לא רלוונטי לתצוגת לקוחה. ── */}
+        <details style={{
+          background: "#f8fafc", border: "1px solid #e2e8f0",
+          borderRadius: 10, padding: "8px 14px", marginTop: 14, fontSize: 13,
+        }}>
+          <summary style={{ cursor: "pointer", color: "#64748b", fontWeight: 600 }}>
+            🔧 כלים פנימיים (pattern memory + Stage 0 trigger)
+          </summary>
+          <div style={{ marginTop: 12 }}>
+            <PatternLibrary />
+            <Stage0Trigger />
+          </div>
+        </details>
 
         {/* ── Disclaimer ── */}
         <div style={{
