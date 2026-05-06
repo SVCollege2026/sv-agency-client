@@ -17,7 +17,7 @@ import { getBaselineFacts, getDashboardKpiLive } from "../api.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const GROUP_ORDER = ["context", "enrollments", "media", "cancellations", "leads", "analytics"];
+const GROUP_ORDER = ["context", "media", "enrollments", "cancellations", "leads", "analytics"];
 
 const GROUP_COLORS = {
   leads:         "#3b82f6",
