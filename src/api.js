@@ -342,6 +342,22 @@ export async function getInvestigationQuestions({ platform = null, limit = 100 }
   return request("GET", `/api/media-reports/investigations-questions?${params.toString()}`);
 }
 
+export async function getMediaStage0Latest() {
+  return request("GET", "/api/media-reports/stage0-report/latest");
+}
+
+export async function generateMediaStage0({ start = null, end = null } = {}) {
+  const params = new URLSearchParams();
+  if (start) params.set("start", start);
+  if (end)   params.set("end",   end);
+  const qs = params.toString();
+  return request("POST", `/api/media-reports/stage0-report${qs ? "?" + qs : ""}`);
+}
+
+export async function listMediaStage0(limit = 20) {
+  return request("GET", `/api/media-reports/stage0-report/list?limit=${limit}`);
+}
+
 export async function runInvestigation({ platform, question, extraData = [], start = null, end = null } = {}) {
   // Backend endpoints (POST /investigate/{platform}) expect query params, not JSON body.
   const params = new URLSearchParams();

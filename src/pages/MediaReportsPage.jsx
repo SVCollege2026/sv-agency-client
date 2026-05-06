@@ -27,6 +27,8 @@ import {
   getInvestigation,
   getInvestigationQuestions,
   runInvestigation,
+  getMediaStage0Latest,
+  generateMediaStage0,
 } from "../api.js";
 
 // ─── Utils ───────────────────────────────────────────────────────────────────
@@ -147,6 +149,7 @@ function hebSourceKind(k) {
 // ─── Filter bar ──────────────────────────────────────────────────────────────
 
 const MODES = [
+  { id: "stage0",          label: "📑 דוח שלב 0" },
   { id: "daily",           label: "יומי"   },
   { id: "weekly",          label: "שבועי" },
   { id: "range",           label: "טווח"   },
@@ -162,7 +165,7 @@ const MODES = [
 
 // המצבים החדשים אינם משתמשים ב-fetchMediaDaily/Weekly/Range/Monthly. כל אחד
 // מנהל את הfetching שלו פנימית.
-const _NEW_MODES = ["investigations", "timeline", "recommendations"];
+const _NEW_MODES = ["stage0", "investigations", "timeline", "recommendations"];
 const _isLegacyMode = (m) => !_NEW_MODES.includes(m);
 
 // ─── Monthly KPI sub-component ─────────────────────────────────────────────
@@ -1082,7 +1085,9 @@ export default function MediaReportsPage() {
         )}
 
         {/* ── Main content: table / sub_status / analytics / monthly / investigations / timeline / questions ── */}
-        {mode === "investigations" ? (
+        {mode === "stage0" ? (
+          <Stage0ReportView />
+        ) : mode === "investigations" ? (
           <InvestigationsView platformFilter={platformFilter} />
         ) : mode === "timeline" ? (
           <TimelineView platformFilter={platformFilter} />
@@ -1963,6 +1968,188 @@ function QuestionsView({ platformFilter }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function Stage0ReportView() {
+  const [report, setReport] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [generating, setGenerating] = React.useState(false);
+  const [error, setError] = React.useState(null);
+
+  async function loadLatest() {
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await getMediaStage0Latest();
+      if (r && r.id) setReport(r);
+      else setReport(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  React.useEffect(() => { loadLatest(); }, []);
+
+  async function generate() {
+    setGenerating(true);
+    setError(null);
+    try {
+      await generateMediaStage0({});
+      await loadLatest();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <div>
+      {/* ── Action bar ── */}
+      <div style={{
+        background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10,
+        padding: "12px 14px", marginBottom: 14,
+        display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+      }}>
+        <span style={{ fontSize: 13, color: "#475569" }}>
+          {loading ? "טוען..." : report
+            ? `דוח אחרון: ${fmtDateTime(report.created_at)} · טווח: ${report.timeframe_start} → ${report.timeframe_end}`
+            : "אין דוח שלב 0 עדיין"}
+        </span>
+        <div style={{ flex: 1 }} />
+        {report && (
+          <button type="button" onClick={loadLatest} disabled={loading} style={{ ...secondaryBtn, opacity: loading ? 0.6 : 1 }}>
+            🔄 רענן
+          </button>
+        )}
+        <button type="button" onClick={generate} disabled={generating}
+          style={{ ...primaryBtn, opacity: generating ? 0.6 : 1 }}>
+          {generating ? "מפיק... (30-90s)" : (report ? "🔁 דוח חדש" : "📑 הפק דוח")}
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", padding: 12, borderRadius: 8, fontSize: 13, marginBottom: 14 }}>
+          ⚠ {error}
+        </div>
+      )}
+
+      {!report && !loading && !generating && (
+        <div style={{ background: "#fff", border: "1px dashed #cbd5e1", borderRadius: 10, padding: 32, textAlign: "center", color: "#64748b" }}>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7 }}>
+            <b>דוח שלב 0 של מחלקת המדיה</b> — תיאור של מה שקורה ומה שקרה.
+            <br />
+            כולל: ניתוח Meta + Google, מצב Analytics (GA4), מסרים שעבדו (לקראת מחלקת קריאייטיב),
+            ממוצע CPL ברבעון אחרון, וחלוקת תקציב.
+          </p>
+          <p style={{ margin: "12px 0 0", fontSize: 12, color: "#94a3b8" }}>
+            לחץ על "📑 הפק דוח" כדי לייצר. ייקח 30-90 שניות.
+          </p>
+        </div>
+      )}
+
+      {report && (
+        <Stage0ReportDisplay report={report} />
+      )}
+    </div>
+  );
+}
+
+function Stage0ReportDisplay({ report }) {
+  const pp = report.per_platform || {};
+  const ga4 = report.ga4_summary || {};
+  const cp = report.cross_platform || {};
+  const messages = report.creative_messages || [];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* Executive summary */}
+      {report.smart_narrative && (
+        <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#1e40af", marginBottom: 6 }}>🧠 סיכום מנהלים</div>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.8, color: "#0f172a" }}>{report.smart_narrative}</p>
+        </div>
+      )}
+
+      {/* Per platform */}
+      {(pp.meta || pp.google) && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
+          {pp.meta && <PlatformCard name="Meta" data={pp.meta} bg="#dbeafe" fg="#1e40af" />}
+          {pp.google && <PlatformCard name="Google" data={pp.google} bg="#fef3c7" fg="#92400e" />}
+        </div>
+      )}
+
+      {/* GA4 */}
+      {ga4 && Object.keys(ga4).length > 0 && (
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>📊 GA4 — Analytics</div>
+          {ga4.traffic_summary && <p style={{ margin: "0 0 6px", fontSize: 13, lineHeight: 1.7 }}><b>תנועה:</b> {ga4.traffic_summary}</p>}
+          {ga4.behavior && <p style={{ margin: "0 0 6px", fontSize: 13, lineHeight: 1.7 }}><b>התנהגות:</b> {ga4.behavior}</p>}
+          {ga4.conversions && <p style={{ margin: "0 0 6px", fontSize: 13, lineHeight: 1.7 }}><b>המרות:</b> {ga4.conversions}</p>}
+          {ga4.data_caveats && (
+            <div style={{ background: "#fef3c7", borderRadius: 6, padding: "6px 10px", fontSize: 12, color: "#92400e", marginTop: 8 }}>
+              ⚠ {ga4.data_caveats}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Creative messages */}
+      {messages.length > 0 && (
+        <div style={{ background: "#fdf4ff", border: "1px solid #f5d0fe", borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#86198f", marginBottom: 8 }}>🎨 מסרים שעבדו (לקראת מחלקת קריאייטיב)</div>
+          <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 13, lineHeight: 1.9 }}>
+            {messages.map((m, i) => (
+              <li key={i}>
+                <b>{m.message_or_theme}</b> — {m.platform} ({m.period}). ראיה: {m.evidence}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Cross platform */}
+      {cp && Object.keys(cp).length > 0 && (
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>🔀 Cross-platform</div>
+          {cp.budget_split && <p style={{ margin: "0 0 6px", fontSize: 13, lineHeight: 1.7 }}><b>חלוקת תקציב:</b> {cp.budget_split}</p>}
+          {cp.net_enrolled_contribution && <p style={{ margin: "0 0 6px", fontSize: 13, lineHeight: 1.7 }}><b>תרומה לנרשמים נטו:</b> {cp.net_enrolled_contribution}</p>}
+          {cp.trend_overall && <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7 }}><b>מגמה כוללת:</b> {cp.trend_overall}</p>}
+        </div>
+      )}
+
+      {/* Data gaps */}
+      {(report.data_gaps || []).length > 0 && (
+        <details style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "10px 14px" }}>
+          <summary style={{ cursor: "pointer", fontSize: 12, color: "#64748b", fontWeight: 600 }}>
+            ⚠ פערי דאטה ({report.data_gaps.length})
+          </summary>
+          <ul style={{ margin: "8px 0 0", paddingInlineStart: 18, fontSize: 12, lineHeight: 1.7, color: "#92400e" }}>
+            {report.data_gaps.map((g, i) => <li key={i}>{g}</li>)}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function PlatformCard({ name, data, bg, fg }) {
+  return (
+    <div style={{ background: bg, borderRadius: 10, padding: "12px 14px" }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: fg, marginBottom: 8 }}>{name}</div>
+      {data.current_state && <p style={{ margin: "0 0 6px", fontSize: 12, lineHeight: 1.6, color: "#0f172a" }}><b>מצב נוכחי:</b> {data.current_state}</p>}
+      {data.quarter_trend && <p style={{ margin: "0 0 6px", fontSize: 12, lineHeight: 1.6, color: "#0f172a" }}><b>מגמה רבעונית:</b> {data.quarter_trend}</p>}
+      {data.avg_cpl != null && <p style={{ margin: "0 0 6px", fontSize: 12, lineHeight: 1.6, color: "#0f172a" }}><b>CPL ממוצע:</b> ₪{Number(data.avg_cpl).toLocaleString()}</p>}
+      {(data.top_campaigns || data.top_keywords) && (
+        <p style={{ margin: "0 0 6px", fontSize: 12, lineHeight: 1.6, color: "#0f172a" }}>
+          <b>{data.top_campaigns ? "Top קמפיינים" : "Top ביטויים"}:</b> {(data.top_campaigns || data.top_keywords || []).slice(0, 5).join(", ")}
+        </p>
+      )}
+      {data.key_insight && <p style={{ margin: 0, fontSize: 12, lineHeight: 1.6, color: fg, fontWeight: 600 }}>💡 {data.key_insight}</p>}
     </div>
   );
 }
