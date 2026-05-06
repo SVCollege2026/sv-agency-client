@@ -2,6 +2,7 @@ import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/Layout.jsx";
 import AnalyticsLayout from "./components/AnalyticsLayout.jsx";
+import StrategyLayout from "./components/StrategyLayout.jsx";
 import PortalHome from "./pages/PortalHome.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import ReportsPage from "./pages/ReportsPage.jsx";
@@ -27,13 +28,17 @@ export default function App() {
           <Route path="reports"    element={<ReportsPage />} />
         </Route>
 
-        {/* Media department — phase A: only the reports page */}
+        {/* Media department — דוחות + חקירות + תהליך + שאלות */}
         <Route path="/media-reports" element={<MediaReportsPage />} />
 
-        {/* Strategy department — Forecasting (Phase 1+2) */}
-        <Route path="/forecasting" element={<ForecastingPage />} />
+        {/* Strategy department — חיזוי כיום פעיל; יעדים/תרחישים/המלצות בהמשך */}
+        <Route path="/strategy" element={<StrategyLayout />}>
+          <Route index element={<Navigate to="forecasting" replace />} />
+          <Route path="forecasting" element={<ForecastingPage />} />
+        </Route>
 
         {/* Legacy redirects — old bookmarks → לעמודים הקיימים */}
+        <Route path="/forecasting"         element={<Navigate to="/strategy/forecasting" replace />} />
         <Route path="/dashboard"           element={<Navigate to="/analytics/dashboard" replace />} />
         <Route path="/reports"             element={<Navigate to="/analytics/reports"   replace />} />
         <Route path="/analysis"            element={<Navigate to="/analytics/dashboard" replace />} />

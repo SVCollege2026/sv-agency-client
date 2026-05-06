@@ -23,6 +23,10 @@ import {
   getMonthlySchoolKpi,
   getMonthlyCoursesKpi,
   runMonthlyKpi,
+  getInvestigations,
+  getInvestigation,
+  getInvestigationQuestions,
+  runInvestigation,
 } from "../api.js";
 
 // ─── Utils ───────────────────────────────────────────────────────────────────
@@ -143,11 +147,19 @@ function hebSourceKind(k) {
 // ─── Filter bar ──────────────────────────────────────────────────────────────
 
 const MODES = [
-  { id: "daily",   label: "יומי"   },
-  { id: "weekly",  label: "שבועי" },
-  { id: "range",   label: "טווח"   },
-  { id: "monthly", label: "📈 חודשי Y-o-Y" },
+  { id: "daily",          label: "יומי"   },
+  { id: "weekly",         label: "שבועי" },
+  { id: "range",          label: "טווח"   },
+  { id: "monthly",        label: "📈 חודשי Y-o-Y" },
+  { id: "investigations", label: "🔎 חקירות" },
+  { id: "timeline",       label: "🗓 תהליך פרסום" },
+  { id: "questions",      label: "❓ שאלות פתוחות" },
 ];
+
+// המצבים החדשים אינם משתמשים ב-fetchMediaDaily/Weekly/Range/Monthly. כל אחד
+// מנהל את הfetching שלו פנימית.
+const _NEW_MODES = ["investigations", "timeline", "questions"];
+const _isLegacyMode = (m) => !_NEW_MODES.includes(m);
 
 // ─── Monthly KPI sub-component ─────────────────────────────────────────────
 // תצוגה זו מחקה את SV_Monthly_Comparison.xlsx:
@@ -659,8 +671,10 @@ export default function MediaReportsPage() {
       .catch(() => setPlatforms([]));
   }, []);
 
-  // Fetch data on mode/date changes
+  // Fetch data on mode/date changes — only for legacy modes (daily/weekly/range).
+  // monthly/investigations/timeline/questions manage their own fetching internally.
   async function fetchData() {
+    if (!_isLegacyMode(mode) || mode === "monthly") return;
     setLoading(true);
     setError(null);
     try {
@@ -887,7 +901,8 @@ export default function MediaReportsPage() {
           ))}
         </div>
 
-        {/* ── Filters ── */}
+        {/* ── Filters (legacy modes only) ── */}
+        {_isLegacyMode(mode) && mode !== "monthly" && (
         <div style={{
           background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10,
           padding: "14px 16px", marginBottom: 16,
@@ -965,6 +980,7 @@ export default function MediaReportsPage() {
             ⬇ CSV
           </button>
         </div>
+        )}
 
         {/* ── Action message ── */}
         {actionMsg && (
@@ -1036,7 +1052,7 @@ export default function MediaReportsPage() {
         )}
 
         {/* ── Column picker (רק בטבלאות עם עמודות) ── */}
-        {!(mode === "daily" && (dailyView === "sub_status" || dailyView === "analytics")) && (
+        {_isLegacyMode(mode) && mode !== "monthly" && !(mode === "daily" && (dailyView === "sub_status" || dailyView === "analytics")) && (
           <details style={{
             background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10,
             padding: "10px 14px", marginBottom: 14, fontSize: 13,
@@ -1061,8 +1077,14 @@ export default function MediaReportsPage() {
           </div>
         )}
 
-        {/* ── Main content: table / sub_status / analytics / monthly ── */}
-        {mode === "monthly" ? (
+        {/* ── Main content: table / sub_status / analytics / monthly / investigations / timeline / questions ── */}
+        {mode === "investigations" ? (
+          <InvestigationsView platformFilter={platformFilter} />
+        ) : mode === "timeline" ? (
+          <TimelineView platformFilter={platformFilter} />
+        ) : mode === "questions" ? (
+          <QuestionsView platformFilter={platformFilter} />
+        ) : mode === "monthly" ? (
           <MonthlyKpiView />
         ) : mode === "daily" && dailyView === "sub_status" ? (
           <SubStatusTable rows={data?.sub_status || []} loading={loading} />
@@ -1334,6 +1356,609 @@ function SimpleTable({ title, cols, rows }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ─── Investigations / Timeline / Questions — Phase 2 UI ─────────────────────
+
+const PLATFORM_LABEL = { google: "Google", meta: "Meta" };
+
+const META_QUESTION_TEMPLATES = [
+  { label: "ימים חזקים בשבוע",          extra: ["weekday_performance"] },
+  { label: "שחיקת קריאייטיב",          extra: ["creative_performance"] },
+  { label: "מסר מוביל",                 extra: ["creative_performance"] },
+  { label: "מתי מורידים קמפיין",        extra: ["campaign_timeline", "budget_timeline"] },
+  { label: "מתי מסיטים תקציבים",        extra: ["budget_timeline"] },
+];
+const GOOGLE_QUESTION_TEMPLATES = [
+  { label: "ירידה בלידים — ביקוש או תקציב?", extra: ["keyword_volume", "search_terms", "search_impression_share"] },
+  { label: "ביטויים שמייצרים הכי הרבה לידים", extra: ["keywords", "search_terms"] },
+  { label: "קטגוריות חיפוש חדשות בשוק",       extra: ["search_terms", "trends_volume"] },
+];
+
+function InvestigationsView({ platformFilter }) {
+  const [items, setItems]       = React.useState([]);
+  const [loading, setLoading]   = React.useState(false);
+  const [error, setError]       = React.useState(null);
+  const [openId, setOpenId]     = React.useState(null);
+  const [openDetails, setOpenDetails] = React.useState(null);
+  const [showRunForm, setShowRunForm] = React.useState(false);
+  const [runStatus, setRunStatus]     = React.useState(null);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const platform = platformFilter !== "all" ? platformFilter : null;
+      const r = await getInvestigations({ platform, limit: 50 });
+      setItems(r.items || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  React.useEffect(() => { load(); /* eslint-disable-next-line */ }, [platformFilter]);
+
+  async function openRow(id) {
+    if (openId === id) { setOpenId(null); setOpenDetails(null); return; }
+    setOpenId(id);
+    setOpenDetails(null);
+    try {
+      const d = await getInvestigation(id);
+      setOpenDetails(d);
+    } catch (err) {
+      setOpenDetails({ _error: err.message });
+    }
+  }
+
+  return (
+    <div>
+      {/* ── Action bar ── */}
+      <div style={{
+        background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10,
+        padding: "12px 14px", marginBottom: 14,
+        display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+      }}>
+        <span style={{ fontSize: 13, color: "#475569" }}>
+          {loading ? "טוען חקירות…" : `${items.length} חקירות שמורות`}
+          {platformFilter !== "all" && <span style={{ marginInlineStart: 6, color: "#94a3b8" }}>(מסונן: {PLATFORM_LABEL[platformFilter] || platformFilter})</span>}
+        </span>
+        <div style={{ flex: 1 }} />
+        <button type="button" onClick={load} disabled={loading} style={{ ...secondaryBtn, opacity: loading ? 0.6 : 1 }}>
+          🔄 רענן
+        </button>
+        <button type="button" onClick={() => setShowRunForm((v) => !v)} style={primaryBtn}>
+          {showRunForm ? "סגור" : "+ חקירה חדשה"}
+        </button>
+      </div>
+
+      {showRunForm && (
+        <RunInvestigationForm
+          onSubmitted={(msg) => { setRunStatus(msg); setShowRunForm(false); load(); }}
+        />
+      )}
+      {runStatus && (
+        <div style={{
+          background: runStatus.startsWith("✗") ? "#fef2f2" : "#f0fdf4",
+          border:     `1px solid ${runStatus.startsWith("✗") ? "#fecaca" : "#bbf7d0"}`,
+          color:      runStatus.startsWith("✗") ? "#991b1b" : "#15803d",
+          borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 14,
+        }}>
+          {runStatus}
+        </div>
+      )}
+
+      {error && (
+        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", padding: 12, borderRadius: 8, fontSize: 13, marginBottom: 14 }}>
+          ⚠ {error}
+        </div>
+      )}
+
+      {/* ── List ── */}
+      {!loading && !items.length && (
+        <div style={{ background: "#fff", border: "1px dashed #cbd5e1", borderRadius: 10, padding: 32, textAlign: "center", color: "#64748b" }}>
+          אין חקירות שמורות עדיין. לחץ על <b>+ חקירה חדשה</b> כדי להתחיל.
+        </div>
+      )}
+
+      {!!items.length && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {items.map((it) => (
+            <div key={it.id} style={{
+              background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden",
+            }}>
+              <button
+                type="button"
+                onClick={() => openRow(it.id)}
+                style={{
+                  width: "100%", textAlign: "right", background: "none", border: "none",
+                  padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "flex-start",
+                  gap: 10, flexWrap: "wrap",
+                }}
+              >
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 12,
+                  background: it.platform === "google" ? "#fef3c7" : "#dbeafe",
+                  color:      it.platform === "google" ? "#92400e" : "#1e40af",
+                  flexShrink: 0,
+                }}>
+                  {PLATFORM_LABEL[it.platform] || it.platform}
+                </span>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", marginBottom: 4 }}>
+                    {it.question}
+                  </div>
+                  {it.summary && (
+                    <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.6 }}>
+                      {it.summary.length > 220 ? it.summary.slice(0, 220) + "…" : it.summary}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 8, fontSize: 11, color: "#64748b", flexShrink: 0 }}>
+                  <span>📋 {it.findings_count} ממצאים</span>
+                  {!!it.data_gaps_count && <span style={{ color: "#ca8a04" }}>❓ {it.data_gaps_count} פערים</span>}
+                  <span style={{ color: statusColor(it.status) }}>{hebStatus(it.status)}</span>
+                  <span>{fmtDateTime(it.created_at)}</span>
+                </div>
+              </button>
+
+              {openId === it.id && (
+                <div style={{ borderTop: "1px solid #e2e8f0", background: "#f8fafc", padding: "14px 18px" }}>
+                  {!openDetails && <div style={{ fontSize: 13, color: "#64748b" }}>טוען פרטים…</div>}
+                  {openDetails && openDetails._error && (
+                    <div style={{ fontSize: 13, color: "#dc2626" }}>שגיאה: {openDetails._error}</div>
+                  )}
+                  {openDetails && !openDetails._error && (
+                    <InvestigationDetails inv={openDetails} />
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InvestigationDetails({ inv }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, fontSize: 13, color: "#0f172a" }}>
+      {inv.summary && (
+        <Section title="סיכום">
+          <p style={{ margin: 0, lineHeight: 1.8 }}>{inv.summary}</p>
+        </Section>
+      )}
+      {!!(inv.findings || []).length && (
+        <Section title={`ממצאים (${inv.findings.length})`}>
+          <ul style={{ margin: 0, paddingInlineStart: 18, lineHeight: 1.8 }}>
+            {inv.findings.map((f, i) => (
+              <li key={i} style={{ marginBottom: 10 }}>
+                <div style={{ fontWeight: 600 }}>
+                  {f.claim}{" "}
+                  <span style={{
+                    fontSize: 10, padding: "1px 7px", borderRadius: 10,
+                    background: f.confidence === "high" ? "#dcfce7" : f.confidence === "low" ? "#fef3c7" : "#e0e7ff",
+                    color:      f.confidence === "high" ? "#166534" : f.confidence === "low" ? "#92400e" : "#3730a3",
+                    marginInlineStart: 6, fontWeight: 500,
+                  }}>
+                    {f.confidence === "high" ? "ביטחון גבוה" : f.confidence === "low" ? "ביטחון נמוך" : "ביטחון בינוני"}
+                  </span>
+                </div>
+                {!!(f.evidence || []).length && (
+                  <ul style={{ margin: "4px 0 0", paddingInlineStart: 18, color: "#475569", fontSize: 12 }}>
+                    {f.evidence.map((e, j) => <li key={j}>{e}</li>)}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+      {!!(inv.data_gaps || []).length && (
+        <Section title={`פערים שמצריכים תשובת לקוחה (${inv.data_gaps.length})`} accent="#ca8a04">
+          <ul style={{ margin: 0, paddingInlineStart: 18, lineHeight: 1.8, color: "#92400e" }}>
+            {inv.data_gaps.map((g, i) => <li key={i}>{g}</li>)}
+          </ul>
+        </Section>
+      )}
+      {!!(inv.followups || []).length && (
+        <Section title={`שאלות המשך מומלצות (${inv.followups.length})`}>
+          <ul style={{ margin: 0, paddingInlineStart: 18, lineHeight: 1.8 }}>
+            {inv.followups.map((f, i) => <li key={i}>{f}</li>)}
+          </ul>
+        </Section>
+      )}
+      {!!(inv.evidence_sources || []).length && (
+        <div style={{ fontSize: 11, color: "#64748b", paddingTop: 6, borderTop: "1px solid #e2e8f0" }}>
+          <b>מקורות ראיות:</b> {inv.evidence_sources.join(" · ")}
+          {inv.duration_ms ? <span> · משך ריצה {(inv.duration_ms / 1000).toFixed(1)}s</span> : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Section({ title, accent, children }) {
+  return (
+    <div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: accent || "#1e40af", marginBottom: 6, letterSpacing: 0.2 }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function RunInvestigationForm({ onSubmitted }) {
+  const [platform, setPlatform]       = React.useState("meta");
+  const [tplIdx, setTplIdx]           = React.useState(0);
+  const [customQ, setCustomQ]         = React.useState("");
+  const [extraStr, setExtraStr]       = React.useState("");
+  const [start, setStart]             = React.useState("2024-01");
+  const [end, setEnd]                 = React.useState(new Date().toISOString().slice(0, 7));
+  const [submitting, setSubmitting]   = React.useState(false);
+
+  const templates = platform === "google" ? GOOGLE_QUESTION_TEMPLATES : META_QUESTION_TEMPLATES;
+  const useCustom = tplIdx === -1;
+  const tpl = useCustom ? null : templates[tplIdx];
+
+  React.useEffect(() => {
+    if (tpl) setExtraStr((tpl.extra || []).join(","));
+  }, [platform, tplIdx]);
+
+  async function submit(e) {
+    e.preventDefault();
+    const question = useCustom ? customQ.trim() : tpl?.label;
+    if (!question) return;
+    setSubmitting(true);
+    try {
+      const extraData = extraStr.split(",").map((s) => s.trim()).filter(Boolean);
+      await runInvestigation({ platform, question, extraData, start, end });
+      onSubmitted("✓ החקירה הופעלה — סיום לוקח ~30-60 שניות, יופיע ברשימה אחרי רענון.");
+    } catch (err) {
+      onSubmitted("✗ " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} style={{
+      background: "#fff", border: "1px solid #1e3a5f", borderRadius: 10,
+      padding: "16px 18px", marginBottom: 14,
+    }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+        <label style={{ fontSize: 12, color: "#64748b", display: "flex", flexDirection: "column", gap: 4 }}>
+          פלטפורמה
+          <select value={platform} onChange={(e) => { setPlatform(e.target.value); setTplIdx(0); }} style={selectStyle}>
+            <option value="meta">Meta</option>
+            <option value="google">Google</option>
+          </select>
+        </label>
+        <label style={{ fontSize: 12, color: "#64748b", display: "flex", flexDirection: "column", gap: 4 }}>
+          שאלה
+          <select value={tplIdx} onChange={(e) => setTplIdx(Number(e.target.value))} style={selectStyle}>
+            {templates.map((t, i) => <option key={i} value={i}>{t.label}</option>)}
+            <option value={-1}>שאלה חופשית…</option>
+          </select>
+        </label>
+        <label style={{ fontSize: 12, color: "#64748b", display: "flex", flexDirection: "column", gap: 4 }}>
+          extra_data
+          <input type="text" value={extraStr} onChange={(e) => setExtraStr(e.target.value)}
+            placeholder="weekday_performance,creative_performance"
+            style={{ ...selectStyle, fontSize: 12 }} />
+        </label>
+        <label style={{ fontSize: 12, color: "#64748b", display: "flex", flexDirection: "column", gap: 4 }}>
+          מתאריך (YYYY-MM)
+          <input type="text" value={start} onChange={(e) => setStart(e.target.value)} style={selectStyle} placeholder="2024-01" />
+        </label>
+        <label style={{ fontSize: 12, color: "#64748b", display: "flex", flexDirection: "column", gap: 4 }}>
+          עד תאריך (YYYY-MM)
+          <input type="text" value={end} onChange={(e) => setEnd(e.target.value)} style={selectStyle} placeholder="2026-04" />
+        </label>
+      </div>
+
+      {useCustom && (
+        <div style={{ marginTop: 10 }}>
+          <label style={{ fontSize: 12, color: "#64748b" }}>טקסט השאלה</label>
+          <textarea
+            value={customQ}
+            onChange={(e) => setCustomQ(e.target.value)}
+            rows={3}
+            placeholder="לדוגמה: מה קרה לתקציב Meta בין ספטמבר ודצמבר 2025 ולמה?"
+            style={{ ...selectStyle, width: "100%", fontFamily: "inherit", marginTop: 4 }}
+          />
+        </div>
+      )}
+
+      <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
+        <button type="submit" disabled={submitting} style={{ ...primaryBtn, opacity: submitting ? 0.6 : 1 }}>
+          {submitting ? "שולח…" : "🚀 הפעל חקירה"}
+        </button>
+        <span style={{ fontSize: 11, color: "#94a3b8" }}>
+          ⚠ Meta יכולה להיכשל ב-rate limit (code 17). Google ירוץ גם בלי KP Basic Access — עם ראיות היסטוריות שכבר ב-DB.
+        </span>
+      </div>
+    </form>
+  );
+}
+
+function TimelineView({ platformFilter }) {
+  const [events, setEvents]   = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError]     = React.useState(null);
+  const [start]               = React.useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 12);
+    return d.toISOString().slice(0, 10);
+  });
+  const [end]                 = React.useState(() => new Date().toISOString().slice(0, 10));
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await getMediaRange(start, end);
+      const detail = r?.detail_rows || r?.rows || [];
+      const filtered = platformFilter === "all" ? detail : detail.filter((d) => d.platform === platformFilter);
+      setEvents(_buildTimelineEvents(filtered));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  React.useEffect(() => { load(); /* eslint-disable-next-line */ }, [platformFilter]);
+
+  return (
+    <div>
+      <div style={{
+        background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10,
+        padding: "12px 14px", marginBottom: 14,
+        display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+      }}>
+        <span style={{ fontSize: 13, color: "#475569" }}>
+          {loading ? "מחשב timeline…" : `${events.length} אירועים ב-12 החודשים האחרונים`}
+        </span>
+        <div style={{ flex: 1 }} />
+        <button type="button" onClick={load} disabled={loading} style={{ ...secondaryBtn, opacity: loading ? 0.6 : 1 }}>
+          🔄 רענן
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", padding: 12, borderRadius: 8, fontSize: 13, marginBottom: 14 }}>
+          ⚠ {error}
+        </div>
+      )}
+
+      {!loading && !events.length && !error && (
+        <div style={{ background: "#fff", border: "1px dashed #cbd5e1", borderRadius: 10, padding: 32, textAlign: "center", color: "#64748b" }}>
+          אין מספיק נתוני קמפיינים לבניית timeline.
+          <div style={{ fontSize: 11, marginTop: 6 }}>צריך לפחות 30 יום של דאטה ב-daily_reports.</div>
+        </div>
+      )}
+
+      {!!events.length && (
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
+          {events.map((e, i) => (
+            <div key={i} style={{
+              padding: "12px 16px",
+              borderBottom: i < events.length - 1 ? "1px solid #f1f5f9" : "none",
+              display: "flex", gap: 12, alignItems: "flex-start",
+            }}>
+              <div style={{ flexShrink: 0, fontSize: 12, color: "#64748b", minWidth: 90 }}>
+                {e.month}
+              </div>
+              <span style={{
+                fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 12, flexShrink: 0,
+                background: e.platform === "google" ? "#fef3c7" : "#dbeafe",
+                color:      e.platform === "google" ? "#92400e" : "#1e40af",
+              }}>
+                {PLATFORM_LABEL[e.platform] || e.platform}
+              </span>
+              <span style={{
+                fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 12, flexShrink: 0,
+                background: e.kindBg, color: e.kindFg,
+              }}>
+                {e.kindLabel}
+              </span>
+              <div style={{ flex: 1, fontSize: 13, color: "#0f172a", lineHeight: 1.6 }}>
+                <b>{e.campaign}</b>
+                <div style={{ fontSize: 12, color: "#475569" }}>{e.detail}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ marginTop: 10, fontSize: 11, color: "#94a3b8", lineHeight: 1.6 }}>
+        ⚠ ה-timeline מחשב אירועים מ-daily_reports בלבד. עבור היסטוריית שינויי-תקציב מלאה (כולל activity log)
+        יש להריץ חקירת Meta עם <code>extra_data=budget_timeline</code>.
+      </div>
+    </div>
+  );
+}
+
+// אגרגטור client-side: מגלה התחלה/סוף קמפיין + שינויי תקציב משמעותיים מ-daily_reports.
+function _buildTimelineEvents(rows) {
+  if (!rows || !rows.length) return [];
+
+  // group by campaign_id × platform
+  const byCampaign = new Map();
+  for (const r of rows) {
+    const key = `${r.platform}|${r.campaign_id || r.campaign_name}`;
+    if (!byCampaign.has(key)) byCampaign.set(key, []);
+    byCampaign.get(key).push(r);
+  }
+
+  const events = [];
+  for (const [key, list] of byCampaign.entries()) {
+    list.sort((a, b) => (a.report_date || "").localeCompare(b.report_date || ""));
+    if (!list.length) continue;
+    const first = list[0];
+    const last  = list[list.length - 1];
+    const platform = first.platform;
+    const campaign = first.campaign_name || first.campaign_id;
+
+    // Start event
+    events.push({
+      month:    (first.report_date || "").slice(0, 7),
+      platform,
+      campaign,
+      kindLabel: "▶ התחלה",
+      kindBg:    "#dcfce7",
+      kindFg:    "#166534",
+      detail:    `קמפיין נצפה לראשונה. תקציב התחלתי: ${first.budget ? "₪" + Number(first.budget).toLocaleString() : "—"}.`,
+    });
+
+    // Significant budget changes — קפיצה של 30%+ במשך חודש
+    const monthlySpend = new Map();
+    for (const r of list) {
+      const m = (r.report_date || "").slice(0, 7);
+      monthlySpend.set(m, (monthlySpend.get(m) || 0) + Number(r.spend || 0));
+    }
+    const months = [...monthlySpend.keys()].sort();
+    let prev = null;
+    for (const m of months) {
+      const v = monthlySpend.get(m);
+      if (prev !== null && prev > 0) {
+        const change = (v - prev) / prev;
+        if (Math.abs(change) >= 0.3 && Math.abs(v - prev) >= 1000) {
+          events.push({
+            month:     m,
+            platform,
+            campaign,
+            kindLabel: change > 0 ? "📈 הגדלת תקציב" : "📉 הקטנת תקציב",
+            kindBg:    change > 0 ? "#dbeafe" : "#fef3c7",
+            kindFg:    change > 0 ? "#1e40af" : "#92400e",
+            detail:    `הוצאה חודשית עברה מ-₪${prev.toLocaleString(undefined,{maximumFractionDigits:0})} ל-₪${v.toLocaleString(undefined,{maximumFractionDigits:0})} (${(change * 100).toFixed(0)}%).`,
+          });
+        }
+      }
+      prev = v;
+    }
+
+    // End event — אם הפעילות פסקה לפני סוף הטווח
+    const lastMonth = (last.report_date || "").slice(0, 7);
+    const todayMonth = new Date().toISOString().slice(0, 7);
+    if (lastMonth && lastMonth < todayMonth) {
+      events.push({
+        month:    lastMonth,
+        platform,
+        campaign,
+        kindLabel: "⏸ סיום",
+        kindBg:    "#fee2e2",
+        kindFg:    "#991b1b",
+        detail:    `אין פעילות מ-${lastMonth}.`,
+      });
+    }
+  }
+
+  // sort newest-first
+  events.sort((a, b) => (b.month || "").localeCompare(a.month || ""));
+  return events.slice(0, 100);  // אחר 100 אירועים אחרונים
+}
+
+function QuestionsView({ platformFilter }) {
+  const [items, setItems]     = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError]     = React.useState(null);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const platform = platformFilter !== "all" ? platformFilter : null;
+      const r = await getInvestigationQuestions({ platform, limit: 100 });
+      setItems(r.items || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  React.useEffect(() => { load(); /* eslint-disable-next-line */ }, [platformFilter]);
+
+  // group by platform
+  const byPlatform = React.useMemo(() => {
+    const m = new Map();
+    for (const q of items) {
+      const k = q.platform || "unknown";
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(q);
+    }
+    return m;
+  }, [items]);
+
+  return (
+    <div>
+      <div style={{
+        background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10,
+        padding: "12px 14px", marginBottom: 14,
+        display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+      }}>
+        <span style={{ fontSize: 13, color: "#475569" }}>
+          {loading ? "אוסף שאלות…" : `${items.length} שאלות פתוחות שדורשות תשובה אנושית`}
+        </span>
+        <div style={{ flex: 1 }} />
+        <button type="button" onClick={load} disabled={loading} style={{ ...secondaryBtn, opacity: loading ? 0.6 : 1 }}>
+          🔄 רענן
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", padding: 12, borderRadius: 8, fontSize: 13, marginBottom: 14 }}>
+          ⚠ {error}
+        </div>
+      )}
+
+      {!loading && !items.length && !error && (
+        <div style={{ background: "#fff", border: "1px dashed #cbd5e1", borderRadius: 10, padding: 32, textAlign: "center", color: "#64748b" }}>
+          לא נמצאו פערי-מידע מהחקירות עד כה. תפעיל חקירות נוספות במצב "חקירות" כדי לחשוף שאלות.
+        </div>
+      )}
+
+      {!!items.length && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {[...byPlatform.entries()].map(([plat, qs]) => (
+            <div key={plat} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
+              <div style={{
+                background: plat === "google" ? "#fef3c7" : "#dbeafe",
+                color:      plat === "google" ? "#92400e" : "#1e40af",
+                padding: "8px 14px", fontSize: 13, fontWeight: 700,
+              }}>
+                {PLATFORM_LABEL[plat] || plat} · {qs.length} שאלות
+              </div>
+              {qs.map((q, i) => (
+                <div key={`${q.investigation_id}-${i}`} style={{
+                  padding: "10px 14px",
+                  borderTop: i === 0 ? "none" : "1px solid #f1f5f9",
+                }}>
+                  <div style={{
+                    display: "inline-block", fontSize: 10, fontWeight: 600,
+                    padding: "1px 6px", borderRadius: 8, marginBottom: 4,
+                    background: q.kind === "data_gap" ? "#fef3c7" : "#e0e7ff",
+                    color:      q.kind === "data_gap" ? "#92400e" : "#3730a3",
+                  }}>
+                    {q.kind === "data_gap" ? "פער-מידע" : "שאלת המשך"}
+                  </div>
+                  <div style={{ fontSize: 13, color: "#0f172a", lineHeight: 1.6 }}>{q.text}</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+                    מהחקירה: <i>{q.investigation_question}</i>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
