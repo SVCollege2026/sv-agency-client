@@ -619,28 +619,18 @@ function FactCard({ fact, accentColor }) {
         {fact.title}
       </h3>
 
-      {/* Chart */}
-      {hasChart && <FactChart fact={fact} />}
-
-      {/* Chart caption — מתחת לגרף */}
-      {hasChart && fact.chart_caption && (
-        <p style={{
-          margin: "10px 0 4px", fontSize: 13, color: "#475569",
-          lineHeight: 1.6, textAlign: "right", direction: "rtl",
-        }}>
-          {fact.chart_caption}
-        </p>
-      )}
-
-      {/* Table type: show description above table */}
-      {isTable && fact.chart_caption && (
+      {/* Chart caption — מעל הגרף (שורה קצרה מה רואים) */}
+      {fact.chart_caption && (
         <p style={{
           margin: "0 0 10px", fontSize: 13, color: "#475569",
-          lineHeight: 1.6, textAlign: "right", direction: "rtl",
+          lineHeight: 1.55, textAlign: "right", direction: "rtl",
         }}>
           {fact.chart_caption}
         </p>
       )}
+
+      {/* Chart */}
+      {hasChart && <FactChart fact={fact} />}
 
       {/* Management summary — collapsible */}
       {fact.human_description && (
