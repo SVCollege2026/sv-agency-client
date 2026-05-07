@@ -780,15 +780,8 @@ function ResultDisplay({ result }) {
         </div>
       )}
 
-      {/* ── What to think about ── */}
-      {(smart.what_to_think_about || []).length > 0 && (
-        <div style={{ background: "#fef3c7", border: "1px solid #fde68a", borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 8 }}>💭 נקודות לחשיבה</div>
-          <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 13, lineHeight: 1.8, color: "#7c2d12" }}>
-            {smart.what_to_think_about.map((w, i) => <li key={i}>{w}</li>)}
-          </ul>
-        </div>
-      )}
+      {/* "נקודות לחשיבה" הוסר — החיזוי לא זורק שאלות חזרה למשתמשת,
+          הוא נותן תשובות. גם אם דאטה ישנה כוללת — לא מציגים. */}
 
       {/* ── AI priors used ── */}
       {(smart.ai_priors_used || []).length > 0 && (
