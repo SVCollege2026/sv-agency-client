@@ -58,6 +58,51 @@ function lastSunSat() {
   return [lastSunday.toISOString().slice(0, 10), lastSaturday.toISOString().slice(0, 10)];
 }
 
+/**
+ * הטווח שאמור להיות מוצג בטאב "יומי" — תואם בדיוק ל-cron schedule
+ * (ראה analytics/media_reports/scheduler.py):
+ *
+ *   ראשון       → ה' + ו' + ש' (3 ימים — היומי על ראשון מצטבר)
+ *   שני–חמישי   → אתמול (יום אחד)
+ *   שישי/שבת    → חמישי האחרון (cron לא רץ ביומיים האלה)
+ *
+ * Returns: { start, end, multi } — כשmulti=true ה-UI ישלוף getMediaRange.
+ */
+function smartDailyRange() {
+  const now = new Date();
+  const dow = now.getDay(); // 0=Sun, 1=Mon, ... 6=Sat
+  const iso = (offset) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - offset);
+    return d.toISOString().slice(0, 10);
+  };
+  if (dow === 0) {
+    // ראשון — Thu (3 days back), Fri (2), Sat (1)
+    return { start: iso(3), end: iso(1), multi: true };
+  }
+  if (dow >= 1 && dow <= 4) {
+    // שני (1) – חמישי (4) — אתמול בלבד
+    return { start: iso(1), end: iso(1), multi: false };
+  }
+  // שישי (5) או שבת (6) — חמישי האחרון
+  // שישי: dow=5, אתמול=Thu (1 day back). שבת: dow=6, יומיים אחורה=Thu.
+  return { start: iso(dow - 4), end: iso(dow - 4), multi: false };
+}
+
+// פורמט עברי DD/MM/YYYY
+function fmtDateHe(iso) {
+  if (!iso) return "";
+  const s = String(iso).slice(0, 10).split("-");
+  if (s.length !== 3) return iso;
+  return `${s[2]}/${s[1]}/${s[0]}`;
+}
+
+// בודק אם תאריך ISO הוא 'אתמול' מה-clock client-side
+function isYesterday(iso) {
+  if (!iso) return false;
+  return iso === yesterday();
+}
+
 function fmtNum(v, digits = 0) {
   if (v === null || v === undefined || v === "") return "—";
   const n = Number(v);
@@ -285,8 +330,11 @@ const COURSE_METRICS = [
 
 // ─── MediaSummaryCharts ───────────────────────────────────────────────────────
 // גרפי סיכום כלליים: KPI tiles + לידים לפי פלטפורמה + CPL + טופ קמפיינים.
-// משמש יומי / שבועי / טווח — מקבל rows ישירות.
-function MediaSummaryCharts({ rows: detailRows = [] }) {
+// משמש יומי / שבועי / טווח — מקבל rows ישירות + תווית של התקופה לכותרת ה-KPI.
+//
+// dateLabel — מחרוזת בעברית שמתארת את התקופה המוצגת ("אתמול 9/5/2026"
+//   או "9/5–11/5/2026" וכו'). מוצג ב-tile הראשון במקום "לידים היום".
+function MediaSummaryCharts({ rows: detailRows = [], dateLabel = "" }) {
   // ── Platform aggregation ──
   const platformData = useMemo(() => {
     const map = {};
@@ -369,9 +417,13 @@ function MediaSummaryCharts({ rows: detailRows = [] }) {
     </div>
   );
 
+  // Title: "לידים — {dateLabel}" אם יש תווית, אחרת ברירת מחדל "לידים".
+  const leadsLabel = dateLabel ? `לידים — ${dateLabel}` : "לידים";
+  const spendLabel = dateLabel ? `הוצאה — ${dateLabel}` : "הוצאה";
+
   const kpis = [
-    { label: "לידים היום",   value: fmtNum(totals.leads), color: "#3b82f6", icon: "📥" },
-    { label: "הוצאה",        value: fmtMoney(totals.spend), color: "#8b5cf6", icon: "💰" },
+    { label: leadsLabel,     value: fmtNum(totals.leads), color: "#3b82f6", icon: "📥" },
+    { label: spendLabel,     value: fmtMoney(totals.spend), color: "#8b5cf6", icon: "💰" },
     totals.cpl != null
       ? { label: "CPL ממוצע", value: fmtMoney(totals.cpl), color: "#f59e0b", icon: "🎯",
           sub: "הוצאה ÷ לידים" }
@@ -444,18 +496,33 @@ function MediaSummaryCharts({ rows: detailRows = [] }) {
 }
 
 // Thin wrappers — pull the right rows out of the raw API response
-function DailyChartsView({ data }) {
+function DailyChartsView({ data, day, rangeStart, rangeEnd }) {
   const rows = useMemo(
     () => (data?.detail_rows || data?.rows || []).filter(r => !r.is_summary),
     [data]
   );
-  return <MediaSummaryCharts rows={rows} />;
+  // אם הוצב טווח (יום ראשון = ה'+ו'+ש'), הצג טווח. אחרת יום אחד.
+  let dateLabel;
+  if (rangeStart && rangeEnd && rangeStart !== rangeEnd) {
+    dateLabel = `${fmtDateHe(rangeStart)} – ${fmtDateHe(rangeEnd)}`;
+  } else if (day) {
+    dateLabel = isYesterday(day) ? `אתמול ${fmtDateHe(day)}` : fmtDateHe(day);
+  } else {
+    dateLabel = "";
+  }
+  return <MediaSummaryCharts rows={rows} dateLabel={dateLabel} />;
 }
-function WeeklyChartsView({ data }) {
-  return <MediaSummaryCharts rows={data?.weekly_summary || []} />;
+function WeeklyChartsView({ data, weekStart, weekEnd }) {
+  const dateLabel = (weekStart && weekEnd)
+    ? `שבוע ${fmtDateHe(weekStart)} – ${fmtDateHe(weekEnd)}`
+    : "";
+  return <MediaSummaryCharts rows={data?.weekly_summary || []} dateLabel={dateLabel} />;
 }
-function RangeChartsView({ data }) {
-  return <MediaSummaryCharts rows={data?.rows || []} />;
+function RangeChartsView({ data, rangeStart, rangeEnd }) {
+  const dateLabel = (rangeStart && rangeEnd)
+    ? (rangeStart === rangeEnd ? fmtDateHe(rangeStart) : `${fmtDateHe(rangeStart)} – ${fmtDateHe(rangeEnd)}`)
+    : "";
+  return <MediaSummaryCharts rows={data?.rows || []} dateLabel={dateLabel} />;
 }
 
 // ─── SchoolKpiCharts ──────────────────────────────────────────────────────────
@@ -1033,7 +1100,12 @@ export default function MediaReportsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [dailyView, setDailyView] = useState("master");  // master | detail | sub_status | analytics
-  const [day, setDay]             = useState(yesterday());
+
+  // ברירת מחדל ל-daily — הטווח שה-cron באמת כיסה אתמול-בלילה.
+  // ראשון = ה'+ו'+ש' (3 ימים). שני-חמישי = אתמול. שישי/שבת = חמישי האחרון.
+  const _smartDaily = useMemo(() => smartDailyRange(), []);
+  const [day, setDay]             = useState(_smartDaily.end);   // התאריך הראשי לתצוגה — האחרון בטווח
+  const [dailyStart, setDailyStart] = useState(_smartDaily.start); // ההתחלה — שווה ל-day כשלא ראשון, אחרת Thu
   const [weekStart, setWeekStart] = useState(lastSunSat()[0]);
   const [weekEnd, setWeekEnd]     = useState(lastSunSat()[1]);
   const [rangeStart, setRangeStart] = useState(() => {
@@ -1089,7 +1161,14 @@ export default function MediaReportsPage() {
     setError(null);
     try {
       let d;
-      if (mode === "daily")       d = await getMediaDaily(day);
+      if (mode === "daily") {
+        // אם הטווח של daily מכסה כמה ימים (ראשון = ה'+ו'+ש') — שולפים דרך range.
+        if (dailyStart && dailyStart !== day) {
+          d = await getMediaRange(dailyStart, day);
+        } else {
+          d = await getMediaDaily(day);
+        }
+      }
       else if (mode === "weekly") d = await getMediaWeekly(weekStart, weekEnd);
       else                        d = await getMediaRange(rangeStart, rangeEnd);
       setData(d);
@@ -1352,11 +1431,25 @@ export default function MediaReportsPage() {
           display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
         }}>
           {mode === "daily" && (
-            <label style={{ fontSize: 13, color: "#64748b", display: "flex", alignItems: "center", gap: 6 }}>
-              תאריך:
-              <input type="date" value={day} onChange={(e) => setDay(e.target.value)}
-                style={dateInputStyle} />
-            </label>
+            <>
+              <label style={{ fontSize: 13, color: "#64748b", display: "flex", alignItems: "center", gap: 6 }}>
+                תאריך:
+                <input type="date" value={day}
+                  onChange={(e) => {
+                    // משתמש בוחר תאריך ספציפי → קופצים למצב יום-בודד (start = end)
+                    const v = e.target.value;
+                    setDay(v);
+                    setDailyStart(v);
+                  }}
+                  style={dateInputStyle} />
+              </label>
+              {/* כשהטווח של היום הראשי כולל יותר מיום אחד — מציגים אינדיקציה */}
+              {dailyStart && dailyStart !== day && (
+                <span style={{ fontSize: 12, color: "#1e40af", background: "#dbeafe", padding: "3px 9px", borderRadius: 6, fontWeight: 600 }}>
+                  טווח: {fmtDateHe(dailyStart)} – {fmtDateHe(day)} (3 ימים)
+                </span>
+              )}
+            </>
           )}
           {mode === "weekly" && (
             <>
@@ -1522,13 +1615,13 @@ export default function MediaReportsPage() {
           {/* גרפי סיכום יומיים — רק בתצוגת ראשית */}
           {/* ── גרפי סיכום: יומי / שבועי / טווח ── */}
           {mode === "daily"  && dailyView === "master" && !loading && data && (
-            <DailyChartsView data={data} />
+            <DailyChartsView data={data} day={day} rangeStart={dailyStart} rangeEnd={day} />
           )}
           {mode === "weekly" && !loading && data && (
-            <WeeklyChartsView data={data} />
+            <WeeklyChartsView data={data} weekStart={weekStart} weekEnd={weekEnd} />
           )}
           {mode === "range"  && !loading && data && (
-            <RangeChartsView data={data} />
+            <RangeChartsView data={data} rangeStart={rangeStart} rangeEnd={rangeEnd} />
           )}
           <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
             <div style={{ overflowX: "auto" }}>
