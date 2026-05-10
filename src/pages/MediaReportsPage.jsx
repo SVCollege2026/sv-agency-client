@@ -149,21 +149,23 @@ function fmtChannelSplit(v) {
 // ─── Column definitions ─────────────────────────────────────────────────────
 
 // עמודות לתצוגת "פירוט לפי מדיה" — per-campaign (ad sets / קמפיינים), רק ממומנים.
+// 6 עמודות default — חיוניות בלבד. השאר זמינות דרך "בחר עמודות".
 const DETAIL_COLUMNS = [
   { key: "platform",        label: "פלטפורמה",   default: true  },
   { key: "campaign_name",   label: "קמפיין",     default: true  },
-  { key: "budget",          label: "תקציב",      default: true,  fmt: fmtMoney },
   { key: "spend",           label: "הוצאה",      default: true,  fmt: fmtMoney },
-  { key: "budget_util_pct", label: "% ניצול",    default: true,  fmt: fmtPct   },
-  { key: "impressions",     label: "חשיפות",     default: true,  fmt: (v) => fmtNum(v) },
-  { key: "clicks",          label: "קליקים",     default: true,  fmt: (v) => fmtNum(v) },
-  { key: "ctr_pct",         label: "CTR",         default: true,  fmt: fmtPct },
-  { key: "leads_count",           label: "לידים (סה״כ)",  default: true,  fmt: (v) => fmtNum(v) },
-  { key: "new_leads_count",       label: "חדשים",          default: true,  fmt: (v) => fmtNum(v) },
-  { key: "returning_leads_count", label: "חוזרים",         default: true,  fmt: (v) => fmtNum(v) },
+  { key: "leads_count",     label: "לידים",       default: true,  fmt: (v) => fmtNum(v) },
+  { key: "new_leads_count", label: "חדשים",      default: true,  fmt: (v) => fmtNum(v) },
+  { key: "cpl",             label: "עלות לליד",  default: true,  fmt: fmtMoney },
+  // — אופציונליים (toggleable) —
+  { key: "budget",          label: "תקציב",      default: false, fmt: fmtMoney },
+  { key: "budget_util_pct", label: "% ניצול",    default: false, fmt: fmtPct },
+  { key: "impressions",     label: "חשיפות",     default: false, fmt: (v) => fmtNum(v) },
+  { key: "clicks",          label: "קליקים",     default: false, fmt: (v) => fmtNum(v) },
+  { key: "ctr_pct",         label: "CTR",         default: false, fmt: fmtPct },
+  { key: "returning_leads_count", label: "חוזרים", default: false, fmt: (v) => fmtNum(v) },
   { key: "leads_by_channel",      label: "פירוט ערוצים (סה״כ)",  default: false, fmt: fmtChannelSplit },
   { key: "new_leads_by_channel",  label: "פירוט ערוצים (חדשים)", default: false, fmt: fmtChannelSplit },
-  { key: "cpl",             label: "עלות לליד",  default: true,  fmt: fmtMoney },
 ];
 
 // עמודות לטבלה ראשית — שורה אחת לכל מדיה.
@@ -363,25 +365,7 @@ function MediaSummaryCharts({ rows: detailRows = [], dateLabel = "" }) {
              meta: byP["Meta"] || null, google: byP["Google"] || null };
   }, [platformData]);
 
-  // ── Top campaigns — strip common prefix ──
-  const topCampaigns = useMemo(() => {
-    const strip = (s) => (s || "")
-      .replace(/^SV\s*College\s*[\/|–-]+\s*Israel\s*[\/|–-]?\s*/i, "")
-      .replace(/^SV\s*College\s*[\/|–-]+\s*/i, "")
-      .replace(/^SV\s*College\s*/i, "")
-      .trim();
-    return [...detailRows]
-      .filter(r => (r.leads_count || 0) > 0)
-      .sort((a, b) => (b.leads_count || 0) - (a.leads_count || 0))
-      .slice(0, 8)
-      .map(r => {
-        const raw = r.adset_name || r.campaign_name || r.platform || "—";
-        const name = (strip(raw) || raw).slice(0, 32);
-        return { name, leads: r.leads_count || 0, spend: r.spend || 0 };
-      });
-  }, [detailRows]);
-
-  if (platformData.length === 0 && topCampaigns.length === 0) return null;
+  if (platformData.length === 0) return null;
 
   const COLORS = ["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"];
   const axisTick = { fontSize: 11, fill: "#64748b" };
@@ -476,21 +460,6 @@ function MediaSummaryCharts({ rows: detailRows = [], dateLabel = "" }) {
         </ChartCard>
       </div>
 
-      {/* ── שורה 3: טופ קמפיינים ── */}
-      {topCampaigns.length > 0 && (
-        <ChartCard title="טופ קמפיינים — לידים" color="#10b981"
-                   height={Math.max(180, topCampaigns.length * 34)}>
-          <BarChart data={topCampaigns} layout="vertical"
-                    margin={{ top: 4, right: 50, bottom: 4, left: 180 }}>
-            <CartesianGrid stroke="#f1f5f9" horizontal={false} />
-            <XAxis type="number" tick={axisTick} allowDecimals={false} />
-            <YAxis type="category" dataKey="name" width={172}
-                   tick={{ fontSize: 10, fill: "#334155" }} />
-            <Tooltip contentStyle={tipStyle} />
-            <Bar dataKey="leads" name="לידים" fill="#10b981" radius={[0, 5, 5, 0]} />
-          </BarChart>
-        </ChartCard>
-      )}
     </div>
   );
 }
@@ -1076,18 +1045,20 @@ export default function MediaReportsPage() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   // URL tab = status | registration | daily | weekly | range | monthly
-  // ברירת מחדל = registration (הדף החדש עם הדשבורד+טבלאות)
-  const tabFromUrl = searchParams.get("tab") || "";
+  // URL view (רק לטאב יומי) = master | detail | sub_status | analytics
+  const tabFromUrl  = searchParams.get("tab")  || "";
+  const viewFromUrl = searchParams.get("view") || "";
   const initialMode = URL_TO_MODE[tabFromUrl] || "registration";
   const [mode, _setMode] = useState(initialMode);
   const setMode = (m) => {
     _setMode(m);
-    // synchronise URL ל-state כדי שכל טאב יהיה shareable/bookmarkable
     const url = (m === "media_status") ? "status"
               : (m === "registration") ? "registration"
-              : m;   // submodes (daily/weekly/range/monthly) משוקפים כפי שהם
+              : m;
     const next = new URLSearchParams(searchParams);
     next.set("tab", url);
+    // כשעוברים בין טאבים — מסירים את ?view= (רלוונטי רק ליומי)
+    if (m !== "daily") next.delete("view");
     setSearchParams(next, { replace: true });
   };
   // sync initial URL → אם המשתמש נחת בלי ?tab=, נכתוב את ברירת המחדל
@@ -1099,7 +1070,16 @@ export default function MediaReportsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [dailyView, setDailyView] = useState("master");  // master | detail | sub_status | analytics
+  // dailyView מסונכרן עם ?view= ב-URL כדי שכל sub-tab יהיה shareable
+  const _validViews = ["master", "detail", "sub_status", "analytics"];
+  const _initialView = _validViews.includes(viewFromUrl) ? viewFromUrl : "master";
+  const [dailyView, _setDailyView] = useState(_initialView);
+  const setDailyView = (v) => {
+    _setDailyView(v);
+    const next = new URLSearchParams(searchParams);
+    next.set("view", v);
+    setSearchParams(next, { replace: true });
+  };
 
   // ברירת מחדל ל-daily — הטווח שה-cron באמת כיסה אתמול-בלילה.
   // ראשון = ה'+ו'+ש' (3 ימים). שני-חמישי = אתמול. שישי/שבת = חמישי האחרון.
@@ -1243,11 +1223,48 @@ export default function MediaReportsPage() {
     if (mode === "daily") {
       // master = שורה לכל מדיה (ממומנות + לא-ממומנות)
       if (dailyView === "master") {
-        const master = (data.master_rows || []).map((r) => ({
-          ...r,
-          source_kind_he: hebSourceKind(r.source_kind),
-        }));
-        return master;
+        // עדיפות 1: master_rows מהשרת (יום בודד)
+        if ((data.master_rows || []).length > 0) {
+          return data.master_rows.map((r) => ({
+            ...r,
+            source_kind_he: hebSourceKind(r.source_kind),
+          }));
+        }
+        // fallback: בריצת range (ראשון = ה'+ו'+ש') השרת מחזיר רק data.rows
+        // (per-campaign). אגרגציה client-side לפי platform/source_name.
+        const rows = data.detail_rows || data.rows || [];
+        const m = new Map();
+        for (const r of rows) {
+          if (r.is_summary) continue;
+          const key = (r.source_name || r.platform || "—").trim();
+          if (!m.has(key)) {
+            m.set(key, {
+              source_name:     key,
+              source_kind:     r.source_kind || "paid",
+              source_kind_he:  hebSourceKind(r.source_kind || "paid"),
+              campaigns_count: 0,
+              spend:           0,
+              impressions:     0,
+              clicks:          0,
+              leads_count:     0,
+              new_leads_count: 0,
+              returning_leads_count: 0,
+            });
+          }
+          const a = m.get(key);
+          a.campaigns_count       += 1;
+          a.spend                 += Number(r.spend                 || 0);
+          a.impressions           += Number(r.impressions           || 0);
+          a.clicks                += Number(r.clicks                || 0);
+          a.leads_count           += Number(r.leads_count           || 0);
+          a.new_leads_count       += Number(r.new_leads_count       || 0);
+          a.returning_leads_count += Number(r.returning_leads_count || 0);
+        }
+        return Array.from(m.values()).map((a) => ({
+          ...a,
+          ctr_pct: a.impressions ? (a.clicks      / a.impressions * 100) : 0,
+          cpl:     a.leads_count ? (a.spend       / a.leads_count)        : null,
+        })).sort((a, b) => (b.leads_count || 0) - (a.leads_count || 0));
       }
       // detail = per-campaign, ממומנים בלבד. platform filter קובע באיזו מדיה לדרול
       if (dailyView === "detail") {
@@ -1654,6 +1671,40 @@ export default function MediaReportsPage() {
                       ))}
                     </tr>
                   ))}
+                  {/* ── שורת סיכום: מחושבת מצד הלקוח אם אין כבר is_summary מהשרת ── */}
+                  {!loading && tableRows.length > 0 && !tableRows.some((r) => r.is_summary) && (() => {
+                    // צבירה: מספרים מסוכמים, אחוזים מחושבים מחדש מסכומים גולמיים.
+                    const sums = {};
+                    let _totalSpend = 0, _totalImpressions = 0, _totalClicks = 0, _totalLeads = 0;
+                    for (const r of tableRows) {
+                      _totalSpend       += Number(r.spend       || 0);
+                      _totalImpressions += Number(r.impressions || 0);
+                      _totalClicks      += Number(r.clicks      || 0);
+                      _totalLeads       += Number(r.leads_count || 0);
+                      for (const c of visibleColList) {
+                        const v = r[c.key];
+                        if (typeof v === "number") {
+                          sums[c.key] = (sums[c.key] || 0) + v;
+                        }
+                      }
+                    }
+                    // אחוזים: לחשב מהסכומים, לא לסכם
+                    if ("ctr_pct"         in sums) sums.ctr_pct         = _totalImpressions ? (_totalClicks / _totalImpressions * 100) : 0;
+                    if ("budget_util_pct" in sums) sums.budget_util_pct = sums.budget       ? (sums.spend   / sums.budget         * 100) : 0;
+                    if ("cpl"             in sums) sums.cpl             = _totalLeads       ? (_totalSpend  / _totalLeads)              : null;
+                    return (
+                      <tr style={{ background: "#f1f5f9", borderTop: "2px solid #1e3a5f", fontWeight: 700, color: "#0f172a" }}>
+                        {visibleColList.map((c, i) => (
+                          <td key={c.key} style={tdStyle}>
+                            {i === 0 ? `סה״כ (${tableRows.length})` :
+                             c.key in sums && sums[c.key] != null
+                               ? (c.fmt ? c.fmt(sums[c.key]) : sums[c.key])
+                               : ""}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -1733,6 +1784,13 @@ function SubStatusTable({ rows, loading }) {
                 </tr>
               );
             })}
+            {!loading && rows.length > 0 && (
+              <tr style={{ background: "#f1f5f9", borderTop: "2px solid #1e3a5f", fontWeight: 700, color: "#0f172a" }}>
+                <td style={tdStyle}>סה״כ ({rows.length})</td>
+                <td style={tdStyle}>{fmtNum(total)}</td>
+                <td style={tdStyle}>100.00%</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
