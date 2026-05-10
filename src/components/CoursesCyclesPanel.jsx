@@ -33,14 +33,36 @@ function fmtMoney(v) {
   return `₪${fmtNum(v)}`;
 }
 
+// פורמט עברי DD/MM/YYYY (במקום ISO YYYY-MM-DD)
 function fmtDate(v) {
   if (!v) return "—";
-  return String(v).slice(0, 10);
+  const s = String(v).slice(0, 10);
+  const parts = s.split("-");
+  if (parts.length !== 3) return s;
+  const [y, m, d] = parts;
+  return `${d}/${m}/${y}`;
 }
 
 function fmtDateTime(v) {
   if (!v) return "—";
   return new Date(v).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" });
+}
+
+// השנה הראשונה שמותר לסנן ממנה (לפני זה — לא רלוונטי)
+const MIN_YEAR = 2026;
+
+// מחזיר רשימת שנים אפשריות: MIN_YEAR..max(currentYear, maxYearInData)
+function availableYears(cycles) {
+  const currentYear = new Date().getFullYear();
+  let maxYear = currentYear;
+  for (const c of cycles) {
+    if (!c.start_date) continue;
+    const y = parseInt(String(c.start_date).slice(0, 4), 10);
+    if (!Number.isNaN(y) && y > maxYear) maxYear = y;
+  }
+  const out = [];
+  for (let y = MIN_YEAR; y <= maxYear; y += 1) out.push(y);
+  return out;
 }
 
 const styles = {
@@ -182,6 +204,7 @@ export default function CoursesCyclesPanel() {
   const [editing,    setEditing]    = useState(null);   // cycle being edited
   const [filterCourse, setFilterCourse] = useState("");
   const [filterOpen,   setFilterOpen]   = useState("all"); // 'all' | 'open' | 'closed'
+  const [filterYear,   setFilterYear]   = useState(() => Math.max(MIN_YEAR, new Date().getFullYear()));
 
   async function loadAll() {
     setLoading(true); setErr(null);
@@ -222,25 +245,22 @@ export default function CoursesCyclesPanel() {
   }
 
   // ── Filtering ──
+  const yearsList = useMemo(() => availableYears(cycles), [cycles]);
+
   const filteredCycles = useMemo(() => {
     return cycles.filter((c) => {
       if (filterCourse && c.product_id !== filterCourse) return false;
       if (filterOpen === "open"   && !(c.registration_status || "").includes("פתוח")) return false;
       if (filterOpen === "closed" &&  (c.registration_status || "").includes("פתוח")) return false;
+      // סינון שנה — לפי start_date. רשומות ללא תאריך מסוננות בשנה.
+      if (filterYear) {
+        if (!c.start_date) return false;
+        const y = parseInt(String(c.start_date).slice(0, 4), 10);
+        if (y !== filterYear) return false;
+      }
       return true;
     });
-  }, [cycles, filterCourse, filterOpen]);
-
-  // ── Group cycles by course ──
-  const cyclesByCourse = useMemo(() => {
-    const m = new Map();
-    for (const c of filteredCycles) {
-      const key = c.product_id || "(ללא קורס)";
-      if (!m.has(key)) m.set(key, []);
-      m.get(key).push(c);
-    }
-    return m;
-  }, [filteredCycles]);
+  }, [cycles, filterCourse, filterOpen, filterYear]);
 
   const lastSync = syncRuns[0];
 
@@ -324,30 +344,51 @@ export default function CoursesCyclesPanel() {
 
       {/* ── Filter bar for cycles ── */}
       <div style={{ ...styles.card, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <label style={styles.hint}>
-          סינון מחזורים:
-        </label>
+        <label style={styles.hint}>סינון מחזורים:</label>
+
+        {/* Year switcher — דיפולט: שנה נוכחית. כפתורים לכל שנה מ-2026 ואילך. */}
+        <div style={{ display: "flex", gap: 4 }}>
+          {yearsList.map((y) => (
+            <button
+              key={y}
+              type="button"
+              onClick={() => setFilterYear(y)}
+              style={{
+                padding: "5px 12px", fontSize: 12, fontWeight: 600,
+                borderRadius: 6, cursor: "pointer",
+                background: filterYear === y ? "#1e3a5f" : "#ffffff",
+                color:      filterYear === y ? "#ffffff" : "#475569",
+                border: `1px solid ${filterYear === y ? "#1e3a5f" : "#cbd5e1"}`,
+              }}
+            >
+              {y}
+            </button>
+          ))}
+        </div>
+
         <select value={filterOpen} onChange={(e) => setFilterOpen(e.target.value)}
                 style={{ ...styles.input, width: "auto" }}>
           <option value="all">כל הסטטוסים</option>
           <option value="open">פתוחים להרשמה</option>
           <option value="closed">סגורים</option>
         </select>
+
         <span style={styles.hint}>
           מציג {filteredCycles.length} מתוך {cycles.length} מחזורים
         </span>
       </div>
 
-      {/* ── Cycles table — grouped by course ── */}
+      {/* ── Cycles table — flat, sorted by start_date desc (latest first) ── */}
       <div style={styles.card}>
-        <h3 style={{ margin: "0 0 12px", color: "#0f172a", fontSize: 15 }}>מחזורים</h3>
+        <h3 style={{ margin: "0 0 12px", color: "#0f172a", fontSize: 15 }}>
+          מחזורים — שנת {filterYear}
+        </h3>
         <div style={{ overflowX: "auto" }}>
           <table style={styles.table}>
             <thead>
               <tr>
                 <th style={styles.th}>קורס</th>
-                <th style={styles.th}>שם המחזור</th>
-                <th style={styles.th}>תאריך תחילה</th>
+                <th style={styles.th}>תאריך התחלה/מחזור</th>
                 <th style={styles.th}>סיום הרשמה</th>
                 <th style={styles.th}>סטטוס רישום</th>
                 <th style={styles.th}>נרשמים</th>
@@ -358,16 +399,14 @@ export default function CoursesCyclesPanel() {
               </tr>
             </thead>
             <tbody>
-              {Array.from(cyclesByCourse.entries()).map(([pid, list]) => {
-                const courseName = list[0]?.course_name || "(ללא קורס)";
-                const sorted = [...list].sort((a, b) => (b.start_date || "").localeCompare(a.start_date || ""));
-                return sorted.map((c, idx) => (
+              {[...filteredCycles]
+                .sort((a, b) => (b.start_date || "").localeCompare(a.start_date || ""))
+                .map((c, idx) => (
                   <tr key={c.cycle_id} style={{ background: idx % 2 ? "#fafafa" : "#ffffff" }}>
-                    <td style={styles.td}>{idx === 0 ? <strong>{courseName}</strong> : ""}</td>
                     <td style={styles.td}>
                       {c.source === "manual" && <span style={styles.badgeManual}>manual</span>}
                       {c.manually_edited_at && <span style={styles.badgeManual}>נערך</span>}
-                      {c.name || "—"}
+                      <strong>{c.course_name || "—"}</strong>
                     </td>
                     <td style={styles.td}>{fmtDate(c.start_date)}</td>
                     <td style={styles.td}>{fmtDate(c.registration_end_date)}</td>
@@ -382,12 +421,11 @@ export default function CoursesCyclesPanel() {
                       </button>
                     </td>
                   </tr>
-                ));
-              })}
+                ))}
               {filteredCycles.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={10} style={{ ...styles.td, textAlign: "center", padding: 24, color: "#94a3b8" }}>
-                    אין מחזורים תואמים סינון
+                  <td colSpan={9} style={{ ...styles.td, textAlign: "center", padding: 24, color: "#94a3b8" }}>
+                    אין מחזורים בשנת {filterYear} תואמים סינון
                   </td>
                 </tr>
               )}

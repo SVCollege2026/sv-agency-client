@@ -35,6 +35,7 @@ import {
   generateMediaStage0,
 } from "../api.js";
 import CoursesCyclesPanel from "../components/CoursesCyclesPanel.jsx";
+import MediaDashboardOverview from "../components/MediaDashboardOverview.jsx";
 
 // ─── Utils ───────────────────────────────────────────────────────────────────
 
@@ -155,15 +156,25 @@ function hebSourceKind(k) {
 
 // מדיה = מציגה מה יש + חוקרת מה עבד/לא עבד + ממוצעים. **בלי חיפוש מגמות**
 // (זה תפקיד מחלקת חיזוי). המלצות מדיה = forward-looking, גם תפקיד חיזוי/recommender.
+// טאבים ראשיים — 3 בלבד. ארגון מחדש 2026-05-10:
+//   הוסר: 📑 דוח שלב 0 (לא היה בשימוש פעיל)
+//   הוסר: 🔎 חקירות (היה placeholder, לא רלוונטי כרגע)
+//   אוחד: יומי / שבועי / טווח / חודשי Y-o-Y → תחת "📊 סטטוס מדיה" עם sub-tabs
 const MODES = [
-  { id: "stage0",         label: "📑 דוח שלב 0" },
-  { id: "daily",          label: "יומי"   },
-  { id: "weekly",         label: "שבועי" },
-  { id: "range",          label: "טווח"   },
-  { id: "monthly",        label: "📈 חודשי Y-o-Y" },
-  { id: "investigations", label: "🔎 חקירות" },
+  { id: "dashboard",      label: "🏠 דשבורד" },
+  { id: "media_status",   label: "📊 סטטוס מדיה" },
   { id: "courses_cycles", label: "🎓 קורסים ומחזורים" },
 ];
+
+// Sub-tabs בתוך "סטטוס מדיה" — אלה ה-mode-ים הקיימים שתמכנו בהם.
+const MEDIA_STATUS_SUBMODES = [
+  { id: "daily",   label: "יומי"   },
+  { id: "weekly",  label: "שבועי" },
+  { id: "range",   label: "טווח"   },
+  { id: "monthly", label: "📈 חודשי Y-o-Y" },
+];
+const _MEDIA_STATUS_IDS = MEDIA_STATUS_SUBMODES.map((m) => m.id);
+const _isMediaStatusMode = (m) => _MEDIA_STATUS_IDS.includes(m);
 
 // "שאלות פתוחות" הוסר — אגרגציית data_gaps הייתה פערים טכניים, לא שאלות
 // פוליסי למנכ"ל. שאלות פוליסי ("מתי להחליף קריאייטיב? מתי להסיט תקציב?")
@@ -171,7 +182,7 @@ const MODES = [
 
 // המצבים החדשים אינם משתמשים ב-fetchMediaDaily/Weekly/Range/Monthly. כל אחד
 // מנהל את הfetching שלו פנימית.
-const _NEW_MODES = ["stage0", "investigations", "timeline", "recommendations", "courses_cycles"];
+const _NEW_MODES = ["stage0", "investigations", "timeline", "recommendations", "courses_cycles", "dashboard", "media_status"];
 const _isLegacyMode = (m) => !_NEW_MODES.includes(m);
 
 // ─── Monthly KPI sub-component ─────────────────────────────────────────────
@@ -988,7 +999,7 @@ function CoursesKpiTable({ rows, currYear, metricId }) {
 export default function MediaReportsPage() {
   const navigate = useNavigate();
 
-  const [mode, setMode]           = useState("daily");
+  const [mode, setMode]           = useState("dashboard");
   const [dailyView, setDailyView] = useState("master");  // master | detail | sub_status | analytics
   const [day, setDay]             = useState(yesterday());
   const [weekStart, setWeekStart] = useState(lastSunSat()[0]);
@@ -1247,26 +1258,62 @@ export default function MediaReportsPage() {
           </button>
         </div>
 
-        {/* ── Mode tabs ── */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => setMode(m.id)}
-              style={{
-                padding: "8px 18px", fontSize: 13, fontWeight: 600,
-                borderRadius: 8, cursor: "pointer",
-                background: mode === m.id ? "#1e3a5f" : "#ffffff",
-                color:      mode === m.id ? "#ffffff" : "#64748b",
-                border: `1px solid ${mode === m.id ? "#1e3a5f" : "#cbd5e1"}`,
-                transition: "all 0.15s",
-              }}
-            >
-              {m.label}
-            </button>
-          ))}
+        {/* ── Top-level mode tabs (3) ── */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          {MODES.map((m) => {
+            // "סטטוס מדיה" = active אם המשתמש בכל אחד מ-4 ה-sub-modes
+            const isActive = m.id === "media_status"
+              ? _isMediaStatusMode(mode)
+              : mode === m.id;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => {
+                  // לחיצה על "סטטוס מדיה" → אם כבר באחד הסאב — נשאר; אחרת ברירת מחדל יומי
+                  if (m.id === "media_status") {
+                    if (!_isMediaStatusMode(mode)) setMode("daily");
+                  } else {
+                    setMode(m.id);
+                  }
+                }}
+                style={{
+                  padding: "8px 18px", fontSize: 13, fontWeight: 600,
+                  borderRadius: 8, cursor: "pointer",
+                  background: isActive ? "#1e3a5f" : "#ffffff",
+                  color:      isActive ? "#ffffff" : "#64748b",
+                  border: `1px solid ${isActive ? "#1e3a5f" : "#cbd5e1"}`,
+                  transition: "all 0.15s",
+                }}
+              >
+                {m.label}
+              </button>
+            );
+          })}
         </div>
+
+        {/* ── Sub-tabs of "סטטוס מדיה" (only shown when in one of the sub-modes) ── */}
+        {_isMediaStatusMode(mode) && (
+          <div style={{ display: "flex", gap: 6, marginBottom: 16, paddingRight: 6 }}>
+            {MEDIA_STATUS_SUBMODES.map((sm) => (
+              <button
+                key={sm.id}
+                type="button"
+                onClick={() => setMode(sm.id)}
+                style={{
+                  padding: "5px 12px", fontSize: 12, fontWeight: 500,
+                  borderRadius: 6, cursor: "pointer",
+                  background: mode === sm.id ? "#dbeafe" : "transparent",
+                  color:      mode === sm.id ? "#1e3a5f" : "#64748b",
+                  border: `1px solid ${mode === sm.id ? "#1e3a5f" : "#cbd5e1"}`,
+                  transition: "all 0.15s",
+                }}
+              >
+                {sm.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* ── Filters (legacy modes only) ── */}
         {_isLegacyMode(mode) && mode !== "monthly" && (
@@ -1432,15 +1479,9 @@ export default function MediaReportsPage() {
           </div>
         )}
 
-        {/* ── Main content: table / sub_status / analytics / monthly / investigations / timeline / questions ── */}
-        {mode === "stage0" ? (
-          <Stage0ReportView />
-        ) : mode === "investigations" ? (
-          <InvestigationsView platformFilter={platformFilter} />
-        ) : mode === "timeline" ? (
-          <TimelineView platformFilter={platformFilter} />
-        ) : mode === "recommendations" ? (
-          <RecommendationsView platformFilter={platformFilter} />
+        {/* ── Main content ── */}
+        {mode === "dashboard" ? (
+          <MediaDashboardOverview />
         ) : mode === "monthly" ? (
           <MonthlyKpiView />
         ) : mode === "courses_cycles" ? (
