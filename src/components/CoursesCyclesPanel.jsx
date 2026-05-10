@@ -717,12 +717,6 @@ export default function CoursesCyclesPanel() {
                 .map((c, idx) => (
                   <tr key={c.cycle_id} style={{ background: idx % 2 ? T.rowAltBg : T.cardBg }}>
                     <td style={{ ...S.td, fontWeight: 600 }}>
-                      {c.source === "manual" && (
-                        <span style={{ ...S.badge("#fef3c7", "#92400e"), marginLeft: 6, fontSize: 10 }}>manual</span>
-                      )}
-                      {c.manually_edited_at && (
-                        <span style={{ ...S.badge("#fef3c7", "#92400e"), marginLeft: 6, fontSize: 10 }}>נערך</span>
-                      )}
                       {c.course_name || "—"}
                     </td>
                     <td style={S.td}>{fmtDate(c.start_date)}</td>
