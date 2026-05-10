@@ -34,6 +34,7 @@ import {
   getMediaStage0Latest,
   generateMediaStage0,
 } from "../api.js";
+import CoursesCyclesPanel from "../components/CoursesCyclesPanel.jsx";
 
 // ─── Utils ───────────────────────────────────────────────────────────────────
 
@@ -161,6 +162,7 @@ const MODES = [
   { id: "range",          label: "טווח"   },
   { id: "monthly",        label: "📈 חודשי Y-o-Y" },
   { id: "investigations", label: "🔎 חקירות" },
+  { id: "courses_cycles", label: "🎓 קורסים ומחזורים" },
 ];
 
 // "שאלות פתוחות" הוסר — אגרגציית data_gaps הייתה פערים טכניים, לא שאלות
@@ -169,7 +171,7 @@ const MODES = [
 
 // המצבים החדשים אינם משתמשים ב-fetchMediaDaily/Weekly/Range/Monthly. כל אחד
 // מנהל את הfetching שלו פנימית.
-const _NEW_MODES = ["stage0", "investigations", "timeline", "recommendations"];
+const _NEW_MODES = ["stage0", "investigations", "timeline", "recommendations", "courses_cycles"];
 const _isLegacyMode = (m) => !_NEW_MODES.includes(m);
 
 // ─── Monthly KPI sub-component ─────────────────────────────────────────────
@@ -1441,6 +1443,8 @@ export default function MediaReportsPage() {
           <RecommendationsView platformFilter={platformFilter} />
         ) : mode === "monthly" ? (
           <MonthlyKpiView />
+        ) : mode === "courses_cycles" ? (
+          <CoursesCyclesPanel />
         ) : mode === "daily" && dailyView === "sub_status" ? (
           <SubStatusTable rows={data?.sub_status || []} loading={loading} />
         ) : mode === "daily" && dailyView === "analytics" ? (

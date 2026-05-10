@@ -381,3 +381,33 @@ export async function runInvestigation({ platform, question, extraData = [], sta
   }
   return request("POST", `/api/media-reports/investigate/${platform}?${params.toString()}`);
 }
+
+// ─── Courses & Cycles (Fireberry mirror) ─────────────────────────────────────
+
+export async function getCourses() {
+  return request("GET", "/api/courses-cycles/courses");
+}
+
+export async function getCycles({ courseId = null, registrationOpen = null } = {}) {
+  const params = new URLSearchParams();
+  if (courseId) params.set("course_id", courseId);
+  if (registrationOpen !== null) params.set("registration_open", registrationOpen);
+  const qs = params.toString();
+  return request("GET", `/api/courses-cycles/cycles${qs ? "?" + qs : ""}`);
+}
+
+export async function updateCycle(cycleId, fields) {
+  return request("PATCH", `/api/courses-cycles/cycles/${cycleId}`, fields);
+}
+
+export async function createCycle(payload) {
+  return request("POST", "/api/courses-cycles/cycles", payload);
+}
+
+export async function triggerCoursesScan() {
+  return request("POST", "/api/courses-cycles/scan");
+}
+
+export async function getCoursesSyncRuns(limit = 10) {
+  return request("GET", `/api/courses-cycles/sync-runs?limit=${limit}`);
+}
