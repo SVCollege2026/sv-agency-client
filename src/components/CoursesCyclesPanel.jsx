@@ -1,18 +1,17 @@
 /**
- * CoursesCyclesPanel.jsx — תצוגת קורסים ומחזורים מ-Fireberry (משוקפים)
- * ====================================================================
- * נטען ע"י MediaReportsPage כשmode='courses_cycles'.
+ * CoursesCyclesPanel.jsx — "רישום לקורסים" — דשבורד מאוחד לקורסים+מחזורים
+ * ========================================================================
+ * תצוגה אחת מובנית, מסוננת לפי שנה (דיפולט = שנה נוכחית):
  *
- * תצוגה:
- *   - כפתור "סרוק עכשיו" + סטטוס סנכרון אחרון
- *   - טבלת קורסים (collapsible)
- *   - טבלת מחזורים מקובצים לפי קורס
- *   - עריכת מחזור inline (תאריך תחילה/סיום, סטטוס רישום, מרצה...)
- *
- * ⚠ עריכות מקומיות בלבד — לא חוזרות ל-Fireberry. הסנכרון הבא ב-06:00
- *   ידרוס אם הרשומה קיימת ב-Fireberry (תוכנית A).
+ *   1. כפתורי שנה (top, prominent — כל לחיצה מסננת הכל)
+ *   2. 3 פאי לפי קורס: סכום עסקאות / הנחות / נגבה בפועל
+ *      - אם נבחר קורס: הפאי מציג חלוקה לפי מחזורים של אותו קורס
+ *   3. טבלת קורסים — סכומים מחושבים מהמחזורים של השנה הנבחרת בלבד
+ *   4. טבלת מחזורים — מסוננת לשנה + קורס, ממויינת תאריך יורד
+ *   5. כל עריכה מקומית בלבד (לא חוזר ל-Fireberry — תוכנית A)
  */
 import React, { useEffect, useMemo, useState } from "react";
+import { PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer } from "recharts";
 import {
   getCourses,
   getCycles,
@@ -20,6 +19,17 @@ import {
   triggerCoursesScan,
   getCoursesSyncRuns,
 } from "../api.js";
+
+// ─── Constants & Utils ───────────────────────────────────────────────────────
+
+const MIN_YEAR = 2026;
+
+// פלטה — 16 צבעים מתואמים לעיצוב כללי
+const PALETTE = [
+  "#1e3a5f", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444",
+  "#8b5cf6", "#ec4899", "#14b8a6", "#84cc16", "#f97316",
+  "#6366f1", "#06b6d4", "#dc2626", "#eab308", "#a855f7", "#475569",
+];
 
 function fmtNum(v) {
   if (v === null || v === undefined || v === "") return "—";
@@ -30,17 +40,26 @@ function fmtNum(v) {
 
 function fmtMoney(v) {
   if (v === null || v === undefined) return "—";
-  return `₪${fmtNum(v)}`;
+  const n = Number(v);
+  if (Number.isNaN(n)) return "—";
+  return `₪${n.toLocaleString("he-IL", { maximumFractionDigits: 0 })}`;
 }
 
-// פורמט עברי DD/MM/YYYY (במקום ISO YYYY-MM-DD)
+function fmtMoneyShort(v) {
+  // ₪1.2M / ₪450K ל-tooltip ולמספרים גדולים
+  if (v === null || v === undefined) return "—";
+  const n = Number(v);
+  if (Number.isNaN(n)) return "—";
+  if (Math.abs(n) >= 1_000_000) return `₪${(n / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(n) >= 1_000)     return `₪${(n / 1_000).toFixed(0)}K`;
+  return `₪${n.toLocaleString("he-IL")}`;
+}
+
 function fmtDate(v) {
   if (!v) return "—";
-  const s = String(v).slice(0, 10);
-  const parts = s.split("-");
-  if (parts.length !== 3) return s;
-  const [y, m, d] = parts;
-  return `${d}/${m}/${y}`;
+  const s = String(v).slice(0, 10).split("-");
+  if (s.length !== 3) return v;
+  return `${s[2]}/${s[1]}/${s[0]}`;
 }
 
 function fmtDateTime(v) {
@@ -48,10 +67,6 @@ function fmtDateTime(v) {
   return new Date(v).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" });
 }
 
-// השנה הראשונה שמותר לסנן ממנה (לפני זה — לא רלוונטי)
-const MIN_YEAR = 2026;
-
-// מחזיר רשימת שנים אפשריות: MIN_YEAR..max(currentYear, maxYearInData)
 function availableYears(cycles) {
   const currentYear = new Date().getFullYear();
   let maxYear = currentYear;
@@ -65,48 +80,211 @@ function availableYears(cycles) {
   return out;
 }
 
-const styles = {
-  card: {
-    background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 10,
-    padding: 16, marginBottom: 16,
-  },
-  table: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
-  th: { background: "#f1f5f9", padding: "10px 12px", textAlign: "right",
-        fontWeight: 600, color: "#0f172a", borderBottom: "1px solid #e2e8f0",
-        position: "sticky", top: 0 },
-  td: { padding: "8px 12px", borderBottom: "1px solid #f1f5f9", color: "#1e293b" },
-  badgeOpen:   { background: "#dcfce7", color: "#166534", padding: "2px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600 },
-  badgeClosed: { background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600 },
-  badgeOther:  { background: "#e2e8f0", color: "#475569", padding: "2px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600 },
-  badgeManual: { background: "#fef3c7", color: "#92400e", padding: "1px 6px", borderRadius: 3, fontSize: 11, fontWeight: 600, marginRight: 6 },
-  btnPrimary: {
-    background: "#1e3a5f", color: "#ffffff", border: "none", borderRadius: 8,
-    padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
-  },
-  btnSecondary: {
-    background: "#f1f5f9", color: "#1e40af", border: "1px solid #cbd5e1", borderRadius: 8,
-    padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer",
-  },
-  input: {
-    border: "1px solid #cbd5e1", borderRadius: 4, padding: "4px 8px", fontSize: 12,
-    width: "100%", boxSizing: "border-box",
-  },
-  hint: { fontSize: 12, color: "#64748b" },
+// ─── Style tokens (consistent design language) ───────────────────────────────
+
+const T = {
+  // colors
+  bgPage:        "#f8fafc",
+  cardBg:        "#ffffff",
+  cardBorder:    "#e2e8f0",
+  navy:          "#1e3a5f",
+  navyHover:     "#172d4a",
+  navyLight:     "#dbeafe",
+  textPrimary:   "#0f172a",
+  textSecondary: "#475569",
+  textMuted:     "#94a3b8",
+  rowAltBg:      "#f8fafc",
+  // accent for the 3 metrics
+  cDeals:        "#1e3a5f",   // navy
+  cDiscounts:    "#f59e0b",   // amber
+  cCollected:    "#10b981",   // emerald
+  // shadows
+  shadowSm:      "0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04)",
+  shadowMd:      "0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04)",
+  // radii
+  rSm: 6, rMd: 10, rLg: 14,
 };
 
+const S = {
+  card: {
+    background:    T.cardBg,
+    border:        `1px solid ${T.cardBorder}`,
+    borderRadius:  T.rLg,
+    padding:       20,
+    marginBottom:  16,
+    boxShadow:     T.shadowSm,
+  },
+  cardCompact: {
+    background:    T.cardBg,
+    border:        `1px solid ${T.cardBorder}`,
+    borderRadius:  T.rMd,
+    padding:       14,
+    marginBottom:  12,
+    boxShadow:     T.shadowSm,
+  },
+  sectionTitle: {
+    margin: "0 0 6px", color: T.textPrimary, fontSize: 16, fontWeight: 700,
+    display: "flex", alignItems: "center", gap: 8,
+  },
+  sectionHint: { fontSize: 12.5, color: T.textSecondary, marginBottom: 14 },
+  table: { width: "100%", borderCollapse: "collapse", fontSize: 13.5 },
+  th: {
+    background: "#f1f5f9", padding: "11px 14px", textAlign: "right",
+    fontWeight: 600, color: T.textPrimary, borderBottom: `1px solid ${T.cardBorder}`,
+    fontSize: 12.5, letterSpacing: 0.2, position: "sticky", top: 0, zIndex: 1,
+  },
+  td: { padding: "10px 14px", borderBottom: `1px solid #f1f5f9`, color: T.textPrimary, verticalAlign: "middle" },
+  tdSecondary: { padding: "10px 14px", borderBottom: `1px solid #f1f5f9`, color: T.textSecondary, fontSize: 13 },
+  badge: (bg, fg) => ({
+    background: bg, color: fg, padding: "3px 10px", borderRadius: 999,
+    fontSize: 11.5, fontWeight: 600, display: "inline-block", whiteSpace: "nowrap",
+  }),
+  btnPrimary: {
+    background: T.navy, color: "#ffffff", border: "none", borderRadius: T.rMd,
+    padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+    transition: "background 0.15s, transform 0.05s",
+    boxShadow: T.shadowSm,
+  },
+  btnSecondary: {
+    background: T.cardBg, color: T.navy, border: `1px solid ${T.cardBorder}`, borderRadius: T.rMd,
+    padding: "7px 14px", fontSize: 12.5, fontWeight: 500, cursor: "pointer",
+    transition: "background 0.15s, border-color 0.15s",
+  },
+  btnGhost: {
+    background: "transparent", color: T.textSecondary, border: "none",
+    padding: "4px 8px", fontSize: 12.5, cursor: "pointer", borderRadius: T.rSm,
+  },
+  input: {
+    border: `1px solid ${T.cardBorder}`, borderRadius: T.rSm, padding: "7px 10px",
+    fontSize: 13, width: "100%", boxSizing: "border-box", color: T.textPrimary,
+    background: T.cardBg,
+  },
+};
+
+// ─── Status badge (open/closed/active) ──────────────────────────────────────
+
 function StatusBadge({ status }) {
-  if (!status) return <span style={styles.badgeOther}>—</span>;
-  if (status.includes("פתוח")) return <span style={styles.badgeOpen}>{status}</span>;
-  if (status.includes("סגור")) return <span style={styles.badgeClosed}>{status}</span>;
-  // "פעיל" וכל מצב אחר נראה ב-Fireberry → ניטרלי
-  return <span style={styles.badgeOther}>{status}</span>;
+  if (!status) return <span style={S.badge("#e2e8f0", "#475569")}>—</span>;
+  const txt = String(status);
+  if (txt.includes("פתוח") || txt.includes("פעיל")) {
+    return <span style={S.badge("#dcfce7", "#166534")}>{txt}</span>;
+  }
+  if (txt.includes("סגור") || txt.includes("הסתיים") || txt.includes("בוטל")) {
+    return <span style={S.badge("#fee2e2", "#991b1b")}>{txt}</span>;
+  }
+  return <span style={S.badge("#e2e8f0", "#475569")}>{txt}</span>;
+}
+
+// ─── Pie chart card — donut style with center label ─────────────────────────
+
+function PieTooltip({ active, payload, total }) {
+  if (!active || !payload || !payload.length) return null;
+  const p = payload[0];
+  const pct = total > 0 ? ((p.value / total) * 100).toFixed(1) : "0";
+  return (
+    <div style={{
+      background: "#ffffff", border: `1px solid ${T.cardBorder}`, borderRadius: T.rSm,
+      padding: "10px 14px", fontSize: 12.5, boxShadow: T.shadowMd,
+    }}>
+      <div style={{ fontWeight: 600, color: T.textPrimary, marginBottom: 4 }}>{p.payload.name}</div>
+      <div style={{ color: T.textSecondary }}>{fmtMoney(p.value)} ({pct}%)</div>
+    </div>
+  );
+}
+
+function PieCard({ title, accent, data, total, emptyText }) {
+  const filtered = (data || []).filter((d) => (d.value || 0) > 0)
+    .sort((a, b) => b.value - a.value);
+
+  return (
+    <div style={{
+      ...S.card,
+      flex: "1 1 320px", minWidth: 320, marginBottom: 0, padding: 18,
+      borderTop: `3px solid ${accent}`,
+    }}>
+      <div style={{ marginBottom: 8 }}>
+        <h4 style={{ margin: 0, fontSize: 13.5, color: T.textSecondary, fontWeight: 600 }}>{title}</h4>
+        <div style={{ marginTop: 4, fontSize: 22, fontWeight: 700, color: T.textPrimary, letterSpacing: -0.3 }}>
+          {fmtMoney(total)}
+        </div>
+      </div>
+      {filtered.length === 0 ? (
+        <div style={{
+          height: 240, display: "flex", alignItems: "center", justifyContent: "center",
+          color: T.textMuted, fontSize: 13, flexDirection: "column", gap: 4,
+        }}>
+          <div style={{ fontSize: 28, opacity: 0.4 }}>○</div>
+          {emptyText || "אין נתונים"}
+        </div>
+      ) : (
+        <div style={{ position: "relative" }}>
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+              <Pie
+                data={filtered} dataKey="value" nameKey="name"
+                cx="50%" cy="50%" outerRadius={88} innerRadius={55}
+                paddingAngle={2} stroke="#ffffff" strokeWidth={2}
+                isAnimationActive={false}
+              >
+                {filtered.map((entry, idx) => (
+                  <Cell key={entry.name} fill={PALETTE[idx % PALETTE.length]} />
+                ))}
+              </Pie>
+              <ReTooltip content={<PieTooltip total={total} />} />
+            </PieChart>
+          </ResponsiveContainer>
+          {/* Center count */}
+          <div style={{
+            position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", pointerEvents: "none",
+          }}>
+            <div style={{ fontSize: 11, color: T.textSecondary, marginTop: 2 }}>
+              {filtered.length} פריטים
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Mini legend below — top 5 only, then "ועוד N" */}
+      {filtered.length > 0 && (
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4, fontSize: 11.5 }}>
+          {filtered.slice(0, 5).map((d, i) => {
+            const pct = total > 0 ? ((d.value / total) * 100).toFixed(0) : "0";
+            return (
+              <div key={d.name} style={{ display: "flex", alignItems: "center", gap: 6, color: T.textSecondary }}>
+                <span style={{
+                  width: 9, height: 9, borderRadius: 2, background: PALETTE[i % PALETTE.length], flex: "0 0 9px",
+                }} />
+                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {d.name}
+                </span>
+                <span style={{ color: T.textPrimary, fontWeight: 600 }}>{pct}%</span>
+              </div>
+            );
+          })}
+          {filtered.length > 5 && (
+            <div style={{ color: T.textMuted, fontSize: 11, paddingRight: 15 }}>
+              +עוד {filtered.length - 5}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Edit modal ──────────────────────────────────────────────────────────────
 
+function Field({ label, value, onChange, type = "text", placeholder = "" }) {
+  return (
+    <label style={{ fontSize: 12, color: T.textSecondary, display: "flex", flexDirection: "column", gap: 4 }}>
+      {label}
+      <input type={type} value={value} onChange={onChange} placeholder={placeholder} style={S.input} />
+    </label>
+  );
+}
+
 function EditCycleModal({ cycle, onSave, onClose }) {
   const [form, setForm] = useState({
-    name:                  cycle.name || "",
     start_date:            cycle.start_date || "",
     end_date:              cycle.end_date || "",
     registration_end_date: cycle.registration_end_date || "",
@@ -126,13 +304,12 @@ function EditCycleModal({ cycle, onSave, onClose }) {
   async function submit() {
     setSaving(true); setErr(null);
     try {
-      // ערכים ריקים נעלמים → לא נשלחים → לא משנים שדה ב-DB
       const payload = {};
       for (const [k, v] of Object.entries(form)) {
         if (v === "" || v === null) continue;
-        if (k === "total_enrollees")  payload[k] = parseInt(v, 10);
-        else if (k === "actual_price") payload[k] = parseFloat(v);
-        else                           payload[k] = v;
+        if (k === "total_enrollees")       payload[k] = parseInt(v, 10);
+        else if (k === "actual_price")      payload[k] = parseFloat(v);
+        else                                payload[k] = v;
       }
       await onSave(payload);
       onClose();
@@ -145,37 +322,43 @@ function EditCycleModal({ cycle, onSave, onClose }) {
 
   return (
     <div style={{
-      position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)",
+      position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.55)",
       display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
     }} onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        background: "#ffffff", borderRadius: 12, padding: 24, width: 560, maxHeight: "90vh", overflowY: "auto",
+        background: T.cardBg, borderRadius: T.rLg, padding: 26, width: 580,
+        maxHeight: "90vh", overflowY: "auto", boxShadow: T.shadowMd,
       }}>
-        <h3 style={{ margin: "0 0 4px", color: "#0f172a", fontSize: 18 }}>עריכת מחזור</h3>
-        <p style={{ margin: "0 0 16px", fontSize: 12, color: "#64748b" }}>
-          ⚠ העריכה מקומית בלבד — לא חוזרת ל-Fireberry. הסנכרון הבא (06:00) ידרוס אם הרשומה קיימת שם.
+        <h3 style={{ margin: "0 0 4px", color: T.textPrimary, fontSize: 18, fontWeight: 700 }}>
+          עריכת מחזור — {cycle.course_name}
+        </h3>
+        <p style={{ margin: "0 0 16px", fontSize: 12, color: T.textMuted }}>
+          ⚠ עריכה מקומית בלבד — לא חוזרת ל-Fireberry. הסנכרון הבא (06:00) ידרוס אם הרשומה קיימת שם.
         </p>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-          <Field label="שם המחזור" value={form.name} onChange={change("name")} />
-          <Field label="סטטוס רישום" value={form.registration_status} onChange={change("registration_status")} placeholder="פתוח להרשמה / סגור" />
-          <Field label="תאריך תחילה" value={form.start_date} onChange={change("start_date")} type="date" />
-          <Field label="תאריך סיום" value={form.end_date} onChange={change("end_date")} type="date" />
-          <Field label="סיום הרשמה" value={form.registration_end_date} onChange={change("registration_end_date")} type="date" />
-          <Field label="סה״כ נרשמים" value={form.total_enrollees} onChange={change("total_enrollees")} type="number" />
-          <Field label="מחיר בפועל" value={form.actual_price} onChange={change("actual_price")} type="number" />
-          <Field label="סניף" value={form.branch} onChange={change("branch")} />
-          <Field label="מרצה" value={form.instructor} onChange={change("instructor")} />
-          <Field label="ימי לימוד" value={form.study_days} onChange={change("study_days")} />
-          <Field label="שעות לימוד" value={form.study_hours} onChange={change("study_hours")} />
+          <Field label="תאריך התחלה/מחזור" value={form.start_date}            onChange={change("start_date")}            type="date" />
+          <Field label="תאריך סיום"          value={form.end_date}              onChange={change("end_date")}              type="date" />
+          <Field label="תאריך סיום הרשמה"   value={form.registration_end_date} onChange={change("registration_end_date")} type="date" />
+          <Field label="סטטוס רישום"         value={form.registration_status}   onChange={change("registration_status")}   placeholder="פתוח להרשמה / פעיל / סגור" />
+          <Field label="סה״כ נרשמים"         value={form.total_enrollees}       onChange={change("total_enrollees")}       type="number" />
+          <Field label="מחיר בפועל"          value={form.actual_price}          onChange={change("actual_price")}          type="number" />
+          <Field label="סניף"                value={form.branch}                onChange={change("branch")} />
+          <Field label="מרצה"                value={form.instructor}            onChange={change("instructor")} />
+          <Field label="ימי לימוד"           value={form.study_days}            onChange={change("study_days")} />
+          <Field label="שעות לימוד"          value={form.study_hours}           onChange={change("study_hours")} />
         </div>
 
-        {err && <div style={{ color: "#dc2626", fontSize: 12, marginBottom: 12 }}>שגיאה: {err}</div>}
-
+        {err && (
+          <div style={{ background: "#fee2e2", color: "#991b1b", padding: "10px 12px", borderRadius: T.rSm, fontSize: 12.5, marginBottom: 12 }}>
+            שגיאה: {err}
+          </div>
+        )}
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={styles.btnSecondary}>ביטול</button>
-          <button type="button" onClick={submit} disabled={saving} style={{ ...styles.btnPrimary, opacity: saving ? 0.6 : 1 }}>
-            {saving ? "שומר..." : "שמור"}
+          <button type="button" onClick={onClose} style={S.btnSecondary}>ביטול</button>
+          <button type="button" onClick={submit} disabled={saving}
+                  style={{ ...S.btnPrimary, opacity: saving ? 0.6 : 1 }}>
+            {saving ? "שומר…" : "שמור"}
           </button>
         </div>
       </div>
@@ -183,12 +366,37 @@ function EditCycleModal({ cycle, onSave, onClose }) {
   );
 }
 
-function Field({ label, value, onChange, type = "text", placeholder = "" }) {
+// ─── Year selector — segmented control ──────────────────────────────────────
+
+function YearSelector({ years, value, onChange }) {
   return (
-    <label style={{ fontSize: 12, color: "#64748b", display: "flex", flexDirection: "column", gap: 4 }}>
-      {label}
-      <input type={type} value={value} onChange={onChange} placeholder={placeholder} style={styles.input} />
-    </label>
+    <div style={{
+      display: "inline-flex", padding: 4, gap: 2,
+      background: "#f1f5f9", borderRadius: T.rMd,
+      border: `1px solid ${T.cardBorder}`,
+    }}>
+      {years.map((y) => {
+        const active = value === y;
+        return (
+          <button
+            key={y}
+            type="button"
+            onClick={() => onChange(y)}
+            style={{
+              padding: "8px 18px", fontSize: 13.5, fontWeight: 700,
+              borderRadius: T.rSm, cursor: "pointer", minWidth: 72,
+              background: active ? T.navy : "transparent",
+              color:      active ? "#ffffff" : T.textSecondary,
+              border:     "none",
+              boxShadow:  active ? T.shadowSm : "none",
+              transition: "all 0.15s",
+            }}
+          >
+            {y}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -201,9 +409,9 @@ export default function CoursesCyclesPanel() {
   const [loading,    setLoading]    = useState(true);
   const [err,        setErr]        = useState(null);
   const [scanning,   setScanning]   = useState(false);
-  const [editing,    setEditing]    = useState(null);   // cycle being edited
-  const [filterCourse, setFilterCourse] = useState("");
-  const [filterOpen,   setFilterOpen]   = useState("all"); // 'all' | 'open' | 'closed'
+  const [editing,    setEditing]    = useState(null);
+  const [filterCourse, setFilterCourse] = useState(""); // product_id selected (or empty)
+  const [filterOpen,   setFilterOpen]   = useState("all");
   const [filterYear,   setFilterYear]   = useState(() => Math.max(MIN_YEAR, new Date().getFullYear()));
 
   async function loadAll() {
@@ -214,7 +422,8 @@ export default function CoursesCyclesPanel() {
         getCycles(),
         getCoursesSyncRuns(5),
       ]);
-      setCourses(c.courses || []);
+      // הסר placeholder "לא ידוע"
+      setCourses((c.courses || []).filter((x) => x.name && x.name !== "לא ידוע"));
       setCycles(cy.cycles || []);
       setSyncRuns(runs.runs || []);
     } catch (e) {
@@ -244,188 +453,321 @@ export default function CoursesCyclesPanel() {
     await loadAll();
   }
 
-  // ── Filtering ──
+  // ── Year-filtered cycles (single source of truth for everything) ──
   const yearsList = useMemo(() => availableYears(cycles), [cycles]);
 
-  const filteredCycles = useMemo(() => {
+  const cyclesInYear = useMemo(() => {
     return cycles.filter((c) => {
-      if (filterCourse && c.product_id !== filterCourse) return false;
-      if (filterOpen === "open"   && !(c.registration_status || "").includes("פתוח")) return false;
-      if (filterOpen === "closed" &&  (c.registration_status || "").includes("פתוח")) return false;
-      // סינון שנה — לפי start_date. רשומות ללא תאריך מסוננות בשנה.
-      if (filterYear) {
-        if (!c.start_date) return false;
-        const y = parseInt(String(c.start_date).slice(0, 4), 10);
-        if (y !== filterYear) return false;
+      if (!c.start_date) return false;
+      const y = parseInt(String(c.start_date).slice(0, 4), 10);
+      return y === filterYear;
+    });
+  }, [cycles, filterYear]);
+
+  // ── Per-course aggregates (computed from year-filtered cycles) ──
+  const courseAggregates = useMemo(() => {
+    const m = new Map();
+    for (const c of cyclesInYear) {
+      const pid = c.product_id;
+      if (!pid) continue;
+      if (!m.has(pid)) {
+        m.set(pid, {
+          product_id:           pid,
+          name:                 c.course_name || "—",
+          cycles_count:         0,
+          total_enrollees:      0,
+          total_deals_amount:   0,
+          total_discounts:      0,
+          total_after_discounts: 0,
+          total_collected:      0,
+        });
       }
+      const a = m.get(pid);
+      a.cycles_count          += 1;
+      a.total_enrollees       += Number(c.total_enrollees       || 0);
+      a.total_deals_amount    += Number(c.total_deals_amount    || 0);
+      a.total_discounts       += Number(c.total_discounts       || 0);
+      a.total_after_discounts += Number(c.total_after_discounts || 0);
+      a.total_collected       += Number(c.total_collected       || 0);
+    }
+    return Array.from(m.values()).sort((a, b) => b.total_deals_amount - a.total_deals_amount);
+  }, [cyclesInYear]);
+
+  // אם נבחר קורס שאין לו מחזורים בשנה הנבחרת, נרים את הסינון
+  useEffect(() => {
+    if (filterCourse && !courseAggregates.some((a) => a.product_id === filterCourse)) {
+      setFilterCourse("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterYear]);
+
+  // ── Filtered cycles for the cycles table ──
+  const filteredCycles = useMemo(() => {
+    return cyclesInYear.filter((c) => {
+      if (filterCourse && c.product_id !== filterCourse) return false;
+      const open = (c.registration_status || "").includes("פתוח") || (c.registration_status || "").includes("פעיל");
+      if (filterOpen === "open"   && !open) return false;
+      if (filterOpen === "closed" &&  open) return false;
       return true;
     });
-  }, [cycles, filterCourse, filterOpen, filterYear]);
+  }, [cyclesInYear, filterCourse, filterOpen]);
+
+  // ── Pies data ──
+  const pieData = useMemo(() => {
+    if (filterCourse) {
+      // קורס נבחר → חלוקה לפי מחזורים שלו
+      const courseCycles = cyclesInYear.filter((c) => c.product_id === filterCourse);
+      const labelOf = (c) => {
+        const d = c.start_date ? fmtDate(c.start_date) : "ללא תאריך";
+        return d;
+      };
+      return {
+        deals:      courseCycles.map((c) => ({ name: labelOf(c), value: Number(c.total_deals_amount    || 0) })),
+        discounts:  courseCycles.map((c) => ({ name: labelOf(c), value: Number(c.total_discounts       || 0) })),
+        collected:  courseCycles.map((c) => ({ name: labelOf(c), value: Number(c.total_collected       || 0) })),
+      };
+    }
+    // אין סינון → חלוקה לפי קורס (אגרגציה לשנה)
+    return {
+      deals:     courseAggregates.map((a) => ({ name: a.name, value: a.total_deals_amount })),
+      discounts: courseAggregates.map((a) => ({ name: a.name, value: a.total_discounts })),
+      collected: courseAggregates.map((a) => ({ name: a.name, value: a.total_collected })),
+    };
+  }, [filterCourse, cyclesInYear, courseAggregates]);
+
+  const totals = useMemo(() => ({
+    deals:     pieData.deals.reduce((s, d) => s + d.value, 0),
+    discounts: pieData.discounts.reduce((s, d) => s + d.value, 0),
+    collected: pieData.collected.reduce((s, d) => s + d.value, 0),
+  }), [pieData]);
 
   const lastSync = syncRuns[0];
+  const selectedCourseName = filterCourse
+    ? courseAggregates.find((a) => a.product_id === filterCourse)?.name
+    : null;
 
   // ── Render ──
+  if (loading) {
+    return (
+      <div style={{ padding: 60, textAlign: "center", color: T.textSecondary, fontSize: 14 }}>
+        טוען נתוני קורסים ומחזורים…
+      </div>
+    );
+  }
+
   return (
     <div>
-      {/* ── Top bar — scan + status ── */}
-      <div style={{ ...styles.card, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+      {/* ── Header — title + sync info + scan button ── */}
+      <div style={{
+        ...S.card, padding: 20, display: "flex", alignItems: "center",
+        justifyContent: "space-between", gap: 12, flexWrap: "wrap",
+      }}>
         <div>
-          <h2 style={{ margin: "0 0 4px", color: "#0f172a", fontSize: 16 }}>קורסים ומחזורים — שיקוף Fireberry</h2>
-          <div style={styles.hint}>
-            סנכרון אוטומטי כל יום ב-06:00 · ניתן ללחוץ "סרוק עכשיו" לעדכון מיידי
+          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 18, fontWeight: 700 }}>
+            רישום לקורסים
+          </h2>
+          <div style={{ marginTop: 4, fontSize: 12.5, color: T.textSecondary }}>
+            שיקוף יומי מ-Fireberry · סנכרון אוטומטי 06:00 ·
+            {lastSync && (
+              <>
+                {" "}אחרון: <strong>{fmtDateTime(lastSync.completed_at || lastSync.started_at)}</strong>
+                {" "}(<span style={{ color: lastSync.status === "completed" ? "#059669" : "#dc2626" }}>{lastSync.status}</span>)
+                {" "}· {lastSync.cycles_fetched} מחזורים
+              </>
+            )}
           </div>
-          {lastSync && (
-            <div style={{ ...styles.hint, marginTop: 6 }}>
-              סנכרון אחרון: <strong>{fmtDateTime(lastSync.completed_at || lastSync.started_at)}</strong> ·
-              {" "}סטטוס: <strong>{lastSync.status}</strong> ·
-              {" "}{lastSync.courses_fetched} קורסים · {lastSync.cycles_fetched} מחזורים
-              {lastSync.cycles_promoted > 0 && (
-                <> · קודמו manual→fireberry: <strong>{lastSync.cycles_promoted}</strong></>
-              )}
-              {" "}({lastSync.duration_ms}ms)
-            </div>
-          )}
         </div>
-        <button type="button" onClick={handleScan} disabled={scanning || loading} style={{ ...styles.btnPrimary, opacity: (scanning || loading) ? 0.6 : 1 }}>
-          {scanning ? "סורק..." : "🔄 סרוק עכשיו"}
+        <button type="button" onClick={handleScan} disabled={scanning}
+                style={{ ...S.btnPrimary, opacity: scanning ? 0.6 : 1 }}>
+          {scanning ? "סורק…" : "🔄 סרוק עכשיו"}
         </button>
       </div>
 
       {err && (
-        <div style={{ ...styles.card, background: "#fee2e2", borderColor: "#fca5a5", color: "#991b1b" }}>
+        <div style={{ ...S.cardCompact, background: "#fee2e2", borderColor: "#fca5a5", color: "#991b1b" }}>
           שגיאה: {err}
         </div>
       )}
 
-      {/* ── Courses summary table ── */}
-      <div style={styles.card}>
-        <h3 style={{ margin: "0 0 12px", color: "#0f172a", fontSize: 15 }}>קורסים ({courses.length})</h3>
-        <div style={{ overflowX: "auto", maxHeight: 280, overflowY: "auto" }}>
-          <table style={styles.table}>
+      {/* ── Year selector — prominent at top ── */}
+      <div style={{
+        ...S.card, padding: 16, display: "flex", alignItems: "center",
+        justifyContent: "space-between", gap: 12, flexWrap: "wrap",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13, color: T.textSecondary, fontWeight: 600 }}>שנה:</span>
+          <YearSelector years={yearsList} value={filterYear} onChange={setFilterYear} />
+          {filterCourse && selectedCourseName && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "5px 10px", background: T.navyLight, color: T.navy,
+              borderRadius: T.rSm, fontSize: 12.5, fontWeight: 600,
+            }}>
+              <span>סינון לפי קורס: {selectedCourseName}</span>
+              <button type="button" onClick={() => setFilterCourse("")} style={{
+                background: "transparent", border: "none", color: T.navy, cursor: "pointer",
+                fontSize: 14, padding: "0 4px", fontWeight: 700,
+              }}>✕</button>
+            </div>
+          )}
+        </div>
+        <div style={{ fontSize: 12, color: T.textMuted }}>
+          {cyclesInYear.length} מחזורים בשנת {filterYear}
+        </div>
+      </div>
+
+      {/* ── 3 Pie cards ── */}
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
+        <PieCard
+          title={filterCourse ? "סכום עסקאות — לפי מחזור"  : "סכום עסקאות — לפי קורס"}
+          accent={T.cDeals}
+          data={pieData.deals}
+          total={totals.deals}
+          emptyText={`אין עסקאות בשנת ${filterYear}`}
+        />
+        <PieCard
+          title={filterCourse ? "סכום הנחות — לפי מחזור"  : "סכום הנחות — לפי קורס"}
+          accent={T.cDiscounts}
+          data={pieData.discounts}
+          total={totals.discounts}
+          emptyText={`אין הנחות בשנת ${filterYear}`}
+        />
+        <PieCard
+          title={filterCourse ? "נגבה בפועל — לפי מחזור"  : "נגבה בפועל — לפי קורס"}
+          accent={T.cCollected}
+          data={pieData.collected}
+          total={totals.collected}
+          emptyText={`אין גביות בשנת ${filterYear}`}
+        />
+      </div>
+
+      {/* ── Courses table — year-aggregated, click to filter ── */}
+      <div style={S.card}>
+        <h3 style={S.sectionTitle}>
+          <span>📚</span><span>קורסים — שנת {filterYear}</span>
+        </h3>
+        <p style={S.sectionHint}>
+          הסכומים מחושבים מתוך המחזורים של אותה שנה בלבד. לחיצה על שורה מסננת את הפאי ואת טבלת המחזורים.
+        </p>
+        <div style={{ overflowX: "auto", borderRadius: T.rMd, border: `1px solid ${T.cardBorder}` }}>
+          <table style={S.table}>
             <thead>
               <tr>
-                <th style={styles.th}>שם הקורס</th>
-                <th style={styles.th}>קוד</th>
-                <th style={styles.th}>מחיר</th>
-                <th style={styles.th}>נרשמים</th>
-                <th style={styles.th}>סכום עסקאות</th>
-                <th style={styles.th}>הנחות</th>
-                <th style={styles.th}>אחרי הנחה</th>
-                <th style={styles.th}>נגבה בפועל</th>
-                <th style={styles.th}>סטטוס</th>
+                <th style={S.th}>קורס</th>
+                <th style={S.th}>מחזורים</th>
+                <th style={S.th}>נרשמים</th>
+                <th style={S.th}>סכום עסקאות</th>
+                <th style={S.th}>הנחות</th>
+                <th style={S.th}>אחרי הנחה</th>
+                <th style={S.th}>נגבה בפועל</th>
               </tr>
             </thead>
             <tbody>
-              {courses.map((c) => (
-                <tr key={c.product_id} style={{ cursor: "pointer", background: filterCourse === c.product_id ? "#dbeafe" : "transparent" }}
-                    onClick={() => setFilterCourse(filterCourse === c.product_id ? "" : c.product_id)}>
-                  <td style={styles.td}><strong>{c.name}</strong></td>
-                  <td style={styles.td}>{c.catalog_number || "—"}</td>
-                  <td style={styles.td}>{fmtMoney(c.item_price)}</td>
-                  <td style={styles.td}>{fmtNum(c.total_enrollees)}</td>
-                  <td style={styles.td}>{fmtMoney(c.total_deals_amount)}</td>
-                  <td style={styles.td}>{fmtMoney(c.total_discounts)}</td>
-                  <td style={styles.td}>{fmtMoney(c.total_after_discounts)}</td>
-                  <td style={styles.td}>{fmtMoney(c.total_collected)}</td>
-                  <td style={styles.td}><StatusBadge status={c.status_text} /></td>
+              {courseAggregates.map((a, idx) => {
+                const selected = filterCourse === a.product_id;
+                return (
+                  <tr
+                    key={a.product_id}
+                    onClick={() => setFilterCourse(selected ? "" : a.product_id)}
+                    style={{
+                      cursor: "pointer",
+                      background: selected ? T.navyLight : (idx % 2 ? T.rowAltBg : T.cardBg),
+                      transition: "background 0.1s",
+                    }}
+                    onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = "#f1f5f9"; }}
+                    onMouseLeave={(e) => { if (!selected) e.currentTarget.style.background = idx % 2 ? T.rowAltBg : T.cardBg; }}
+                  >
+                    <td style={{ ...S.td, fontWeight: selected ? 700 : 600 }}>
+                      {a.name}
+                      {selected && <span style={{ color: T.navy, marginRight: 6 }}>•</span>}
+                    </td>
+                    <td style={S.tdSecondary}>{fmtNum(a.cycles_count)}</td>
+                    <td style={S.tdSecondary}>{fmtNum(a.total_enrollees)}</td>
+                    <td style={{ ...S.td, fontWeight: 600, color: T.cDeals }}>{fmtMoney(a.total_deals_amount)}</td>
+                    <td style={{ ...S.tdSecondary, color: T.cDiscounts }}>{fmtMoney(a.total_discounts)}</td>
+                    <td style={S.tdSecondary}>{fmtMoney(a.total_after_discounts)}</td>
+                    <td style={{ ...S.td, fontWeight: 600, color: T.cCollected }}>{fmtMoney(a.total_collected)}</td>
+                  </tr>
+                );
+              })}
+              {courseAggregates.length === 0 && (
+                <tr>
+                  <td colSpan={7} style={{ ...S.td, textAlign: "center", padding: 32, color: T.textMuted }}>
+                    אין קורסים עם מחזורים בשנת {filterYear}
+                  </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
-        {filterCourse && (
-          <div style={{ marginTop: 8 }}>
-            <button type="button" onClick={() => setFilterCourse("")} style={styles.btnSecondary}>
-              ✕ הסר סינון לפי קורס
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* ── Filter bar for cycles ── */}
-      <div style={{ ...styles.card, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <label style={styles.hint}>סינון מחזורים:</label>
-
-        {/* Year switcher — דיפולט: שנה נוכחית. כפתורים לכל שנה מ-2026 ואילך. */}
-        <div style={{ display: "flex", gap: 4 }}>
-          {yearsList.map((y) => (
-            <button
-              key={y}
-              type="button"
-              onClick={() => setFilterYear(y)}
-              style={{
-                padding: "5px 12px", fontSize: 12, fontWeight: 600,
-                borderRadius: 6, cursor: "pointer",
-                background: filterYear === y ? "#1e3a5f" : "#ffffff",
-                color:      filterYear === y ? "#ffffff" : "#475569",
-                border: `1px solid ${filterYear === y ? "#1e3a5f" : "#cbd5e1"}`,
-              }}
-            >
-              {y}
-            </button>
-          ))}
-        </div>
-
-        <select value={filterOpen} onChange={(e) => setFilterOpen(e.target.value)}
-                style={{ ...styles.input, width: "auto" }}>
-          <option value="all">כל הסטטוסים</option>
-          <option value="open">פתוחים להרשמה</option>
-          <option value="closed">סגורים</option>
-        </select>
-
-        <span style={styles.hint}>
-          מציג {filteredCycles.length} מתוך {cycles.length} מחזורים
-        </span>
-      </div>
-
-      {/* ── Cycles table — flat, sorted by start_date desc (latest first) ── */}
-      <div style={styles.card}>
-        <h3 style={{ margin: "0 0 12px", color: "#0f172a", fontSize: 15 }}>
-          מחזורים — שנת {filterYear}
+      {/* ── Cycles table — year + course filtered, latest first ── */}
+      <div style={S.card}>
+        <h3 style={S.sectionTitle}>
+          <span>📅</span>
+          <span>
+            מחזורים — שנת {filterYear}
+            {selectedCourseName && <span style={{ fontWeight: 500, color: T.textSecondary }}> · {selectedCourseName}</span>}
+          </span>
         </h3>
-        <div style={{ overflowX: "auto" }}>
-          <table style={styles.table}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <select value={filterOpen} onChange={(e) => setFilterOpen(e.target.value)}
+                  style={{ ...S.input, width: "auto", paddingLeft: 28 }}>
+            <option value="all">כל הסטטוסים</option>
+            <option value="open">פתוחים להרשמה / פעילים</option>
+            <option value="closed">סגורים / הסתיימו</option>
+          </select>
+          <span style={{ fontSize: 12, color: T.textMuted }}>
+            מציג {filteredCycles.length} מתוך {cyclesInYear.length} מחזורים
+          </span>
+        </div>
+        <div style={{ overflowX: "auto", borderRadius: T.rMd, border: `1px solid ${T.cardBorder}` }}>
+          <table style={S.table}>
             <thead>
               <tr>
-                <th style={styles.th}>קורס</th>
-                <th style={styles.th}>תאריך התחלה/מחזור</th>
-                <th style={styles.th}>סיום הרשמה</th>
-                <th style={styles.th}>סטטוס רישום</th>
-                <th style={styles.th}>נרשמים</th>
-                <th style={styles.th}>סכום עסקאות</th>
-                <th style={styles.th}>נגבה בפועל</th>
-                <th style={styles.th}>סניף</th>
-                <th style={styles.th}>פעולות</th>
+                <th style={S.th}>קורס</th>
+                <th style={S.th}>תאריך התחלה/מחזור</th>
+                <th style={S.th}>סיום הרשמה</th>
+                <th style={S.th}>סטטוס רישום</th>
+                <th style={S.th}>נרשמים</th>
+                <th style={S.th}>סכום עסקאות</th>
+                <th style={S.th}>נגבה בפועל</th>
+                <th style={S.th}>סניף</th>
+                <th style={S.th}></th>
               </tr>
             </thead>
             <tbody>
               {[...filteredCycles]
                 .sort((a, b) => (b.start_date || "").localeCompare(a.start_date || ""))
                 .map((c, idx) => (
-                  <tr key={c.cycle_id} style={{ background: idx % 2 ? "#fafafa" : "#ffffff" }}>
-                    <td style={styles.td}>
-                      {c.source === "manual" && <span style={styles.badgeManual}>manual</span>}
-                      {c.manually_edited_at && <span style={styles.badgeManual}>נערך</span>}
-                      <strong>{c.course_name || "—"}</strong>
+                  <tr key={c.cycle_id} style={{ background: idx % 2 ? T.rowAltBg : T.cardBg }}>
+                    <td style={{ ...S.td, fontWeight: 600 }}>
+                      {c.source === "manual" && (
+                        <span style={{ ...S.badge("#fef3c7", "#92400e"), marginLeft: 6, fontSize: 10 }}>manual</span>
+                      )}
+                      {c.manually_edited_at && (
+                        <span style={{ ...S.badge("#fef3c7", "#92400e"), marginLeft: 6, fontSize: 10 }}>נערך</span>
+                      )}
+                      {c.course_name || "—"}
                     </td>
-                    <td style={styles.td}>{fmtDate(c.start_date)}</td>
-                    <td style={styles.td}>{fmtDate(c.registration_end_date)}</td>
-                    <td style={styles.td}><StatusBadge status={c.registration_status} /></td>
-                    <td style={styles.td}>{fmtNum(c.total_enrollees)}</td>
-                    <td style={styles.td}>{fmtMoney(c.total_deals_amount)}</td>
-                    <td style={styles.td}>{fmtMoney(c.total_collected)}</td>
-                    <td style={styles.td}>{c.branch || "—"}</td>
-                    <td style={styles.td}>
-                      <button type="button" onClick={() => setEditing(c)} style={styles.btnSecondary}>
-                        ✏️ ערוך
-                      </button>
+                    <td style={S.td}>{fmtDate(c.start_date)}</td>
+                    <td style={S.tdSecondary}>{fmtDate(c.registration_end_date)}</td>
+                    <td style={S.td}><StatusBadge status={c.registration_status} /></td>
+                    <td style={S.tdSecondary}>{fmtNum(c.total_enrollees)}</td>
+                    <td style={{ ...S.td, color: T.cDeals }}>{fmtMoney(c.total_deals_amount)}</td>
+                    <td style={{ ...S.td, color: T.cCollected }}>{fmtMoney(c.total_collected)}</td>
+                    <td style={S.tdSecondary}>{c.branch || "—"}</td>
+                    <td style={S.td}>
+                      <button type="button" onClick={() => setEditing(c)} style={S.btnGhost}
+                              title="ערוך מחזור">✏️</button>
                     </td>
                   </tr>
                 ))}
-              {filteredCycles.length === 0 && !loading && (
+              {filteredCycles.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ ...styles.td, textAlign: "center", padding: 24, color: "#94a3b8" }}>
-                    אין מחזורים בשנת {filterYear} תואמים סינון
+                  <td colSpan={9} style={{ ...S.td, textAlign: "center", padding: 32, color: T.textMuted }}>
+                    אין מחזורים תואמי סינון בשנת {filterYear}
                   </td>
                 </tr>
               )}

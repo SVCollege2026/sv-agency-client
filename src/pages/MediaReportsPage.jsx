@@ -1,18 +1,18 @@
 /**
- * MediaReportsPage.jsx — ממשק דוחות מדיה (שלב א')
- * ====================================================
- * תצוגה יומית / שבועית / טווח + סינון פלטפורמה + בחירת עמודות + CSV export.
- * הפעלה ידנית של דוח + שליחת מייל חוזרת.
+ * MediaReportsPage.jsx — ממשק מחלקת המדיה
+ * ==========================================
+ * 2 טאבים ראשיים, כל אחד עם URL נפרד דרך ?tab=:
+ *   📊 סטטוס מדיה   — יומי / שבועי / טווח / חודשי Y-o-Y
+ *   📋 רישום לקורסים — דשבורד פאי + טבלאות קורסים+מחזורים, מסונן לפי שנה
  *
- * נתיב: /media-reports
- * Backend: /api/media-reports/*
+ * נתיב: /media-reports?tab=<status|registration|daily|weekly|range|monthly>
  */
 import React, { useState, useEffect, useMemo } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, Cell,
 } from "recharts";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   getMediaDaily,
   getMediaWeekly,
@@ -35,7 +35,6 @@ import {
   generateMediaStage0,
 } from "../api.js";
 import CoursesCyclesPanel from "../components/CoursesCyclesPanel.jsx";
-import MediaDashboardOverview from "../components/MediaDashboardOverview.jsx";
 
 // ─── Utils ───────────────────────────────────────────────────────────────────
 
@@ -156,15 +155,24 @@ function hebSourceKind(k) {
 
 // מדיה = מציגה מה יש + חוקרת מה עבד/לא עבד + ממוצעים. **בלי חיפוש מגמות**
 // (זה תפקיד מחלקת חיזוי). המלצות מדיה = forward-looking, גם תפקיד חיזוי/recommender.
-// טאבים ראשיים — 3 בלבד. ארגון מחדש 2026-05-10:
-//   הוסר: 📑 דוח שלב 0 (לא היה בשימוש פעיל)
-//   הוסר: 🔎 חקירות (היה placeholder, לא רלוונטי כרגע)
-//   אוחד: יומי / שבועי / טווח / חודשי Y-o-Y → תחת "📊 סטטוס מדיה" עם sub-tabs
+// טאבים ראשיים — 2 בלבד. כל אחד עם URL נפרד דרך ?tab=
+//   📊 סטטוס מדיה   — מאחד יומי/שבועי/טווח/חודשי Y-o-Y כ-sub-tabs
+//   📋 רישום לקורסים — דשבורד פאי + טבלאות קורסים+מחזורים, מסונן לפי שנה
 const MODES = [
-  { id: "dashboard",      label: "🏠 דשבורד" },
-  { id: "media_status",   label: "📊 סטטוס מדיה" },
-  { id: "courses_cycles", label: "🎓 קורסים ומחזורים" },
+  { id: "media_status", label: "📊 סטטוס מדיה",   url: "status" },
+  { id: "registration", label: "📋 רישום לקורסים", url: "registration" },
 ];
+
+// מיפוי URL ↔ mode
+const URL_TO_MODE = {
+  "status":       "media_status",
+  "registration": "registration",
+  // sub-modes של media_status — נכנסים כמופע סטטוס עם submode
+  "daily":   "daily",
+  "weekly":  "weekly",
+  "range":   "range",
+  "monthly": "monthly",
+};
 
 // Sub-tabs בתוך "סטטוס מדיה" — אלה ה-mode-ים הקיימים שתמכנו בהם.
 const MEDIA_STATUS_SUBMODES = [
@@ -182,7 +190,7 @@ const _isMediaStatusMode = (m) => _MEDIA_STATUS_IDS.includes(m);
 
 // המצבים החדשים אינם משתמשים ב-fetchMediaDaily/Weekly/Range/Monthly. כל אחד
 // מנהל את הfetching שלו פנימית.
-const _NEW_MODES = ["stage0", "investigations", "timeline", "recommendations", "courses_cycles", "dashboard", "media_status"];
+const _NEW_MODES = ["stage0", "investigations", "timeline", "recommendations", "registration", "media_status"];
 const _isLegacyMode = (m) => !_NEW_MODES.includes(m);
 
 // ─── Monthly KPI sub-component ─────────────────────────────────────────────
@@ -999,7 +1007,31 @@ function CoursesKpiTable({ rows, currYear, metricId }) {
 export default function MediaReportsPage() {
   const navigate = useNavigate();
 
-  const [mode, setMode]           = useState("dashboard");
+  const [searchParams, setSearchParams] = useSearchParams();
+  // URL tab = status | registration | daily | weekly | range | monthly
+  // ברירת מחדל = registration (הדף החדש עם הדשבורד+טבלאות)
+  const tabFromUrl = searchParams.get("tab") || "";
+  const initialMode = URL_TO_MODE[tabFromUrl] || "registration";
+  const [mode, _setMode] = useState(initialMode);
+  const setMode = (m) => {
+    _setMode(m);
+    // synchronise URL ל-state כדי שכל טאב יהיה shareable/bookmarkable
+    const url = (m === "media_status") ? "status"
+              : (m === "registration") ? "registration"
+              : m;   // submodes (daily/weekly/range/monthly) משוקפים כפי שהם
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", url);
+    setSearchParams(next, { replace: true });
+  };
+  // sync initial URL → אם המשתמש נחת בלי ?tab=, נכתוב את ברירת המחדל
+  useEffect(() => {
+    if (!tabFromUrl) {
+      const next = new URLSearchParams(searchParams);
+      next.set("tab", "registration");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [dailyView, setDailyView] = useState("master");  // master | detail | sub_status | analytics
   const [day, setDay]             = useState(yesterday());
   const [weekStart, setWeekStart] = useState(lastSunSat()[0]);
@@ -1241,10 +1273,7 @@ export default function MediaReportsPage() {
         {/* ── Header ── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "#0f172a" }}>דוחות מדיה</h1>
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>
-              נתונים גולמיים ל-Meta / Google + לידים מ-Fireberry · שלב א' — ללא המלצות
-            </p>
+            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "#0f172a" }}>מחלקת מדיה</h1>
           </div>
           <button
             type="button"
@@ -1480,12 +1509,10 @@ export default function MediaReportsPage() {
         )}
 
         {/* ── Main content ── */}
-        {mode === "dashboard" ? (
-          <MediaDashboardOverview />
+        {mode === "registration" ? (
+          <CoursesCyclesPanel />
         ) : mode === "monthly" ? (
           <MonthlyKpiView />
-        ) : mode === "courses_cycles" ? (
-          <CoursesCyclesPanel />
         ) : mode === "daily" && dailyView === "sub_status" ? (
           <SubStatusTable rows={data?.sub_status || []} loading={loading} />
         ) : mode === "daily" && dailyView === "analytics" ? (
@@ -1577,10 +1604,6 @@ export default function MediaReportsPage() {
           </div>
         )}
 
-        {/* ── Footer note ── */}
-        <p style={{ marginTop: 20, fontSize: 11, color: "#94a3b8", textAlign: "center" }}>
-          שלב א' — נתונים יבשים בלבד. ניתוח והמלצות יגיעו בשלבים הבאים.
-        </p>
       </div>
     </div>
   );
