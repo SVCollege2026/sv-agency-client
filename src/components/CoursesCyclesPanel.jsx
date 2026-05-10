@@ -22,7 +22,8 @@ import {
 
 // ─── Constants & Utils ───────────────────────────────────────────────────────
 
-const MIN_YEAR = 2026;
+// השנה הראשונה שמופיעה בבוחר שנה. דיפולט הצפייה הוא השנה הנוכחית.
+const MIN_YEAR = 2025;
 
 // פלטה — 16 צבעים מתואמים לעיצוב כללי
 const PALETTE = [
@@ -664,6 +665,29 @@ export default function CoursesCyclesPanel() {
                   </tr>
                 );
               })}
+              {/* ── Total row ── */}
+              {courseAggregates.length > 0 && (() => {
+                const sum = courseAggregates.reduce((s, a) => ({
+                  cycles_count:          s.cycles_count          + (a.cycles_count          || 0),
+                  total_enrollees:       s.total_enrollees       + (a.total_enrollees       || 0),
+                  total_deals_amount:    s.total_deals_amount    + (a.total_deals_amount    || 0),
+                  total_discounts:       s.total_discounts       + (a.total_discounts       || 0),
+                  total_after_discounts: s.total_after_discounts + (a.total_after_discounts || 0),
+                  total_collected:       s.total_collected       + (a.total_collected       || 0),
+                }), { cycles_count: 0, total_enrollees: 0, total_deals_amount: 0, total_discounts: 0, total_after_discounts: 0, total_collected: 0 });
+                const tdTotal = { ...S.td, fontWeight: 700, background: "#f1f5f9", borderTop: `2px solid ${T.navy}` };
+                return (
+                  <tr>
+                    <td style={tdTotal}>סה״כ</td>
+                    <td style={tdTotal}>{fmtNum(sum.cycles_count)}</td>
+                    <td style={tdTotal}>{fmtNum(sum.total_enrollees)}</td>
+                    <td style={{ ...tdTotal, color: T.cDeals }}>{fmtMoney(sum.total_deals_amount)}</td>
+                    <td style={{ ...tdTotal, color: T.cDiscounts }}>{fmtMoney(sum.total_discounts)}</td>
+                    <td style={tdTotal}>{fmtMoney(sum.total_after_discounts)}</td>
+                    <td style={{ ...tdTotal, color: T.cCollected }}>{fmtMoney(sum.total_collected)}</td>
+                  </tr>
+                );
+              })()}
               {courseAggregates.length === 0 && (
                 <tr>
                   <td colSpan={7} style={{ ...S.td, textAlign: "center", padding: 32, color: T.textMuted }}>
@@ -713,25 +737,60 @@ export default function CoursesCyclesPanel() {
             </thead>
             <tbody>
               {[...filteredCycles]
-                .sort((a, b) => (b.start_date || "").localeCompare(a.start_date || ""))
-                .map((c, idx) => (
-                  <tr key={c.cycle_id} style={{ background: idx % 2 ? T.rowAltBg : T.cardBg }}>
-                    <td style={{ ...S.td, fontWeight: 600 }}>
-                      {c.course_name || "—"}
-                    </td>
-                    <td style={S.td}>{fmtDate(c.start_date)}</td>
-                    <td style={S.tdSecondary}>{fmtDate(c.registration_end_date)}</td>
-                    <td style={S.td}><StatusBadge status={c.registration_status} /></td>
-                    <td style={S.tdSecondary}>{fmtNum(c.total_enrollees)}</td>
-                    <td style={{ ...S.td, color: T.cDeals }}>{fmtMoney(c.total_deals_amount)}</td>
-                    <td style={{ ...S.td, color: T.cCollected }}>{fmtMoney(c.total_collected)}</td>
-                    <td style={S.tdSecondary}>{c.branch || "—"}</td>
-                    <td style={S.td}>
-                      <button type="button" onClick={() => setEditing(c)} style={S.btnGhost}
-                              title="ערוך מחזור">✏️</button>
-                    </td>
+                // מיון: שם קורס א-ב, ובתוך כל קורס תאריך מאוחר → מוקדם
+                .sort((a, b) => {
+                  const cn = (a.course_name || "").localeCompare(b.course_name || "", "he");
+                  if (cn !== 0) return cn;
+                  return (b.start_date || "").localeCompare(a.start_date || "");
+                })
+                .map((c, idx, arr) => {
+                  const prevCourse = idx > 0 ? arr[idx - 1].course_name : null;
+                  const isFirstOfCourse = c.course_name !== prevCourse;
+                  return (
+                    <tr key={c.cycle_id} style={{
+                      background: idx % 2 ? T.rowAltBg : T.cardBg,
+                      borderTop: isFirstOfCourse && idx > 0 ? `1px solid ${T.cardBorder}` : undefined,
+                    }}>
+                      <td style={{ ...S.td, fontWeight: 600 }}>
+                        {/* שם הקורס מוצג רק בשורה הראשונה של הקבוצה — חוסך חזרה */}
+                        {isFirstOfCourse ? (c.course_name || "—") : ""}
+                      </td>
+                      <td style={S.td}>{fmtDate(c.start_date)}</td>
+                      <td style={S.tdSecondary}>{fmtDate(c.registration_end_date)}</td>
+                      <td style={S.td}><StatusBadge status={c.registration_status} /></td>
+                      <td style={S.tdSecondary}>{fmtNum(c.total_enrollees)}</td>
+                      <td style={{ ...S.td, color: T.cDeals }}>{fmtMoney(c.total_deals_amount)}</td>
+                      <td style={{ ...S.td, color: T.cCollected }}>{fmtMoney(c.total_collected)}</td>
+                      <td style={S.tdSecondary}>{c.branch || "—"}</td>
+                      <td style={S.td}>
+                        <button type="button" onClick={() => setEditing(c)} style={S.btnGhost}
+                                title="ערוך מחזור">✏️</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              {/* ── Total row ── */}
+              {filteredCycles.length > 0 && (() => {
+                const sum = filteredCycles.reduce((s, c) => ({
+                  total_enrollees:    s.total_enrollees    + Number(c.total_enrollees    || 0),
+                  total_deals_amount: s.total_deals_amount + Number(c.total_deals_amount || 0),
+                  total_collected:    s.total_collected    + Number(c.total_collected    || 0),
+                }), { total_enrollees: 0, total_deals_amount: 0, total_collected: 0 });
+                const tdTotal = { ...S.td, fontWeight: 700, background: "#f1f5f9", borderTop: `2px solid ${T.navy}` };
+                return (
+                  <tr>
+                    <td style={tdTotal}>סה״כ ({filteredCycles.length} מחזורים)</td>
+                    <td style={tdTotal}></td>
+                    <td style={tdTotal}></td>
+                    <td style={tdTotal}></td>
+                    <td style={tdTotal}>{fmtNum(sum.total_enrollees)}</td>
+                    <td style={{ ...tdTotal, color: T.cDeals }}>{fmtMoney(sum.total_deals_amount)}</td>
+                    <td style={{ ...tdTotal, color: T.cCollected }}>{fmtMoney(sum.total_collected)}</td>
+                    <td style={tdTotal}></td>
+                    <td style={tdTotal}></td>
                   </tr>
-                ))}
+                );
+              })()}
               {filteredCycles.length === 0 && (
                 <tr>
                   <td colSpan={9} style={{ ...S.td, textAlign: "center", padding: 32, color: T.textMuted }}>
