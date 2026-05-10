@@ -557,39 +557,13 @@ export default function CoursesCyclesPanel() {
 
   return (
     <div>
-      {/* ── Header — title + sync info + scan button ── */}
-      <div style={{
-        ...S.card, padding: 20, display: "flex", alignItems: "center",
-        justifyContent: "space-between", gap: 12, flexWrap: "wrap",
-      }}>
-        <div>
-          <h2 style={{ margin: 0, color: T.textPrimary, fontSize: 18, fontWeight: 700 }}>
-            רישום לקורסים
-          </h2>
-          <div style={{ marginTop: 4, fontSize: 12.5, color: T.textSecondary }}>
-            שיקוף יומי מ-Fireberry · סנכרון אוטומטי 06:00 ·
-            {lastSync && (
-              <>
-                {" "}אחרון: <strong>{fmtDateTime(lastSync.completed_at || lastSync.started_at)}</strong>
-                {" "}(<span style={{ color: lastSync.status === "completed" ? "#059669" : "#dc2626" }}>{lastSync.status}</span>)
-                {" "}· {lastSync.cycles_fetched} מחזורים
-              </>
-            )}
-          </div>
-        </div>
-        <button type="button" onClick={handleScan} disabled={scanning}
-                style={{ ...S.btnPrimary, opacity: scanning ? 0.6 : 1 }}>
-          {scanning ? "סורק…" : "🔄 סרוק עכשיו"}
-        </button>
-      </div>
-
       {err && (
         <div style={{ ...S.cardCompact, background: "#fee2e2", borderColor: "#fca5a5", color: "#991b1b" }}>
           שגיאה: {err}
         </div>
       )}
 
-      {/* ── Year selector — prominent at top ── */}
+      {/* ── Year selector — first thing the user sees ── */}
       <div style={{
         ...S.card, padding: 16, display: "flex", alignItems: "center",
         justifyContent: "space-between", gap: 12, flexWrap: "wrap",
@@ -779,6 +753,33 @@ export default function CoursesCyclesPanel() {
       {editing && (
         <EditCycleModal cycle={editing} onSave={handleSave} onClose={() => setEditing(null)} />
       )}
+
+      {/* ── Sync footer — operational metadata, kept discreet at bottom ── */}
+      <div style={{
+        marginTop: 24, padding: "12px 16px", display: "flex", alignItems: "center",
+        justifyContent: "space-between", gap: 12, flexWrap: "wrap",
+        fontSize: 11.5, color: T.textMuted, borderTop: `1px dashed ${T.cardBorder}`,
+      }}>
+        <div>
+          {lastSync ? (
+            <>
+              עודכן לאחרונה{" "}
+              <span style={{ color: T.textSecondary, fontWeight: 600 }}>
+                {fmtDateTime(lastSync.completed_at || lastSync.started_at)}
+              </span>
+              {lastSync.status !== "completed" && (
+                <span style={{ color: "#dc2626", marginRight: 6 }}>· {lastSync.status}</span>
+              )}
+            </>
+          ) : (
+            "טרם בוצע סנכרון"
+          )}
+        </div>
+        <button type="button" onClick={handleScan} disabled={scanning}
+                style={{ ...S.btnGhost, fontSize: 11.5, color: T.textSecondary, textDecoration: "underline" }}>
+          {scanning ? "סורק…" : "רענן עכשיו"}
+        </button>
+      </div>
     </div>
   );
 }
