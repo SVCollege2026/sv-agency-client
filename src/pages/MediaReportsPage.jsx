@@ -464,6 +464,84 @@ function MediaSummaryCharts({ rows: detailRows = [], dateLabel = "" }) {
   );
 }
 
+/**
+ * מאחד תוצאות מ-N קריאות getMediaDaily (יום-בודד) לאובייקט אחד מאוחד
+ * שכולל master_rows + detail_rows + totals אגרגטיבים. משמש כשהיומי
+ * מציג כמה ימים (ראשון = ה'+ו'+ש').
+ *
+ * אגרגציה ברמת מקור: למקור לא-ממומן (אורגני / ספקי לידים / אתר) אין
+ * spend/impressions/clicks ולכן הם נסכמים רק כ-leads_count.
+ */
+function _mergeDailyResults(dailies) {
+  if (!dailies.length) return null;
+  if (dailies.length === 1) return dailies[0];
+
+  // master_rows aggregation by source_name
+  const masterMap = new Map();
+  for (const d of dailies) {
+    for (const r of (d.master_rows || [])) {
+      const key = (r.source_name || r.platform || "—").trim();
+      if (!masterMap.has(key)) {
+        masterMap.set(key, {
+          source_name:           r.source_name,
+          source_kind:           r.source_kind,
+          campaigns_count:       0,
+          spend:                 0,
+          impressions:           0,
+          clicks:                0,
+          leads_count:           0,
+          new_leads_count:       0,
+          returning_leads_count: 0,
+        });
+      }
+      const a = masterMap.get(key);
+      a.campaigns_count       += Number(r.campaigns_count       || 0);
+      a.spend                 += Number(r.spend                 || 0);
+      a.impressions           += Number(r.impressions           || 0);
+      a.clicks                += Number(r.clicks                || 0);
+      a.leads_count           += Number(r.leads_count           || 0);
+      a.new_leads_count       += Number(r.new_leads_count       || 0);
+      a.returning_leads_count += Number(r.returning_leads_count || 0);
+    }
+  }
+  const master_rows = Array.from(masterMap.values()).map((a) => ({
+    ...a,
+    ctr_pct: a.impressions ? (a.clicks / a.impressions * 100) : 0,
+    cpl:     a.leads_count ? (a.spend  / a.leads_count)        : null,
+  })).sort((a, b) => (b.leads_count || 0) - (a.leads_count || 0));
+
+  // detail_rows = concat (כל קמפיין יום נפרד = שורה נפרדת)
+  const detail_rows = [];
+  for (const d of dailies) {
+    for (const r of (d.detail_rows || d.rows || [])) {
+      if (!r.is_summary) detail_rows.push(r);
+    }
+  }
+
+  // sub_status = concat לכל הימים
+  const sub_status = [];
+  for (const d of dailies) {
+    for (const r of (d.sub_status || [])) sub_status.push(r);
+  }
+
+  // totals — סכום פלטפורמות paid בלבד (לתאימות עם השדה הקיים)
+  const _sumNum = (k) => master_rows.reduce((s, r) => s + Number(r[k] || 0), 0);
+  const totalSpend = _sumNum("spend"), totalLeads = _sumNum("leads_count");
+  return {
+    master_rows,
+    detail_rows,
+    rows: detail_rows,    // alias לתאימות עם RangeChartsView
+    sub_status,
+    totals: {
+      leads: totalLeads,
+      spend: totalSpend,
+      cpl:   totalLeads ? totalSpend / totalLeads : null,
+    },
+    // איחוד רץ — לציון בלבד, לא תפעולי
+    _merged_from: dailies.map((d) => d.run?.report_date).filter(Boolean),
+  };
+}
+
 // Thin wrappers — pull the right rows out of the raw API response
 function DailyChartsView({ data, day, rangeStart, rangeEnd }) {
   const rows = useMemo(
@@ -1142,9 +1220,18 @@ export default function MediaReportsPage() {
     try {
       let d;
       if (mode === "daily") {
-        // אם הטווח של daily מכסה כמה ימים (ראשון = ה'+ו'+ש') — שולפים דרך range.
         if (dailyStart && dailyStart !== day) {
-          d = await getMediaRange(dailyStart, day);
+          // ראשון = ה'+ו'+ש' — שולפים את 3 הימים בנפרד ב-getMediaDaily
+          // (במקום getMediaRange) כדי לקבל גם master_rows הכולל מקורות
+          // non-paid (אורגני / ספקי לידים / אתר). אז אגרגציה client-side.
+          const dates = [];
+          for (let dt = new Date(dailyStart); dt <= new Date(day); dt.setDate(dt.getDate() + 1)) {
+            dates.push(dt.toISOString().slice(0, 10));
+          }
+          const results = await Promise.all(
+            dates.map((dd) => getMediaDaily(dd).catch(() => null))
+          );
+          d = _mergeDailyResults(results.filter(Boolean));
         } else {
           d = await getMediaDaily(day);
         }
@@ -1673,14 +1760,15 @@ export default function MediaReportsPage() {
                   ))}
                   {/* ── שורת סיכום: מחושבת מצד הלקוח אם אין כבר is_summary מהשרת ── */}
                   {!loading && tableRows.length > 0 && !tableRows.some((r) => r.is_summary) && (() => {
-                    // צבירה: מספרים מסוכמים, אחוזים מחושבים מחדש מסכומים גולמיים.
+                    // צבירה: מספרים מסוכמים, אחוזים/יחסים נגזרים מסכומים גולמיים.
                     const sums = {};
-                    let _totalSpend = 0, _totalImpressions = 0, _totalClicks = 0, _totalLeads = 0;
+                    let totalSpend = 0, totalImpressions = 0, totalClicks = 0, totalLeads = 0, totalBudget = 0;
                     for (const r of tableRows) {
-                      _totalSpend       += Number(r.spend       || 0);
-                      _totalImpressions += Number(r.impressions || 0);
-                      _totalClicks      += Number(r.clicks      || 0);
-                      _totalLeads       += Number(r.leads_count || 0);
+                      totalSpend       += Number(r.spend       || 0);
+                      totalImpressions += Number(r.impressions || 0);
+                      totalClicks      += Number(r.clicks      || 0);
+                      totalLeads       += Number(r.leads_count || 0);
+                      totalBudget      += Number(r.budget      || 0);
                       for (const c of visibleColList) {
                         const v = r[c.key];
                         if (typeof v === "number") {
@@ -1688,10 +1776,12 @@ export default function MediaReportsPage() {
                         }
                       }
                     }
-                    // אחוזים: לחשב מהסכומים, לא לסכם
-                    if ("ctr_pct"         in sums) sums.ctr_pct         = _totalImpressions ? (_totalClicks / _totalImpressions * 100) : 0;
-                    if ("budget_util_pct" in sums) sums.budget_util_pct = sums.budget       ? (sums.spend   / sums.budget         * 100) : 0;
-                    if ("cpl"             in sums) sums.cpl             = _totalLeads       ? (_totalSpend  / _totalLeads)              : null;
+                    // עמודות מחושבות (ratios/avgs) — תמיד מחושבות מחדש מסכומים גולמיים אם
+                    // העמודה מוצגת, גם אם אף שורה לא הכילה ערך מספרי.
+                    const _set = (k, v) => { if (visibleColList.some((c) => c.key === k)) sums[k] = v; };
+                    _set("ctr_pct",         totalImpressions ? (totalClicks / totalImpressions * 100) : 0);
+                    _set("budget_util_pct", totalBudget      ? (totalSpend  / totalBudget       * 100) : 0);
+                    _set("cpl",             totalLeads       ? (totalSpend  / totalLeads)               : null);
                     return (
                       <tr style={{ background: "#f1f5f9", borderTop: "2px solid #1e3a5f", fontWeight: 700, color: "#0f172a" }}>
                         {visibleColList.map((c, i) => (
