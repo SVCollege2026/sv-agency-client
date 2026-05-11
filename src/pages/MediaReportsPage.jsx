@@ -1437,7 +1437,7 @@ export default function MediaReportsPage() {
       >
         <div style={{ padding: "11px 14px", display: "flex", alignItems: "center", gap: 8 }}>
           <span>📣</span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#1e40af" }}>מחלקת מדיה · דוחות</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#1e40af" }}>ניהול קמפיינים</span>
         </div>
         <button
           type="button"
@@ -1459,7 +1459,7 @@ export default function MediaReportsPage() {
         {/* ── Header ── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "#0f172a" }}>מחלקת מדיה</h1>
+            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "#0f172a" }}>ניהול קמפיינים</h1>
           </div>
           <button
             type="button"

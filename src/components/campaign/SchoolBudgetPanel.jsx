@@ -1,54 +1,56 @@
 /**
- * SchoolBudgetPanel.jsx — תקציב בית-ספרי כללי (Spec 01 §8 — תוכנית פעילות בית ספרית ותקציבים).
- * Annual budget + monthly budget + media split per platform.
- * Saved to media_settings.payload.school_budget (no new table).
+ * SchoolBudgetPanel.jsx — תקציב בית-ספרי כללי. גמיש: שנתי, חודשי, או שניהם.
  */
 import React, { useState, useEffect } from "react";
 import { getSchoolBudget, updateSchoolBudget, listPlatformSettings } from "../../api.js";
 
-const section = {
-  background: "#ffffff", borderRadius: 10, border: "1px solid #e2e8f0",
-  padding: 20, marginBottom: 16,
+const card = {
+  background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb",
+  padding: 24, marginBottom: 16, boxShadow: "0 1px 3px rgba(15,23,42,0.04)",
 };
-
-const fieldLabel = {
-  display: "block", fontSize: 13, fontWeight: 700, color: "#334155", marginBottom: 4,
-};
-
+const fieldLabel = { display: "block", fontSize: 13, fontWeight: 700, color: "#1f2937", marginBottom: 6 };
+const hint = { fontSize: 12, color: "#9ca3af", marginTop: 4, lineHeight: 1.5 };
 const input = {
-  width: "100%", padding: "10px 12px", fontSize: 14,
-  border: "1px solid #cbd5e1", borderRadius: 6, direction: "rtl",
+  width: "100%", padding: "11px 14px", fontSize: 14,
+  border: "1px solid #e5e7eb", borderRadius: 8, direction: "rtl",
+  background: "#f9fafb",
 };
 
 export default function SchoolBudgetPanel() {
-  const [annual, setAnnual] = useState("");
+  // Two scopes — annual, monthly. Each can be filled independently.
+  const [annualEnabled,  setAnnualEnabled]  = useState(false);
+  const [monthlyEnabled, setMonthlyEnabled] = useState(false);
+  const [annual,  setAnnual]  = useState("");
   const [monthly, setMonthly] = useState("");
-  const [notes, setNotes] = useState("");
-  const [split, setSplit] = useState({});  // platform → fraction (0..1)
+  const [notes,   setNotes]   = useState("");
+  const [split,   setSplit]   = useState({});
   const [platforms, setPlatforms] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState(null);
+  const [msg, setMsg]   = useState(null);
 
   async function load() {
     try {
       const [budget, plats] = await Promise.all([
         getSchoolBudget(),
-        listPlatformSettings({ activeOnly: false }),
+        listPlatformSettings({ activeOnly: true }),
       ]);
-      setAnnual(budget.annual_budget_ils ?? "");
-      setMonthly(budget.monthly_budget_ils ?? "");
+      const a = budget.annual_budget_ils;
+      const m = budget.monthly_budget_ils;
+      setAnnualEnabled(a !== null && a !== undefined);
+      setMonthlyEnabled(m !== null && m !== undefined);
+      setAnnual(a ?? "");
+      setMonthly(m ?? "");
       setNotes(budget.notes ?? "");
       setSplit(budget.media_split || {});
       setPlatforms(plats || []);
-    } catch (e) {
-      setMsg(`שגיאה: ${e.message}`);
-    }
+    } catch (e) { setMsg(`שגיאה: ${e.message}`); }
   }
 
   useEffect(() => { load(); }, []);
 
   const splitSum = Object.values(split).reduce((a, b) => a + (Number(b) || 0), 0);
   const splitOk = Math.abs(splitSum - 1) < 0.001 || splitSum === 0;
+  const anyBudget = (annualEnabled && annual) || (monthlyEnabled && monthly);
 
   function setPlat(platform, v) {
     const num = v === "" ? 0 : Number(v);
@@ -59,13 +61,14 @@ export default function SchoolBudgetPanel() {
     setBusy(true); setMsg(null);
     try {
       await updateSchoolBudget({
-        annual_budget_ils:  annual ? Number(annual) : null,
-        monthly_budget_ils: monthly ? Number(monthly) : null,
+        annual_budget_ils:  annualEnabled && annual  ? Number(annual)  : null,
+        monthly_budget_ils: monthlyEnabled && monthly ? Number(monthly) : null,
         media_split:        split,
         notes:              notes || null,
         updated_by:         "marketing_manager",
       });
-      setMsg("✓ נשמר");
+      setMsg("✓ נשמר בהצלחה");
+      setTimeout(() => setMsg(null), 3000);
       await load();
     } catch (e) {
       setMsg(`שגיאה: ${e.message}`);
@@ -73,79 +76,143 @@ export default function SchoolBudgetPanel() {
   }
 
   return (
-    <div style={section}>
-      <h3 style={{ margin: "0 0 6px", fontSize: 17, color: "#0f172a", fontWeight: 700 }}>
-        💰 תכנית תקציב בית-ספרית
-      </h3>
-      <div style={{ fontSize: 13, color: "#64748b", marginBottom: 18 }}>
-        התקציב הכללי של בית הספר. תיקיות יכולות לצאת מהתקציב הזה (`from_existing`) או לקבל תקציב נפרד (`dedicated`).
+    <div style={card}>
+      <div style={{ marginBottom: 18 }}>
+        <h3 style={{ margin: "0 0 4px", fontSize: 18, color: "#111827", fontWeight: 700 }}>
+          💰 תכנית תקציב בית-ספרית
+        </h3>
+        <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.5 }}>
+          התקציב הכללי של בית הספר. תיקיות יכולות לצאת מהתקציב הזה (<em>"מהתקציב הקיים"</em>) או לקבל תקציב נפרד (<em>"ייעודי"</em>).
+        </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 18 }}>
-        <div>
-          <label style={fieldLabel}>תקציב שנתי (₪)</label>
-          <input style={input} type="number" value={annual} onChange={e => setAnnual(e.target.value)} placeholder="300000" />
+      {/* Budget mode picker — flexible: annual, monthly, or both */}
+      <div style={{ marginBottom: 22 }}>
+        <div style={fieldLabel}>איזה תקציב את יודעת להגדיר כרגע?</div>
+        <div style={hint}>אפשר רק שנתי, רק חודשי, או שניהם. אל תכריחי את עצמך אם אין מספר.</div>
+        <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+          <BudgetToggle
+            active={annualEnabled} onClick={() => setAnnualEnabled(v => !v)}
+            icon="📆" label="תקציב שנתי" hint="סכום שמוקצה לכלל השנה" />
+          <BudgetToggle
+            active={monthlyEnabled} onClick={() => setMonthlyEnabled(v => !v)}
+            icon="🗓" label="תקציב חודשי" hint="סכום קבוע לכל חודש" />
         </div>
-        <div>
-          <label style={fieldLabel}>תקציב חודשי (₪)</label>
-          <input style={input} type="number" value={monthly} onChange={e => setMonthly(e.target.value)} placeholder="25000" />
-          {annual && monthly && (
-            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
-              {Number(monthly) * 12 === Number(annual)
-                ? "✓ מתואם עם שנתי (×12)"
-                : `שנתי המחושב: ₪${(Number(monthly) * 12).toLocaleString()}`}
+      </div>
+
+      {(annualEnabled || monthlyEnabled) && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 18 }}>
+          {annualEnabled && (
+            <div>
+              <label style={fieldLabel}>תקציב שנתי (₪)</label>
+              <input style={input} type="number" value={annual} onChange={e => setAnnual(e.target.value)} placeholder="לדוגמה 300,000" />
+              {annual && monthlyEnabled && monthly && (
+                <div style={hint}>
+                  {Number(monthly) * 12 === Number(annual)
+                    ? "✓ מסונכרן עם החודשי (×12)"
+                    : `שים לב: 12 × חודשי = ₪${(Number(monthly) * 12).toLocaleString("he-IL")}`}
+                </div>
+              )}
+            </div>
+          )}
+          {monthlyEnabled && (
+            <div>
+              <label style={fieldLabel}>תקציב חודשי (₪)</label>
+              <input style={input} type="number" value={monthly} onChange={e => setMonthly(e.target.value)} placeholder="לדוגמה 25,000" />
+              {monthly && !annualEnabled && (
+                <div style={hint}>תקציב שנתי משוער (×12): ₪{(Number(monthly) * 12).toLocaleString("he-IL")}</div>
+              )}
             </div>
           )}
         </div>
-      </div>
+      )}
 
-      <div style={{ marginBottom: 18 }}>
+      {!anyBudget && (
+        <div style={{
+          background: "#fef3c7", color: "#854d0e", padding: "12px 16px",
+          borderRadius: 10, fontSize: 13, marginBottom: 18,
+        }}>
+          ℹ עוד לא הזנת תקציב. סמני לפחות שנתי או חודשי כדי לאפשר חישוב תקציב.
+        </div>
+      )}
+
+      <div style={{ marginBottom: 22 }}>
         <label style={fieldLabel}>חלוקה למדיה (סכום ל-100%)</label>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+        <div style={hint}>איך התקציב יתחלק בין הפלטפורמות. אופציונלי — אפשר לחזור לזה מאוחר יותר.</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
           {platforms.map(p => (
             <div key={p.platform} style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "8px 12px",
-              background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0",
+              display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
+              background: "#f9fafb", borderRadius: 10, border: "1px solid #e5e7eb",
             }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#334155" }}>{p.platform}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>
+                {p.platform === "meta" ? "📘 Meta" :
+                 p.platform === "google" ? "🔍 Google" :
+                 p.platform === "tiktok" ? "🎵 TikTok" :
+                 p.platform}
+              </span>
               <input
                 type="number" step="0.05" min="0" max="1"
                 value={split[p.platform] ?? ""}
                 onChange={e => setPlat(p.platform, e.target.value)}
-                style={{ width: 80, padding: "4px 8px", border: "1px solid #cbd5e1", borderRadius: 4, fontSize: 13 }}
+                style={{ width: 80, padding: "5px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, background: "#fff" }}
+                placeholder="0.0"
               />
-              <span style={{ fontSize: 12, color: "#64748b" }}>= {Math.round((split[p.platform] || 0) * 100)}%</span>
+              <span style={{ fontSize: 12, color: "#6b7280", minWidth: 36 }}>= {Math.round((split[p.platform] || 0) * 100)}%</span>
             </div>
           ))}
         </div>
-        <div style={{
-          marginTop: 8, fontSize: 12,
-          color: splitOk ? "#15803d" : "#b91c1c", fontWeight: 600,
-        }}>
-          סך החלוקה: {Math.round(splitSum * 100)}% {splitOk ? "✓" : "⚠ צריך להסתכם ל-100%"}
-        </div>
+        {Object.keys(split).length > 0 && (
+          <div style={{
+            marginTop: 10, fontSize: 12, fontWeight: 700,
+            color: splitOk ? "#15803d" : "#b91c1c",
+          }}>
+            סך החלוקה: {Math.round(splitSum * 100)}% {splitOk ? "✓" : "⚠ צריך להסתכם ב-100%"}
+          </div>
+        )}
       </div>
 
-      <div style={{ marginBottom: 18 }}>
-        <label style={fieldLabel}>הערות</label>
-        <textarea
-          value={notes} onChange={e => setNotes(e.target.value)}
-          rows={3}
-          style={{ ...input, resize: "vertical", fontFamily: "inherit" }}
-          placeholder="הערות תכנון, דגשים מיוחדים, חוקי חלוקה..."
-        />
+      <div style={{ marginBottom: 22 }}>
+        <label style={fieldLabel}>הערות והנחיות כלליות</label>
+        <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
+                  style={{ ...input, resize: "vertical", fontFamily: "inherit" }}
+                  placeholder="לדוגמה: חוקי חלוקה לפי עונה, נקודות תשומת לב, יעדים חצי-שנתיים..." />
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{
-          fontSize: 13, fontWeight: 700,
-          color: msg?.startsWith("✓") ? "#15803d" : "#b91c1c",
-        }}>{msg}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 18, borderTop: "1px solid #e5e7eb" }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: msg?.startsWith("✓") ? "#15803d" : "#b91c1c" }}>
+          {msg || ""}
+        </span>
         <button onClick={save} disabled={busy} style={{
-          padding: "10px 20px", background: "#1e3a5f", color: "#fff", border: "none",
-          borderRadius: 6, cursor: busy ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 14,
-        }}>{busy ? "שומר..." : "💾 שמור"}</button>
+          padding: "11px 24px", background: "#1e3a5f", color: "#fff", border: "none",
+          borderRadius: 8, cursor: busy ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 14,
+          boxShadow: "0 2px 6px rgba(30,58,95,0.25)", opacity: busy ? 0.6 : 1,
+        }}>{busy ? "שומר..." : "💾 שמירת שינויים"}</button>
       </div>
+    </div>
+  );
+}
+
+function BudgetToggle({ active, onClick, icon, label, hint }) {
+  return (
+    <div onClick={onClick} style={{
+      flex: 1, minWidth: 200, padding: "14px 16px", borderRadius: 10, cursor: "pointer",
+      background: active ? "#eff6ff" : "#fff",
+      border: `2px solid ${active ? "#1e3a5f" : "#e5e7eb"}`,
+      display: "flex", alignItems: "center", gap: 12, transition: "all 0.15s",
+    }}>
+      <span style={{ fontSize: 24 }}>{icon}</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: active ? "#1e3a5f" : "#111827" }}>{label}</div>
+        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{hint}</div>
+      </div>
+      <div style={{
+        width: 20, height: 20, borderRadius: "50%",
+        background: active ? "#1e3a5f" : "#fff",
+        border: `2px solid ${active ? "#1e3a5f" : "#cbd5e1"}`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: "#fff", fontSize: 12, fontWeight: 700,
+      }}>{active && "✓"}</div>
     </div>
   );
 }
