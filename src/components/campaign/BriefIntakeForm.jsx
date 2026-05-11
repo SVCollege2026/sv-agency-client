@@ -107,6 +107,7 @@ export default function BriefIntakeForm({ folderId = null, onSubmitted = () => {
         monthly_budget:  monthlyBudget ? Number(monthlyBudget) : null,
         important_media: importantMedia.split(",").map(s => s.trim()).filter(Boolean),
         goals:           schoolGoals,
+        notes,
       };
     }
     return {
@@ -251,6 +252,11 @@ export default function BriefIntakeForm({ folderId = null, onSubmitted = () => {
           </Field>
           <Field label="יעדים">
             <textarea style={{ ...inputStyle, minHeight: 70 }} value={schoolGoals} onChange={e => setSchoolGoals(e.target.value)} placeholder="מספר נרשמים, CPL מקסימלי, יעדי הרשמה..." />
+          </Field>
+
+          <h4 style={sectionTitle}>📌 נקודות תשומת לב</h4>
+          <Field label="הערות חופשיות לצוות" hint="כל מה שחשוב שמחלקת המדיה והקריאייטיב יידעו: דגשים, סייגים, חוויה מהשנה הקודמת...">
+            <textarea style={{ ...inputStyle, minHeight: 80 }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="לדוגמה: אסור להזכיר את המתחרה X · שווה לדגוש Y · בעבר עבד Z" />
           </Field>
         </>
       )}
