@@ -29,8 +29,10 @@ export default function App() {
           <Route path="reports"    element={<ReportsPage />} />
         </Route>
 
-        {/* Media department — דוחות + חקירות + תהליך + שאלות */}
-        <Route path="/media-reports" element={<MediaReportsPage />} />
+        {/* Media department — דוחות + חקירות + תהליך + שאלות + ניהול קמפיינים */}
+        <Route path="/media-reports"        element={<MediaReportsPage />} />
+        {/* Campaign Management — canonical (soft navigates from /media-reports work too) */}
+        <Route path="/campaign-management"  element={<MediaReportsPage />} />
 
         {/* Strategy department — חיזוי + יעדים פעילים */}
         <Route path="/strategy" element={<StrategyLayout />}>

@@ -411,3 +411,289 @@ export async function triggerCoursesScan() {
 export async function getCoursesSyncRuns(limit = 10) {
   return request("GET", `/api/courses-cycles/sync-runs?limit=${limit}`);
 }
+
+// ─── Campaign Management — Workflow ───────────────────────────────────────────
+// Spec 01 v6 — Workflow Spine. POST /requests starts the full pipeline.
+
+export async function submitCampaignRequest(body) {
+  // body: { folder_id?, request_type, brief_type, brief_payload, brief_doc_url?, submitter? }
+  return request("POST", "/api/workflow/requests", body);
+}
+
+export async function getWorkflowItem(itemId) {
+  return request("GET", `/api/workflow/items/${itemId}`);
+}
+
+export async function approveWorkflowItem(itemId, body) {
+  // body: { approved_by, reason? }
+  return request("POST", `/api/workflow/items/${itemId}/approve`, body);
+}
+
+export async function rejectWorkflowItem(itemId, body) {
+  // body: { rejected_by, reason } — reason חובה (Spec 03 §6.2)
+  return request("POST", `/api/workflow/items/${itemId}/reject`, body);
+}
+
+export async function listWorkflowQueue(targetDepartment = null) {
+  const qs = targetDepartment ? `?target_department=${encodeURIComponent(targetDepartment)}` : "";
+  return request("GET", `/api/workflow/queue${qs}`);
+}
+
+export async function listWorkflowBlockers({ ownerRole = null, severity = null, onlyOpen = true } = {}) {
+  const p = new URLSearchParams({ only_open: onlyOpen ? "true" : "false" });
+  if (ownerRole) p.set("owner_role", ownerRole);
+  if (severity)  p.set("severity",   severity);
+  return request("GET", `/api/workflow/blockers?${p.toString()}`);
+}
+
+export async function resolveBlocker(blockerId, body) {
+  // body: { resolution, resolved_by? }
+  return request("POST", `/api/workflow/blockers/${blockerId}/resolve`, body);
+}
+
+export async function dispatchDepartment(department, agentId = "ui_dispatcher") {
+  return request(
+    "POST",
+    `/api/workflow/dispatch?department=${encodeURIComponent(department)}&agent_id=${encodeURIComponent(agentId)}`,
+  );
+}
+
+// ─── Campaign Management — Campaigns (folders + briefs) ───────────────────────
+
+export async function listCampaignFolders({ status = null, fireberryCourseId = null } = {}) {
+  const p = new URLSearchParams();
+  if (status) p.set("status", status);
+  if (fireberryCourseId) p.set("fireberry_course_id", fireberryCourseId);
+  const qs = p.toString();
+  return request("GET", `/api/campaigns/folders${qs ? "?" + qs : ""}`);
+}
+
+export async function getCampaignFolder(folderId, { includeVersions = false } = {}) {
+  const qs = includeVersions ? "?include_versions=true" : "";
+  return request("GET", `/api/campaigns/folders/${folderId}${qs}`);
+}
+
+export async function createCampaignFolder(body) {
+  // body: { course_name, fireberry_course_id?, activity_label?, planned_go_live_date?,
+  //         methodology_switch_date?, methodology_switch_to?, created_by?, metadata? }
+  return request("POST", "/api/campaigns/folders", body);
+}
+
+export async function updateCampaignFolder(folderId, body) {
+  return request("PATCH", `/api/campaigns/folders/${folderId}`, body);
+}
+
+export async function listFolderBriefs(folderId, { includeVersions = false } = {}) {
+  const qs = includeVersions ? "?include_versions=true" : "";
+  return request("GET", `/api/campaigns/briefs/${folderId}${qs}`);
+}
+
+export async function getBriefVersionHistory(folderId, requestType) {
+  return request("GET", `/api/campaigns/briefs/${folderId}/${requestType}/history`);
+}
+
+// ─── Campaign Management — Notifications (multi-channel) ─────────────────────
+
+export async function listNotifications({ recipientRole = "marketing_manager", onlyUnread = true, limit = 50 } = {}) {
+  const p = new URLSearchParams({
+    recipient_role: recipientRole,
+    only_unread: onlyUnread ? "true" : "false",
+    limit: String(limit),
+  });
+  return request("GET", `/api/notifications/?${p.toString()}`);
+}
+
+export async function markNotificationRead(eventId, byRole = "marketing_manager") {
+  return request("POST", `/api/notifications/${eventId}/read?by_role=${encodeURIComponent(byRole)}`);
+}
+
+export async function listNotificationChannels({ activeOnly = false } = {}) {
+  const qs = activeOnly ? "?active_only=true" : "";
+  return request("GET", `/api/notifications/channels${qs}`);
+}
+
+export async function toggleNotificationChannel(channelId, body) {
+  // body: { is_active, changed_by?, change_reason? }
+  return request("PATCH", `/api/notifications/channels/${channelId}/active`, body);
+}
+
+export async function listNotificationPreferences(recipientRole = null) {
+  const qs = recipientRole ? `?recipient_role=${encodeURIComponent(recipientRole)}` : "";
+  return request("GET", `/api/notifications/preferences${qs}`);
+}
+
+export async function upsertNotificationPreference(body) {
+  // body: { recipient_role, channel_id, event_type, is_enabled, min_severity }
+  return request("PUT", "/api/notifications/preferences", body);
+}
+
+// ─── Campaign Management — Settings ─────────────────────────────────────────
+
+export async function getGeneralSettings() {
+  return request("GET", "/api/settings/general");
+}
+
+export async function updateGeneralSettings(body) {
+  // body: { payload, updated_by, change_reason? }
+  return request("PUT", "/api/settings/general", body);
+}
+
+export async function getCourseSettings(folderId) {
+  return request("GET", `/api/settings/course/${folderId}`);
+}
+
+export async function upsertCourseSettings(folderId, body) {
+  return request("PUT", `/api/settings/course/${folderId}`, body);
+}
+
+export async function listPlatformSettings({ activeOnly = false } = {}) {
+  const qs = activeOnly ? "?active_only=true" : "";
+  return request("GET", `/api/settings/platform${qs}`);
+}
+
+export async function getPlatformSettings(platform) {
+  return request("GET", `/api/settings/platform/${platform}`);
+}
+
+export async function updatePlatformSettings(platform, body) {
+  // body: { payload, formats?, is_active?, updated_by, change_reason? }
+  return request("PUT", `/api/settings/platform/${platform}`, body);
+}
+
+export async function getEffectiveSettings({ folderId = null, platform = null } = {}) {
+  const p = new URLSearchParams();
+  if (folderId) p.set("folder_id", folderId);
+  if (platform) p.set("platform",  platform);
+  const qs = p.toString();
+  return request("GET", `/api/settings/effective${qs ? "?" + qs : ""}`);
+}
+
+export async function listMediaRules({ scope = null, activeOnly = true } = {}) {
+  const p = new URLSearchParams({ active_only: activeOnly ? "true" : "false" });
+  if (scope) p.set("scope", scope);
+  return request("GET", `/api/settings/rules?${p.toString()}`);
+}
+
+export async function createMediaRule(body) {
+  return request("POST", "/api/settings/rules", body);
+}
+
+export async function updateMediaRule(ruleId, body) {
+  return request("PATCH", `/api/settings/rules/${ruleId}`, body);
+}
+
+export async function listBudgetSources(folderId = null) {
+  const qs = folderId ? `?folder_id=${folderId}` : "";
+  return request("GET", `/api/settings/budgets/sources${qs}`);
+}
+
+export async function createBudgetSource(body) {
+  return request("POST", "/api/settings/budgets/sources", body);
+}
+
+export async function listBudgetAllocations(folderId = null) {
+  const qs = folderId ? `?folder_id=${folderId}` : "";
+  return request("GET", `/api/settings/budgets/allocations${qs}`);
+}
+
+export async function decideBudgetAllocation(allocationId, { decision, decidedBy, reason = null } = {}) {
+  const p = new URLSearchParams({ decision, decided_by: decidedBy });
+  if (reason) p.set("reason", reason);
+  return request("PATCH", `/api/settings/budgets/allocations/${allocationId}/decide?${p.toString()}`);
+}
+
+// ─── Campaign Management — Recommendations Engine ───────────────────────────
+
+export async function runRecommendationEngine(body) {
+  // body: { metrics, platform, folder_id?, activity_label?, campaign_ref?, data_window? }
+  return request("POST", "/api/recommendations/run", body);
+}
+
+export async function listRecommendations({ folderId = null, platform = null, decisionStatus = null, limit = 50 } = {}) {
+  const p = new URLSearchParams({ limit: String(limit) });
+  if (folderId)       p.set("folder_id", folderId);
+  if (platform)       p.set("platform", platform);
+  if (decisionStatus) p.set("decision_status", decisionStatus);
+  return request("GET", `/api/recommendations/?${p.toString()}`);
+}
+
+export async function getRecommendation(recId) {
+  return request("GET", `/api/recommendations/${recId}`);
+}
+
+export async function decideRecommendation(recId, body) {
+  // body: { decided_by, decision, reason?, qa_feedback_dimensions[] }
+  return request("POST", `/api/recommendations/${recId}/decide`, body);
+}
+
+export async function listRecommendationPolicies({ activeOnly = true } = {}) {
+  const qs = activeOnly ? "?active_only=true" : "?active_only=false";
+  return request("GET", `/api/recommendations/policies${qs}`);
+}
+
+// ─── Campaign Management — QA harnesses ────────────────────────────────────
+
+export async function runSetupSimulation(body) {
+  // body: { brief_payload, request_type, folder_id? }
+  return request("POST", "/api/qa/setup-simulation", body);
+}
+
+export async function runRecommendationsSimulation(body) {
+  // body: { metrics, platform, folder_id? }
+  return request("POST", "/api/qa/recommendations-simulation", body);
+}
+
+// ─── Campaign Management — Closure + Methodology + Dry Run ──────────────────
+
+export async function closeCampaign(folderId, body) {
+  // body: { requested_by, reason, campaign_name_confirmation } — reason חובה
+  return request("POST", `/api/closure/folders/${folderId}/close`, body);
+}
+
+export async function scheduleMethodologySwitch(folderId, body) {
+  // body: { switch_date, switch_to: 'conversion'|'clicks', requested_by }
+  return request("POST", `/api/closure/folders/${folderId}/methodology-switch`, body);
+}
+
+export async function getDryRunStatus() {
+  return request("GET", "/api/closure/dry-run-status");
+}
+
+// ─── Campaign Management — MAKE department ──────────────────────────────────
+
+export async function syncMakeInventory() {
+  return request("POST", "/api/make-dept/inventory/sync");
+}
+
+export async function listMakeInventory({ category = null, activeOnly = false } = {}) {
+  const p = new URLSearchParams({ active_only: activeOnly ? "true" : "false" });
+  if (category) p.set("category", category);
+  return request("GET", `/api/make-dept/inventory?${p.toString()}`);
+}
+
+export async function markMakeRelevant(inventoryId, body) {
+  // body: { relevance_reason, business_label?, confirmed_by? }
+  return request("POST", `/api/make-dept/inventory/${inventoryId}/mark-relevant`, body);
+}
+
+export async function runMakeHealth() {
+  return request("POST", "/api/make-dept/health/run");
+}
+
+export async function listMakeHealthEvents({ status = "open", limit = 50 } = {}) {
+  const p = new URLSearchParams({ limit: String(limit) });
+  if (status) p.set("status", status);
+  return request("GET", `/api/make-dept/health/events?${p.toString()}`);
+}
+
+// ─── Campaign Management — Platform Connector (Phase 10) ───────────────────
+
+export async function startPlatformConnection(body) {
+  // body: { platform, requested_by? }
+  return request("POST", "/api/platform-connect/start", body);
+}
+
+export async function completePlatformConnection(workflowItemId, body) {
+  // body: { platform, api_key_env_name, api_key_value, by? }
+  return request("POST", `/api/platform-connect/${workflowItemId}/complete`, body);
+}
