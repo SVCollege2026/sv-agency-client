@@ -697,3 +697,32 @@ export async function completePlatformConnection(workflowItemId, body) {
   // body: { platform, api_key_env_name, api_key_value, by? }
   return request("POST", `/api/platform-connect/${workflowItemId}/complete`, body);
 }
+
+// ─── Campaign Management — File uploads + school-wide budget ────────────────
+
+export async function uploadCampaignFile(file, { folderId = null, purpose = "brief" } = {}) {
+  const form = new FormData();
+  form.append("file", file);
+  if (folderId) form.append("folder_id", folderId);
+  form.append("purpose", purpose);
+  const res = await fetch(`${BASE}/api/campaigns/upload`, { method: "POST", body: form });
+  if (!res.ok) {
+    let msg = `שגיאת העלאה: ${res.status}`;
+    try { const j = await res.json(); msg = j.detail || msg; } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+export function fileAccessUrl(objectPath) {
+  return `${BASE}/api/campaigns/files/${objectPath}`;
+}
+
+export async function getSchoolBudget() {
+  return request("GET", "/api/campaigns/school-budget");
+}
+
+export async function updateSchoolBudget(body) {
+  // body: { annual_budget_ils, monthly_budget_ils, media_split, notes, updated_by? }
+  return request("PUT", "/api/campaigns/school-budget", body);
+}

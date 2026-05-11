@@ -3,18 +3,20 @@
  * Sub-tabs: לוח קמפיינים / בריף חדש / הגדרות / חסמים פתוחים.
  */
 import React, { useState } from "react";
-import FolderList from "./FolderList.jsx";
+import FolderBoard from "./FolderBoard.jsx";
 import FolderDetail from "./FolderDetail.jsx";
 import BriefIntakeForm from "./BriefIntakeForm.jsx";
 import SettingsPanel from "./SettingsPanel.jsx";
+import SchoolBudgetPanel from "./SchoolBudgetPanel.jsx";
 import NotificationBell from "./NotificationBell.jsx";
 import BlockersInbox from "./BlockersInbox.jsx";
 
 const SUB_TABS = [
-  { id: "board",    label: "🗂 לוח קמפיינים" },
-  { id: "intake",   label: "📝 בריף חדש" },
-  { id: "blockers", label: "⛔ חסמים פתוחים" },
-  { id: "settings", label: "⚙ הגדרות" },
+  { id: "board",     label: "🗂 לוח קמפיינים" },
+  { id: "intake",    label: "📝 בריף חדש" },
+  { id: "blockers",  label: "⛔ חסמים פתוחים" },
+  { id: "budget",    label: "💰 תקציב בית-ספרי" },
+  { id: "settings",  label: "⚙ הגדרות" },
 ];
 
 export default function CampaignTab() {
@@ -45,7 +47,7 @@ export default function CampaignTab() {
       {sub === "board" && (
         folderId
           ? <FolderDetail folderId={folderId} onBack={() => { setFolderId(null); setRefreshKey(k => k + 1); }} />
-          : <FolderList onSelectFolder={setFolderId} refreshKey={refreshKey} />
+          : <FolderBoard onSelectFolder={setFolderId} refreshKey={refreshKey} />
       )}
 
       {sub === "intake" && (
@@ -56,6 +58,8 @@ export default function CampaignTab() {
       )}
 
       {sub === "blockers" && <BlockersInbox />}
+
+      {sub === "budget"   && <SchoolBudgetPanel />}
 
       {sub === "settings" && <SettingsPanel />}
     </div>
