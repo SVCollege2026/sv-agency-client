@@ -15,11 +15,13 @@ import SettingsPanel from "./SettingsPanel.jsx";
 import SchoolBudgetPanel from "./SchoolBudgetPanel.jsx";
 import NotificationBell from "./NotificationBell.jsx";
 import BlockersInbox from "./BlockersInbox.jsx";
+import ArtifactsApprovalPanel from "./ArtifactsApprovalPanel.jsx";
 
 const SUB_TABS = [
   { id: "board",     label: "לוח קמפיינים",     icon: "🗂", desc: "כל תיקיות הקמפיין לפי סטטוס" },
   { id: "intake",    label: "בריף חדש",         icon: "📝", desc: "שליחת בריף בית-ספרי או לקורס" },
-  { id: "tasks",     label: "דורש פעולה",       icon: "✅", desc: "אישורים, תיקונים והחלטות שמחכים לך" },
+  { id: "approvals", label: "תוצרים לאישור",    icon: "✋", desc: "כל מה שמחלקות הסוכנים הכינו ומחכה לאישור שלך — קופי, קריאייטיב, פריסות מדיה ותקציבים" },
+  { id: "tasks",     label: "דורש פעולה",       icon: "✅", desc: "אישורים מהירים, תיקונים והחלטות שמחכות לך" },
   { id: "budget",    label: "תקציב בית-ספרי",   icon: "💰", desc: "תכנית התקציב הכוללת" },
   { id: "settings",  label: "הגדרות מערכת",     icon: "⚙",  desc: "חוקי המלצה, ערוצי התראה, פלטפורמות" },
 ];
@@ -97,9 +99,10 @@ export default function CampaignTab() {
         />
       )}
 
-      {sub === "tasks"    && <BlockersInbox />}
-      {sub === "budget"   && <SchoolBudgetPanel />}
-      {sub === "settings" && <SettingsPanel />}
+      {sub === "approvals" && <ArtifactsApprovalPanel />}
+      {sub === "tasks"     && <BlockersInbox />}
+      {sub === "budget"    && <SchoolBudgetPanel />}
+      {sub === "settings"  && <SettingsPanel />}
     </div>
   );
 }

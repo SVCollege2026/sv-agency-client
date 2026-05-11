@@ -60,14 +60,17 @@ export default function RecommendationsPanel({ folderId, recommendations = [], o
   if (recommendations.length === 0) {
     return (
       <div style={card}>
-        <h3 style={{ margin: "0 0 6px", fontSize: 16, color: "#111827", fontWeight: 700 }}>💡 המלצות מדיה</h3>
+        <h3 style={{ margin: "0 0 4px", fontSize: 16, color: "#111827", fontWeight: 700 }}>💡 התראות פעולה מהמערכת</h3>
+        <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 12 }}>
+          המערכת מנטרת את הקמפיין באופן רציף. כשהיא מזהה משהו שדורש את תשומת לבך — היא מציעה לך פעולה כאן.
+        </div>
         <div style={{
           textAlign: "center", padding: "30px 12px", color: "#6b7280",
           background: "#f9fafb", borderRadius: 10, fontSize: 14, fontWeight: 600,
         }}>
-          🌱 אין המלצות פעילות לתיקייה הזו כרגע.<br />
+          🌱 אין התראות פעולה כרגע — הקמפיין פועל באופן תקין.<br />
           <span style={{ fontSize: 13, color: "#9ca3af", fontWeight: 400 }}>
-            ברגע שיהיו נתונים מספיקים והמערכת תזהה משהו שדורש את תשומת לבך — היא תוצאה כאן.
+            ברגע שהמערכת תזהה משהו שדורש את תשומת לבך — היא תוצאה כאן.
           </span>
         </div>
       </div>
@@ -76,10 +79,13 @@ export default function RecommendationsPanel({ folderId, recommendations = [], o
 
   return (
     <div style={card}>
-      <h3 style={{ margin: "0 0 14px", fontSize: 16, color: "#111827", fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
-        💡 המלצות מדיה
+      <h3 style={{ margin: "0 0 4px", fontSize: 16, color: "#111827", fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+        💡 התראות פעולה מהמערכת
         <span style={{ fontSize: 13, fontWeight: 400, color: "#9ca3af" }}>({recommendations.length})</span>
       </h3>
+      <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 14 }}>
+        המערכת זיהתה דברים שדורשים את תשומת לבך. את יכולה לאשר את ההמלצה, לדחות, או לדחות לעת עתה.
+      </div>
       {recommendations.map(r => (
         <RecommendationCard key={r.id} rec={r} onChanged={onChanged} />
       ))}

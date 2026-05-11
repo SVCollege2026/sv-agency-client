@@ -726,3 +726,32 @@ export async function updateSchoolBudget(body) {
   // body: { annual_budget_ils, monthly_budget_ils, media_split, notes, updated_by? }
   return request("PUT", "/api/campaigns/school-budget", body);
 }
+
+// ─── Campaign Management — Artifacts (תוצרים לאישור) ─────────────────────────
+
+export async function listArtifacts({ folderId = null, status = null, artifactType = null, pendingForApproval = false, limit = 100 } = {}) {
+  const p = new URLSearchParams({ limit: String(limit) });
+  if (folderId)      p.set("folder_id", folderId);
+  if (status)        p.set("status", status);
+  if (artifactType)  p.set("artifact_type", artifactType);
+  if (pendingForApproval) p.set("pending_for_approval", "true");
+  return request("GET", `/api/artifacts/?${p.toString()}`);
+}
+
+export async function getArtifact(artifactId) {
+  return request("GET", `/api/artifacts/${artifactId}`);
+}
+
+export async function approveArtifact(artifactId, body = {}) {
+  return request("POST", `/api/artifacts/${artifactId}/approve`, { decided_by: "marketing_manager", ...body });
+}
+
+export async function requestArtifactRevision(artifactId, body) {
+  // body: { revision_note, decided_by? }
+  return request("POST", `/api/artifacts/${artifactId}/request-revision`, { decided_by: "marketing_manager", ...body });
+}
+
+export async function forwardArtifact(artifactId, body) {
+  // body: { target: 'launch'|'school_director'|'next_stage', note?, decided_by? }
+  return request("POST", `/api/artifacts/${artifactId}/forward`, { decided_by: "marketing_manager", ...body });
+}
