@@ -35,6 +35,7 @@ import {
   generateMediaStage0,
 } from "../api.js";
 import CoursesCyclesPanel from "../components/CoursesCyclesPanel.jsx";
+import CampaignTab from "../components/campaign/CampaignTab.jsx";
 
 // ─── Utils ───────────────────────────────────────────────────────────────────
 
@@ -206,14 +207,16 @@ function hebSourceKind(k) {
 //   📊 סטטוס מדיה   — מאחד יומי/שבועי/טווח/חודשי Y-o-Y כ-sub-tabs
 //   📋 רישום לקורסים — דשבורד פאי + טבלאות קורסים+מחזורים, מסונן לפי שנה
 const MODES = [
-  { id: "media_status", label: "📊 סטטוס מדיה",   url: "status" },
-  { id: "registration", label: "📋 רישום לקורסים", url: "registration" },
+  { id: "media_status", label: "📊 סטטוס מדיה",      url: "status" },
+  { id: "registration", label: "📋 רישום לקורסים",   url: "registration" },
+  { id: "marketing",    label: "🎯 פעילות שיווקית", url: "marketing" },
 ];
 
 // מיפוי URL ↔ mode
 const URL_TO_MODE = {
   "status":       "media_status",
   "registration": "registration",
+  "marketing":    "marketing",
   // sub-modes של media_status — נכנסים כמופע סטטוס עם submode
   "daily":   "daily",
   "weekly":  "weekly",
@@ -237,7 +240,7 @@ const _isMediaStatusMode = (m) => _MEDIA_STATUS_IDS.includes(m);
 
 // המצבים החדשים אינם משתמשים ב-fetchMediaDaily/Weekly/Range/Monthly. כל אחד
 // מנהל את הfetching שלו פנימית.
-const _NEW_MODES = ["stage0", "investigations", "timeline", "recommendations", "registration", "media_status"];
+const _NEW_MODES = ["stage0", "investigations", "timeline", "recommendations", "registration", "media_status", "marketing"];
 const _isLegacyMode = (m) => !_NEW_MODES.includes(m);
 
 // ─── Monthly KPI sub-component ─────────────────────────────────────────────
@@ -1706,7 +1709,9 @@ export default function MediaReportsPage() {
         )}
 
         {/* ── Main content ── */}
-        {mode === "registration" ? (
+        {mode === "marketing" ? (
+          <CampaignTab />
+        ) : mode === "registration" ? (
           <CoursesCyclesPanel />
         ) : mode === "monthly" ? (
           <MonthlyKpiView />
