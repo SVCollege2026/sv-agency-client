@@ -564,7 +564,7 @@ export default function CoursesCyclesPanel() {
         </div>
       )}
 
-      {/* ── Year selector — first thing the user sees ── */}
+      {/* ── Year selector + Update button (top, prominent) ── */}
       <div style={{
         ...S.card, padding: 16, display: "flex", alignItems: "center",
         justifyContent: "space-between", gap: 12, flexWrap: "wrap",
@@ -586,8 +586,33 @@ export default function CoursesCyclesPanel() {
             </div>
           )}
         </div>
-        <div style={{ fontSize: 12, color: T.textMuted }}>
-          {cyclesInYear.length} מחזורים בשנת {filterYear}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 12, color: T.textMuted }}>
+            {cyclesInYear.length} מחזורים בשנת {filterYear}
+          </span>
+          {/* כפתור עדכון בולט — מסנכרן מ-Fireberry בזמן אמת, ללא תלות ב-cron של 06:00 */}
+          <button
+            type="button"
+            onClick={handleScan}
+            disabled={scanning}
+            style={{
+              ...S.btnPrimary,
+              padding: "9px 18px",
+              fontSize: 13.5,
+              opacity: scanning ? 0.7 : 1,
+              cursor: scanning ? "wait" : "pointer",
+              display: "inline-flex", alignItems: "center", gap: 6,
+            }}
+            title="שולף את הנתונים העדכניים ביותר מ-Fireberry — ללא קשר לריצה האוטומטית של 06:00"
+          >
+            <span style={{
+              fontSize: 14,
+              display: "inline-block",
+              animation: scanning ? "spin 1s linear infinite" : "none",
+            }}>🔄</span>
+            <span>{scanning ? "מעדכן…" : "עדכון נתונים"}</span>
+          </button>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       </div>
 
@@ -807,31 +832,24 @@ export default function CoursesCyclesPanel() {
         <EditCycleModal cycle={editing} onSave={handleSave} onClose={() => setEditing(null)} />
       )}
 
-      {/* ── Sync footer — operational metadata, kept discreet at bottom ── */}
+      {/* ── Sync footer — timestamp confirmation, אישור עדין שהמידע טרי ── */}
       <div style={{
-        marginTop: 24, padding: "12px 16px", display: "flex", alignItems: "center",
-        justifyContent: "space-between", gap: 12, flexWrap: "wrap",
+        marginTop: 24, padding: "12px 16px", textAlign: "center",
         fontSize: 11.5, color: T.textMuted, borderTop: `1px dashed ${T.cardBorder}`,
       }}>
-        <div>
-          {lastSync ? (
-            <>
-              עודכן לאחרונה{" "}
-              <span style={{ color: T.textSecondary, fontWeight: 600 }}>
-                {fmtDateTime(lastSync.completed_at || lastSync.started_at)}
-              </span>
-              {lastSync.status !== "completed" && (
-                <span style={{ color: "#dc2626", marginRight: 6 }}>· {lastSync.status}</span>
-              )}
-            </>
-          ) : (
-            "טרם בוצע סנכרון"
-          )}
-        </div>
-        <button type="button" onClick={handleScan} disabled={scanning}
-                style={{ ...S.btnGhost, fontSize: 11.5, color: T.textSecondary, textDecoration: "underline" }}>
-          {scanning ? "סורק…" : "רענן עכשיו"}
-        </button>
+        {lastSync ? (
+          <>
+            עודכן לאחרונה{" "}
+            <span style={{ color: T.textSecondary, fontWeight: 600 }}>
+              {fmtDateTime(lastSync.completed_at || lastSync.started_at)}
+            </span>
+            {lastSync.status !== "completed" && (
+              <span style={{ color: "#dc2626", marginRight: 6 }}>· {lastSync.status}</span>
+            )}
+          </>
+        ) : (
+          "טרם בוצע סנכרון"
+        )}
       </div>
     </div>
   );
