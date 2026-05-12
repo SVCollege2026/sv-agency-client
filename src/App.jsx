@@ -7,7 +7,7 @@ import PortalHome from "./pages/PortalHome.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import ReportsPage from "./pages/ReportsPage.jsx";
 import EcosystemPage from "./pages/EcosystemPage.jsx";
-import MediaReportsPage from "./pages/MediaReportsPage.jsx";
+import CampaignManagementPage from "./pages/CampaignManagementPage.jsx";
 import ForecastingPage from "./pages/ForecastingPage.jsx";
 import GoalsPage from "./pages/GoalsPage.jsx";
 import { ToastProvider } from "./components/campaign/Toast.jsx";
@@ -31,10 +31,10 @@ export default function App() {
           <Route path="reports"    element={<ReportsPage />} />
         </Route>
 
-        {/* Media department — דוחות + חקירות + תהליך + שאלות + ניהול קמפיינים */}
-        <Route path="/media-reports"        element={<MediaReportsPage />} />
-        {/* Campaign Management — canonical (soft navigates from /media-reports work too) */}
-        <Route path="/campaign-management"  element={<MediaReportsPage />} />
+        {/* Campaign Management — canonical (Spec 03 §2.2). The page was renamed
+            from MediaReportsPage to CampaignManagementPage. Old URL kept as alias. */}
+        <Route path="/campaign-management"  element={<CampaignManagementPage />} />
+        <Route path="/media-reports"        element={<CampaignManagementPage />} />
 
         {/* Strategy department — חיזוי + יעדים פעילים */}
         <Route path="/strategy" element={<StrategyLayout />}>

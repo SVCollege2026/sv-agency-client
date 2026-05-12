@@ -16,14 +16,18 @@ import HelpCenter, { useHelpFirstVisit } from "./HelpCenter.jsx";
 import { ApprovalGuardBadge } from "./ApprovalGuard.jsx";
 import { color, radius, shadow, space, type, transition, fontFamily } from "./_tokens.js";
 
+// MAKE removed from manager view per mandate: "make בממשק לא מעניין בכלל".
+// MakeHub.jsx + the back-end code remain intact (admin/QA use).
+// Lead routing scenarios are verified by the workflow gate on go-live —
+// the manager only sees relevant blockers in "דורש פעולה" if something needs
+// her attention, never the operational dashboard.
 const SUB_TABS = [
   { id: "board",     label: "לוח קמפיינים",     icon: "🗂", desc: "כל תיקיות הקמפיין לפי סטטוס" },
   { id: "intake",    label: "בריף חדש",         icon: "📝", desc: "שליחת בריף בית-ספרי או לקורס" },
   { id: "approvals", label: "תוצרים לאישור",    icon: "✋", desc: "כל מה שמחלקות הסוכנים הכינו ומחכה לאישור שלך — קופי, קריאייטיב, פריסות מדיה ותקציבים" },
   { id: "tasks",     label: "דורש פעולה",       icon: "✅", desc: "אישורים מהירים, תיקונים והחלטות שמחכות לך" },
-  { id: "budget",    label: "תקציב בית-ספרי",   icon: "💰", desc: "תכנית התקציב הכוללת" },
-  { id: "make",      label: "MAKE",             icon: "🔌", desc: "תרחישי make.com — אילו רלוונטיים למערכת + בריאות שוטפת" },
-  { id: "settings",  label: "הגדרות מערכת",     icon: "⚙",  desc: "חוקי המלצה, ערוצי התראה, פלטפורמות" },
+  { id: "budget",    label: "תקציב בית-ספרי",   icon: "💰", desc: "תכנית התקציב הכוללת — שנתי + חודשי (אופציונלי)" },
+  { id: "settings",  label: "הגדרות מערכת",     icon: "⚙",  desc: "ערכי מותג, התראות, חגים — מה שאת קובעת פעם בשנה" },
 ];
 
 export default function CampaignTab() {

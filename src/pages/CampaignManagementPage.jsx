@@ -1,11 +1,15 @@
 /**
- * MediaReportsPage.jsx — ממשק מחלקת המדיה
- * ==========================================
- * 2 טאבים ראשיים, כל אחד עם URL נפרד דרך ?tab=:
- *   📊 סטטוס מדיה   — יומי / שבועי / טווח / חודשי Y-o-Y
- *   📋 רישום לקורסים — דשבורד פאי + טבלאות קורסים+מחזורים, מסונן לפי שנה
+ * CampaignManagementPage.jsx — ממשק ניהול קמפיינים (Spec 03 §2.2)
+ * ================================================================
+ * Renamed from MediaReportsPage.jsx per Spec 03 §2.2 mandate.
+ * The URL /media-reports remains as a redirect alias — all bookmarks work.
  *
- * נתיב: /media-reports?tab=<status|registration|daily|weekly|range|monthly>
+ * 3 טאבים ראשיים:
+ *   📊 סטטוס מדיה        — יומי / שבועי / טווח / חודשי Y-o-Y
+ *   📋 רישום לקורסים     — דשבורד פאי + טבלאות קורסים+מחזורים
+ *   🎯 פעילות שיווקית     — ניהול קמפיינים מלא (CampaignTab)
+ *
+ * נתיב קנוני: /campaign-management?tab=<status|registration|marketing|...>
  */
 import React, { useState, useEffect, useMemo } from "react";
 import {
@@ -1121,7 +1125,7 @@ function CoursesKpiTable({ rows, currYear, metricId }) {
 
 // ─── Main component ─────────────────────────────────────────────────────────
 
-export default function MediaReportsPage() {
+export default function CampaignManagementPage() {
   const navigate = useNavigate();
 
   const [searchParams, setSearchParams] = useSearchParams();
