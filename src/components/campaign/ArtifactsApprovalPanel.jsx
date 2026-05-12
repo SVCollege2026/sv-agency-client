@@ -1,14 +1,12 @@
 /**
  * ArtifactsApprovalPanel.jsx — תוצרים שמחכים לאישור.
- *
- * המקום שבו מנהלת השיווק רואה את כל מה שמחלקת המדיה/קופי/קריאייטיב/MAKE
- * הכינו וצריכים את האישור שלה. לכל תוצר היא יכולה:
- *   ✓ לאשר      — התוצר עובר ל-approved.
- *   ↩ לשלוח לתיקון — חוזר למחלקה עם הערה (חובה).
- *   ⏩ להעביר הלאה — אישור + שליחה לפרסום / למנכ"ל / לשלב הבא.
+ * Uses design tokens, toast notifications, skeleton loading, hover lift.
  */
 import React, { useState, useEffect } from "react";
 import { listArtifacts, approveArtifact, requestArtifactRevision, forwardArtifact, fileAccessUrl } from "../../api.js";
+import { color, radius, shadow, space, type, transition, button as btn, input as inputStyle, emptyState, pill, fontFamily } from "./_tokens.js";
+import { useToast } from "./Toast.jsx";
+import { SkeletonCard } from "./Skeleton.jsx";
 
 const ARTIFACT_TYPES = {
   media_plan:            { icon: "📊", label: "פריסת מדיה",         producer: "מחלקת מדיה" },
@@ -24,24 +22,26 @@ const ARTIFACT_TYPES = {
   make_scenario:         { icon: "🔌", label: "תרחיש Make",          producer: "מחלקת MAKE" },
 };
 
-const STATUS_BADGES = {
-  internal_review:                { bg: "#e0e7ff", color: "#3730a3", label: "בבדיקה פנימית" },
-  qa_passed:                      { bg: "#dcfce7", color: "#15803d", label: "QA עבר ✓" },
-  waiting_for_marketing_approval: { bg: "#fef3c7", color: "#a16207", label: "ממתין לאישור שלך" },
-  revision_required:              { bg: "#fee2e2", color: "#b91c1c", label: "נדרש תיקון" },
-  approved:                       { bg: "#bbf7d0", color: "#166534", label: "אושר" },
+const STATUS_TONES = {
+  internal_review:                { tone: "accent",  label: "בבדיקה פנימית" },
+  qa_passed:                      { tone: "success", label: "QA עבר" },
+  waiting_for_marketing_approval: { tone: "warning", label: "ממתין לאישור שלך" },
+  revision_required:              { tone: "danger",  label: "נדרש תיקון" },
+  approved:                       { tone: "success", label: "אושר" },
 };
 
 const card = {
-  background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb",
-  padding: 20, marginBottom: 16, boxShadow: "0 1px 3px rgba(15,23,42,0.04)",
+  background: color.surface, borderRadius: radius.card,
+  border: `1px solid ${color.borderDefault}`, padding: space(5),
+  marginBottom: space(4), boxShadow: shadow.sm,
 };
 
 export default function ArtifactsApprovalPanel() {
+  const toast = useToast();
   const [items, setItems]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]   = useState(null);
-  const [filter, setFilter] = useState("pending"); // pending | all
+  const [filter, setFilter] = useState("pending");
   const [refreshKey, setRefreshKey] = useState(0);
 
   async function load() {
@@ -56,7 +56,6 @@ export default function ArtifactsApprovalPanel() {
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter, refreshKey]);
 
-  // Group by folder for visual organization
   const grouped = items.reduce((acc, a) => {
     const key = a.folder_name || "כללי / ללא תיקייה";
     (acc[key] ||= []).push(a);
@@ -64,28 +63,35 @@ export default function ArtifactsApprovalPanel() {
   }, {});
 
   return (
-    <div style={{ direction: "rtl" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <div style={{ display: "flex", gap: 6 }}>
+    <div style={{ direction: "rtl", fontFamily }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: space(4), flexWrap: "wrap", gap: space(2) }}>
+        <div style={{ display: "flex", gap: space(2) }}>
           <Pill active={filter === "pending"} onClick={() => setFilter("pending")} count={filter === "pending" ? items.length : null}>
             ממתינים לי
           </Pill>
           <Pill active={filter === "all"} onClick={() => setFilter("all")}>הכל</Pill>
         </div>
-        <button onClick={() => setRefreshKey(k => k + 1)} style={{
-          padding: "8px 14px", background: "#fff", color: "#374151",
-          border: "1px solid #e5e7eb", borderRadius: 8, cursor: "pointer", fontSize: 13,
-        }}>🔄 רענון</button>
+        <button onClick={() => setRefreshKey(k => k + 1)} style={btn.secondary}>🔄 רענון</button>
       </div>
 
-      {error && <div style={{ padding: 12, background: "#fee2e2", color: "#b91c1c", borderRadius: 8, marginBottom: 12 }}>שגיאה: {error}</div>}
-      {loading && <div style={{ padding: 20, color: "#6b7280" }}>טוען...</div>}
+      {error && (
+        <div style={{
+          padding: space(3), background: color.dangerSoftBg, color: color.dangerSoftFg,
+          borderRadius: radius.md, marginBottom: space(3),
+        }}>שגיאה: {error}</div>
+      )}
+
+      {loading && (
+        <div style={card}>
+          <SkeletonCard /><SkeletonCard />
+        </div>
+      )}
 
       {!loading && items.length === 0 && (
-        <div style={{ ...card, textAlign: "center", padding: 40 }}>
-          <div style={{ fontSize: 48, marginBottom: 8 }}>🎉</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>אין תוצרים שמחכים לך כרגע</div>
-          <div style={{ fontSize: 13, color: "#6b7280", marginTop: 6 }}>
+        <div style={{ ...card, ...emptyState, padding: space(10) }}>
+          <div style={{ fontSize: 56, marginBottom: space(3) }}>🎉</div>
+          <div style={{ ...type.h3, marginBottom: space(2) }}>אין תוצרים שמחכים לך כרגע</div>
+          <div style={{ ...type.bodySmall, color: color.fgSubtle }}>
             כשמחלקה תכין תוצר חדש (פריסת מדיה, קופי, קריאייטיב וכו') הוא יופיע פה לאישור.
           </div>
         </div>
@@ -93,14 +99,14 @@ export default function ArtifactsApprovalPanel() {
 
       {Object.entries(grouped).map(([folderName, list]) => (
         <div key={folderName} style={card}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 14 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#111827" }}>📁 {folderName}</h3>
-            <span style={{ fontSize: 13, color: "#9ca3af" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: space(3), marginBottom: space(4) }}>
+            <h3 style={{ ...type.h3, margin: 0 }}>📁 {folderName}</h3>
+            <span style={{ ...type.bodySmall, color: color.fgSubtle }}>
               {list.length} {list.length === 1 ? "תוצר" : "תוצרים"}
             </span>
           </div>
           {list.map(art => (
-            <ArtifactCard key={art.id} artifact={art} onChanged={() => setRefreshKey(k => k + 1)} />
+            <ArtifactCard key={art.id} artifact={art} onChanged={() => setRefreshKey(k => k + 1)} toast={toast} />
           ))}
         </div>
       ))}
@@ -111,127 +117,130 @@ export default function ArtifactsApprovalPanel() {
 function Pill({ active, onClick, count, children }) {
   return (
     <button onClick={onClick} style={{
-      padding: "8px 16px", borderRadius: 999, cursor: "pointer", fontSize: 13, fontWeight: 700,
-      background: active ? "#1e3a5f" : "#fff",
-      color:      active ? "#fff" : "#374151",
-      border: `1px solid ${active ? "#1e3a5f" : "#e5e7eb"}`,
+      padding: `${space(2)} ${space(4)}`, borderRadius: radius.pill,
+      cursor: "pointer", fontSize: 13, fontWeight: 700,
+      background: active ? color.primary : color.surface,
+      color:      active ? color.fgOnDark : color.fgMuted,
+      border: `1px solid ${active ? color.primary : color.borderDefault}`,
+      transition: transition.fast, fontFamily,
     }}>
       {children}
       {count !== null && count !== undefined && (
         <span style={{
-          marginInlineStart: 6, background: active ? "rgba(255,255,255,0.25)" : "#1e3a5f",
-          color: "#fff", borderRadius: 999, padding: "1px 8px", fontSize: 11,
+          marginInlineStart: space(1.5),
+          background: active ? "rgba(255,255,255,0.25)" : color.primary,
+          color: color.fgOnDark, borderRadius: radius.pill,
+          padding: `1px ${space(2)}`, fontSize: 11,
         }}>{count}</span>
       )}
     </button>
   );
 }
 
-function ArtifactCard({ artifact, onChanged }) {
+function ArtifactCard({ artifact, onChanged, toast }) {
   const meta = ARTIFACT_TYPES[artifact.artifact_type] || { icon: "📎", label: artifact.artifact_type, producer: "—" };
-  const status = STATUS_BADGES[artifact.status] || { bg: "#f1f5f9", color: "#475569", label: artifact.status };
-  const [expanded, setExpanded]     = useState(false);
-  const [showRevise, setShowRevise] = useState(false);
+  const statusInfo = STATUS_TONES[artifact.status] || { tone: "neutral", label: artifact.status };
+  const [expanded, setExpanded]       = useState(false);
+  const [showRevise, setShowRevise]   = useState(false);
   const [showForward, setShowForward] = useState(false);
-  const [busy, setBusy]             = useState(false);
-  const [error, setError]           = useState(null);
+  const [busy, setBusy]               = useState(false);
 
   async function doApprove() {
-    setBusy(true); setError(null);
-    try { await approveArtifact(artifact.id); onChanged(); }
-    catch (e) { setError(e.message); }
+    setBusy(true);
+    try {
+      await approveArtifact(artifact.id);
+      toast.success(`✓ אושר: ${artifact.title || meta.label}`);
+      onChanged();
+    } catch (e) { toast.error(`שגיאה באישור: ${e.message}`); }
     finally { setBusy(false); }
   }
 
   return (
     <div style={{
-      border: "1px solid #f3f4f6", borderRadius: 10, padding: 16, marginBottom: 12,
-      background: "#fafbfc",
+      border: `1px solid ${color.borderSubtle}`, borderRadius: radius.md,
+      padding: space(4), marginBottom: space(3), background: color.surfaceMuted,
+      transition: transition.base,
     }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 220 }}>
-          <div style={{ fontSize: 30 }}>{meta.icon}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: space(3), flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: space(3), flex: 1, minWidth: 220 }}>
+          <div style={{ fontSize: 32 }}>{meta.icon}</div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>{artifact.title || meta.label}</div>
-            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+            <div style={{ ...type.bodyStrong, color: color.fgDefault }}>{artifact.title || meta.label}</div>
+            <div style={{ ...type.small, color: color.fgMuted, marginTop: 2 }}>
               {meta.label} · הוכן ע"י {meta.producer}
             </div>
           </div>
         </div>
-        <span style={{
-          background: status.bg, color: status.color,
-          padding: "4px 12px", borderRadius: 16, fontSize: 11, fontWeight: 700,
-        }}>{status.label}</span>
+        <span style={pill(statusInfo.tone)}>{statusInfo.label}</span>
       </div>
 
-      {/* Preview */}
-      <div style={{ marginTop: 14, padding: 12, background: "#fff", borderRadius: 8, border: "1px solid #f3f4f6" }}>
+      <div style={{
+        marginTop: space(3), padding: space(3), background: color.surface,
+        borderRadius: radius.md, border: `1px solid ${color.borderSubtle}`,
+      }}>
         <Preview artifact={artifact} expanded={expanded} />
         <button onClick={() => setExpanded(e => !e)} style={{
-          marginTop: 8, background: "transparent", border: "none", color: "#1e3a5f",
-          cursor: "pointer", fontSize: 12, fontWeight: 700, padding: 0,
+          ...btn.ghost, marginTop: space(2), padding: 0, color: color.primary,
         }}>
           {expanded ? "הסתר פרטים ▲" : "הצג עוד פרטים ▼"}
         </button>
       </div>
 
-      {error && (
-        <div style={{ marginTop: 10, padding: 10, background: "#fee2e2", color: "#b91c1c", borderRadius: 8, fontSize: 12 }}>
-          {error}
-        </div>
-      )}
-
-      {/* Actions */}
       {artifact.status !== "approved" && artifact.status !== "revision_required" && (
-        <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-          <ActionBtn onClick={doApprove} disabled={busy} bg="#16a34a" icon="✓">אשרי</ActionBtn>
-          <ActionBtn onClick={() => setShowRevise(true)} disabled={busy} bg="#fff" color="#b91c1c" border="#fecaca" icon="↩">שלחי לתיקון</ActionBtn>
-          <ActionBtn onClick={() => setShowForward(true)} disabled={busy} bg="#fff" color="#1e3a5f" border="#dbeafe" icon="⏩">העברי הלאה</ActionBtn>
+        <div style={{ display: "flex", gap: space(2), marginTop: space(3), flexWrap: "wrap" }}>
+          <button onClick={doApprove} disabled={busy} style={btn.success}>
+            ✓ אשרי
+          </button>
+          <button onClick={() => setShowRevise(true)} disabled={busy} style={btn.danger}>
+            ↩ שלחי לתיקון
+          </button>
+          <button onClick={() => setShowForward(true)} disabled={busy} style={btn.secondary}>
+            ⏩ העברי הלאה
+          </button>
         </div>
       )}
 
-      {showRevise && <ReviseModal artifact={artifact} onClose={() => setShowRevise(false)} onDone={() => { setShowRevise(false); onChanged(); }} />}
-      {showForward && <ForwardModal artifact={artifact} onClose={() => setShowForward(false)} onDone={() => { setShowForward(false); onChanged(); }} />}
+      {showRevise && (
+        <ReviseModal
+          artifact={artifact}
+          onClose={() => setShowRevise(false)}
+          onDone={() => { setShowRevise(false); onChanged(); }}
+          toast={toast}
+        />
+      )}
+      {showForward && (
+        <ForwardModal
+          artifact={artifact}
+          onClose={() => setShowForward(false)}
+          onDone={() => { setShowForward(false); onChanged(); }}
+          toast={toast}
+        />
+      )}
     </div>
-  );
-}
-
-function ActionBtn({ children, icon, bg, color = "#fff", border = "transparent", ...p }) {
-  return (
-    <button {...p} style={{
-      padding: "8px 16px", background: bg, color, border: `1px solid ${border}`,
-      borderRadius: 8, cursor: p.disabled ? "not-allowed" : "pointer",
-      fontWeight: 700, fontSize: 13, opacity: p.disabled ? 0.6 : 1,
-      display: "inline-flex", alignItems: "center", gap: 6,
-    }}>
-      <span>{icon}</span>{children}
-    </button>
   );
 }
 
 function Preview({ artifact, expanded }) {
   const p = artifact.payload || {};
-  const type = artifact.artifact_type;
+  const t = artifact.artifact_type;
 
-  // Per-type minimal preview.
-  if (type === "ad_copy_meta" || type === "ad_copy_google" || type === "ad_copy_tiktok") {
+  if (t === "ad_copy_meta" || t === "ad_copy_google" || t === "ad_copy_tiktok") {
     const headlines = p.headlines || [];
     const primary = p.primary_texts || [];
     return (
-      <div style={{ fontSize: 13, color: "#1f2937", lineHeight: 1.7 }}>
+      <div style={{ ...type.bodySmall, color: color.fgDefault }}>
         {headlines.length > 0 && (
-          <div style={{ marginBottom: 8 }}>
+          <div style={{ marginBottom: space(2) }}>
             <strong>כותרות:</strong>
-            <ul style={{ margin: "4px 0", paddingInlineStart: 20 }}>
+            <ul style={{ margin: `${space(1)} 0`, paddingInlineStart: space(5) }}>
               {headlines.slice(0, expanded ? undefined : 2).map((h, i) => <li key={i}>{h}</li>)}
             </ul>
           </div>
         )}
         {primary.length > 0 && (
-          <div style={{ marginBottom: 8 }}>
+          <div style={{ marginBottom: space(2) }}>
             <strong>טקסט ראשי:</strong>
-            <div style={{ background: "#f9fafb", padding: 10, borderRadius: 6, marginTop: 4 }}>
+            <div style={{ background: color.surfaceMuted, padding: space(2.5), borderRadius: radius.sm, marginTop: space(1) }}>
               {(expanded ? primary : primary.slice(0, 1)).join("\n\n")}
             </div>
           </div>
@@ -243,15 +252,15 @@ function Preview({ artifact, expanded }) {
     );
   }
 
-  if (type === "creative_concept") {
+  if (t === "creative_concept") {
     return (
-      <div style={{ fontSize: 13, color: "#1f2937", lineHeight: 1.7 }}>
+      <div style={{ ...type.bodySmall, color: color.fgDefault }}>
         <div><strong>קונספט:</strong> {p.concept_title || "—"}</div>
         <div><strong>טון:</strong> {p.tone || "—"}</div>
         {expanded && p.visual_directions && (
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: space(2) }}>
             <strong>כיווני ויזואל:</strong>
-            <ul style={{ margin: "4px 0", paddingInlineStart: 20 }}>
+            <ul style={{ margin: `${space(1)} 0`, paddingInlineStart: space(5) }}>
               {p.visual_directions.map((v, i) => <li key={i}>{v}</li>)}
             </ul>
           </div>
@@ -260,25 +269,25 @@ function Preview({ artifact, expanded }) {
     );
   }
 
-  if (type === "media_plan") {
+  if (t === "media_plan") {
     return (
-      <div style={{ fontSize: 13, color: "#1f2937" }}>
+      <div style={{ ...type.bodySmall, color: color.fgDefault }}>
         <div><strong>פלטפורמות:</strong> {(p.platforms || []).join(" · ") || "—"}</div>
         <div><strong>אופק תכנון:</strong> {p.horizon_days || 30} ימים</div>
-        {p.methodology?.note && <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>{p.methodology.note}</div>}
+        {p.methodology?.note && <div style={{ marginTop: space(1.5), ...type.small, color: color.fgMuted }}>{p.methodology.note}</div>}
       </div>
     );
   }
 
-  if (type === "budget_recommendation") {
+  if (t === "budget_recommendation") {
     return (
-      <div style={{ fontSize: 13, color: "#1f2937" }}>
+      <div style={{ ...type.bodySmall, color: color.fgDefault }}>
         <div><strong>סכום זמין:</strong> ₪{Number(p.total_available_ils || 0).toLocaleString("he-IL")}</div>
         {p.breakdown && (
-          <div style={{ marginTop: 6 }}>
+          <div style={{ marginTop: space(1.5) }}>
             <strong>חלוקה:</strong>{" "}
             {Object.entries(p.breakdown).map(([k, v]) =>
-              <span key={k} style={{ marginInlineEnd: 12 }}>{k}: ₪{Number(v).toLocaleString("he-IL")}</span>
+              <span key={k} style={{ marginInlineEnd: space(3) }}>{k}: ₪{Number(v).toLocaleString("he-IL")}</span>
             )}
           </div>
         )}
@@ -286,58 +295,53 @@ function Preview({ artifact, expanded }) {
     );
   }
 
-  if (type === "market_research") {
+  if (t === "market_research") {
     return (
-      <div style={{ fontSize: 13, color: "#1f2937" }}>
+      <div style={{ ...type.bodySmall, color: color.fgDefault }}>
         <div><strong>קטגוריה:</strong> {p.category || p.domain || "—"}</div>
         {p.audience_segments && (
           <div><strong>פלחי קהל:</strong> {(p.audience_segments || []).slice(0, expanded ? undefined : 2).join(" · ")}</div>
         )}
         {expanded && p.messaging_hooks && (
-          <div style={{ marginTop: 6 }}>
+          <div style={{ marginTop: space(1.5) }}>
             <strong>וורי מסר:</strong>
-            <ul style={{ margin: "4px 0", paddingInlineStart: 20 }}>{p.messaging_hooks.map((h, i) => <li key={i}>{h}</li>)}</ul>
+            <ul style={{ margin: `${space(1)} 0`, paddingInlineStart: space(5) }}>{p.messaging_hooks.map((h, i) => <li key={i}>{h}</li>)}</ul>
           </div>
         )}
       </div>
     );
   }
 
-  // Generic
-  return (
-    <div style={{ fontSize: 13, color: "#6b7280" }}>
-      {artifact.title || meta_label(type)}
-    </div>
-  );
+  return <div style={{ ...type.bodySmall, color: color.fgMuted }}>{artifact.title || meta_label(t)}</div>;
 }
 const meta_label = t => (ARTIFACT_TYPES[t]?.label || t);
 
-function ReviseModal({ artifact, onClose, onDone }) {
+function ReviseModal({ artifact, onClose, onDone, toast }) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
-  const [err, setErr]   = useState(null);
 
   async function submit() {
-    if (!note.trim()) { setErr("יש להסביר מה צריך לתקן"); return; }
-    setBusy(true); setErr(null);
+    if (!note.trim()) { toast.warning("יש להסביר מה צריך לתקן"); return; }
+    setBusy(true);
     try {
       await requestArtifactRevision(artifact.id, { revision_note: note.trim() });
+      toast.success("↩ נשלח חזרה לתיקון");
       onDone();
-    } catch (e) { setErr(e.message); }
+    } catch (e) { toast.error(`שגיאה: ${e.message}`); }
     finally { setBusy(false); }
   }
 
   return (
     <Modal title="↩ שליחה לתיקון" onClose={onClose}>
-      <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 10 }}>
+      <div style={{ ...type.bodySmall, color: color.fgMuted, marginBottom: space(2.5) }}>
         כתבי במדויק מה צריך לשנות. ההערה תועבר חזרה למחלקה שהכינה את התוצר.
       </div>
-      <textarea value={note} onChange={e => setNote(e.target.value)} rows={4} placeholder="לדוגמה: הכותרת הראשונה חזקה, הטקסט השני יוצא ארוך — לקצר ב-30 תווים..."
-        style={modalInput} />
-      {err && <div style={{ color: "#b91c1c", fontSize: 12, marginTop: 8 }}>{err}</div>}
+      <textarea value={note} onChange={e => setNote(e.target.value)} rows={4}
+        placeholder="לדוגמה: הכותרת הראשונה חזקה, הטקסט השני יוצא ארוך — לקצר ב-30 תווים..."
+        style={{ ...inputStyle, resize: "vertical", fontFamily }} />
       <div style={modalFooter}>
-        <button onClick={onClose} style={modalCancel}>ביטול</button>
-        <button onClick={submit} disabled={busy} style={modalPrimary}>
+        <button onClick={onClose} style={btn.secondary}>ביטול</button>
+        <button onClick={submit} disabled={busy} style={btn.primary}>
           {busy ? "שולחת..." : "↩ שלחי לתיקון"}
         </button>
       </div>
@@ -345,53 +349,55 @@ function ReviseModal({ artifact, onClose, onDone }) {
   );
 }
 
-function ForwardModal({ artifact, onClose, onDone }) {
+function ForwardModal({ artifact, onClose, onDone, toast }) {
   const [target, setTarget] = useState("launch");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
-  const [err, setErr]   = useState(null);
 
   async function submit() {
-    setBusy(true); setErr(null);
+    setBusy(true);
     try {
       await forwardArtifact(artifact.id, { target, note: note.trim() || null });
+      toast.success("⏩ הועבר הלאה בהצלחה");
       onDone();
-    } catch (e) { setErr(e.message); }
+    } catch (e) { toast.error(`שגיאה: ${e.message}`); }
     finally { setBusy(false); }
   }
 
   const targets = [
-    { id: "launch",          icon: "🚀", label: "לפרסום",                  hint: "התוצר מאושר ונשלח לפרסום בפלטפורמה" },
+    { id: "launch",          icon: "🚀", label: "לפרסום",                 hint: "התוצר מאושר ונשלח לפרסום בפלטפורמה" },
     { id: "school_director", icon: "👔", label: "למנכ\"ל בית הספר",       hint: "החלטה אסטרטגית שדורשת אישור נוסף" },
-    { id: "next_stage",      icon: "➡",  label: "לשלב הבא ב-workflow",     hint: "המשך טיפול במחלקה הבאה" },
+    { id: "next_stage",      icon: "➡", label: "לשלב הבא ב-workflow",     hint: "המשך טיפול במחלקה הבאה" },
   ];
 
   return (
     <Modal title="⏩ העברה הלאה" onClose={onClose}>
-      <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 10 }}>
+      <div style={{ ...type.bodySmall, color: color.fgMuted, marginBottom: space(2.5) }}>
         איפה את רוצה שהתוצר יגיע אחרי האישור שלך?
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: space(2), marginBottom: space(3) }}>
         {targets.map(t => (
           <div key={t.id} onClick={() => setTarget(t.id)} style={{
-            padding: 12, borderRadius: 10, cursor: "pointer",
-            background: target === t.id ? "#eff6ff" : "#fff",
-            border: `2px solid ${target === t.id ? "#1e3a5f" : "#e5e7eb"}`,
-            display: "flex", alignItems: "center", gap: 12,
+            padding: space(3), borderRadius: radius.md, cursor: "pointer",
+            background: target === t.id ? color.primarySoftBg : color.surface,
+            border: `2px solid ${target === t.id ? color.primary : color.borderDefault}`,
+            display: "flex", alignItems: "center", gap: space(3),
+            transition: transition.fast,
           }}>
             <span style={{ fontSize: 26 }}>{t.icon}</span>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: target === t.id ? "#1e3a5f" : "#111827" }}>{t.label}</div>
-              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{t.hint}</div>
+              <div style={{ ...type.bodyStrong, color: target === t.id ? color.primary : color.fgDefault }}>{t.label}</div>
+              <div style={{ ...type.small, color: color.fgMuted, marginTop: 2 }}>{t.hint}</div>
             </div>
           </div>
         ))}
       </div>
-      <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="הערה (אופציונלי)" style={modalInput} />
-      {err && <div style={{ color: "#b91c1c", fontSize: 12, marginTop: 8 }}>{err}</div>}
+      <textarea value={note} onChange={e => setNote(e.target.value)} rows={2}
+        placeholder="הערה (אופציונלי)"
+        style={{ ...inputStyle, resize: "vertical", fontFamily }} />
       <div style={modalFooter}>
-        <button onClick={onClose} style={modalCancel}>ביטול</button>
-        <button onClick={submit} disabled={busy} style={modalPrimary}>
+        <button onClick={onClose} style={btn.secondary}>ביטול</button>
+        <button onClick={submit} disabled={busy} style={btn.primary}>
           {busy ? "שולחת..." : "⏩ העברי הלאה"}
         </button>
       </div>
@@ -403,23 +409,19 @@ function Modal({ title, onClose, children }) {
   return (
     <div onClick={onClose} style={{
       position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", zIndex: 100,
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 16, direction: "rtl",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: space(4),
+      direction: "rtl", animation: "campaign-overlay-in 180ms ease",
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        background: "#fff", borderRadius: 14, padding: 22, maxWidth: 520, width: "100%",
-        boxShadow: "0 20px 60px rgba(15,23,42,0.3)",
+        background: color.surface, borderRadius: radius.lg, padding: space(5),
+        maxWidth: 520, width: "100%", boxShadow: shadow.xl,
+        animation: "campaign-modal-in 220ms cubic-bezier(0.34, 1.56, 0.64, 1)",
       }}>
-        <h3 style={{ margin: "0 0 14px", fontSize: 18, color: "#111827", fontWeight: 700 }}>{title}</h3>
+        <h3 style={{ ...type.h2, margin: `0 0 ${space(3)}` }}>{title}</h3>
         {children}
       </div>
     </div>
   );
 }
 
-const modalInput = {
-  width: "100%", padding: "10px 12px", border: "1px solid #e5e7eb",
-  borderRadius: 8, fontSize: 14, direction: "rtl", resize: "vertical", fontFamily: "inherit", background: "#f9fafb",
-};
-const modalFooter = { display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 14 };
-const modalCancel = { padding: "10px 18px", background: "transparent", color: "#475569", border: "1px solid #e5e7eb", borderRadius: 8, cursor: "pointer" };
-const modalPrimary = { padding: "10px 18px", background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700 };
+const modalFooter = { display: "flex", gap: space(2.5), justifyContent: "flex-end", marginTop: space(3) };

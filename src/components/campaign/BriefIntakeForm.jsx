@@ -10,6 +10,7 @@
 import React, { useState } from "react";
 import { submitCampaignRequest, uploadCampaignFile } from "../../api.js";
 import FileUpload from "./FileUpload.jsx";
+import { useToast } from "./Toast.jsx";
 
 const BUDGET_SOURCES = [
   { value: "from_existing",       label: "מהתקציב הבית-ספרי הקיים",       icon: "🏫" },
@@ -62,6 +63,7 @@ function BigChoice({ active, disabled, onClick, icon, title, subtitle }) {
 }
 
 export default function BriefIntakeForm({ folderId = null, onSubmitted = () => {}, onCancel = () => {} }) {
+  const toast = useToast();
   const [requestType, setRequestType] = useState(folderId ? "new_course" : "school_level");
   const [briefType,   setBriefType]   = useState("structured_form");
   const [busy, setBusy] = useState(false);
@@ -140,9 +142,11 @@ export default function BriefIntakeForm({ folderId = null, onSubmitted = () => {
         metadata:      { ui: "BriefIntakeForm", v: 2 },
       };
       const result = await submitCampaignRequest(body);
+      toast.success("🚀 הבריף נשלח לביצוע. הצוות יתחיל לעבוד עליו עכשיו.");
       onSubmitted(result);
     } catch (e) {
       setError(e.message);
+      toast.error(`שגיאה בשליחת בריף: ${e.message}`);
     } finally { setBusy(false); }
   }
 

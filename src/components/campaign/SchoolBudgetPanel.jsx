@@ -3,6 +3,7 @@
  */
 import React, { useState, useEffect } from "react";
 import { getSchoolBudget, updateSchoolBudget, listPlatformSettings } from "../../api.js";
+import { useToast } from "./Toast.jsx";
 
 const card = {
   background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb",
@@ -17,6 +18,7 @@ const input = {
 };
 
 export default function SchoolBudgetPanel() {
+  const toast = useToast();
   // Two scopes — annual, monthly. Each can be filled independently.
   const [annualEnabled,  setAnnualEnabled]  = useState(false);
   const [monthlyEnabled, setMonthlyEnabled] = useState(false);
@@ -67,11 +69,10 @@ export default function SchoolBudgetPanel() {
         notes:              notes || null,
         updated_by:         "marketing_manager",
       });
-      setMsg("✓ נשמר בהצלחה");
-      setTimeout(() => setMsg(null), 3000);
+      toast.success("💰 תכנית התקציב נשמרה");
       await load();
     } catch (e) {
-      setMsg(`שגיאה: ${e.message}`);
+      toast.error(`שגיאה בשמירה: ${e.message}`);
     } finally { setBusy(false); }
   }
 
