@@ -10,6 +10,7 @@ import React, { useEffect, useState } from "react";
 import { getGeneralSettings, updateGeneralSettings } from "../../../api.js";
 import { color, radius, space, type, fontFamily } from "../_tokens.js";
 import { useToast } from "../Toast.jsx";
+import FileUpload from "../FileUpload.jsx";
 import {
   card, Section, Row, FieldBox, TagList, Chip, SaveBar,
   ErrorBanner, LoadingBlock, input, select, textarea, fieldHint, fieldLabel,
@@ -31,15 +32,6 @@ const DEFAULT_CTAS = [
   "לימוד נוסף",
 ];
 
-const MAX_LENGTH_FORMATS = [
-  { id: "meta_feed",     label: "Meta Feed" },
-  { id: "meta_story",    label: "Meta Story" },
-  { id: "meta_reel",     label: "Meta Reel" },
-  { id: "google_banner", label: "Google Banner" },
-  { id: "google_youtube",label: "YouTube" },
-  { id: "tiktok_video",  label: "TikTok Video" },
-];
-
 export default function CopyCreativeTab() {
   const toast = useToast();
   const [loaded, setLoaded] = useState(null);
@@ -50,7 +42,6 @@ export default function CopyCreativeTab() {
       forbidden_words: [],
       required_disclaimers: [],
       allowed_ctas: DEFAULT_CTAS,
-      max_lengths_per_format: {},
     },
     creative_guidelines: {
       primary_colors: [],
@@ -59,6 +50,8 @@ export default function CopyCreativeTab() {
       visual_dos: [],
       visual_donts: [],
       brand_notes: "",
+      logo_file: null,           // { path, name, access_url }
+      reference_images: [],      // [{ path, name, access_url }]
     },
   });
   const [busy, setBusy] = useState(false);
@@ -75,12 +68,11 @@ export default function CopyCreativeTab() {
       setLoaded(gs);
       setDraft({
         copy_guidelines: {
-          brand_voice:            readPayload(p, "copy_guidelines.brand_voice", "professional_warm"),
-          tone_notes:             readPayload(p, "copy_guidelines.tone_notes", ""),
-          forbidden_words:        readPayload(p, "copy_guidelines.forbidden_words", []),
-          required_disclaimers:   readPayload(p, "copy_guidelines.required_disclaimers", []),
-          allowed_ctas:           readPayload(p, "copy_guidelines.allowed_ctas", DEFAULT_CTAS),
-          max_lengths_per_format: readPayload(p, "copy_guidelines.max_lengths_per_format", {}),
+          brand_voice:          readPayload(p, "copy_guidelines.brand_voice", "professional_warm"),
+          tone_notes:           readPayload(p, "copy_guidelines.tone_notes", ""),
+          forbidden_words:      readPayload(p, "copy_guidelines.forbidden_words", []),
+          required_disclaimers: readPayload(p, "copy_guidelines.required_disclaimers", []),
+          allowed_ctas:         readPayload(p, "copy_guidelines.allowed_ctas", DEFAULT_CTAS),
         },
         creative_guidelines: {
           primary_colors:   readPayload(p, "creative_guidelines.primary_colors", []),
@@ -89,6 +81,8 @@ export default function CopyCreativeTab() {
           visual_dos:       readPayload(p, "creative_guidelines.visual_dos", []),
           visual_donts:     readPayload(p, "creative_guidelines.visual_donts", []),
           brand_notes:      readPayload(p, "creative_guidelines.brand_notes", ""),
+          logo_file:        readPayload(p, "creative_guidelines.logo_file", null),
+          reference_images: readPayload(p, "creative_guidelines.reference_images", []),
         },
       });
     } catch (e) { setError(e.message); }
@@ -97,19 +91,6 @@ export default function CopyCreativeTab() {
 
   function patchCopy(key, val)     { setDraft(prev => ({ ...prev, copy_guidelines:     { ...prev.copy_guidelines,     [key]: val } })); }
   function patchCreative(key, val) { setDraft(prev => ({ ...prev, creative_guidelines: { ...prev.creative_guidelines, [key]: val } })); }
-
-  function patchMaxLength(format, val) {
-    setDraft(prev => ({
-      ...prev,
-      copy_guidelines: {
-        ...prev.copy_guidelines,
-        max_lengths_per_format: {
-          ...prev.copy_guidelines.max_lengths_per_format,
-          [format]: val === "" ? null : Number(val),
-        },
-      },
-    }));
-  }
 
   async function save() {
     setBusy(true);
@@ -188,19 +169,15 @@ export default function CopyCreativeTab() {
           />
         </Section>
 
-        <Section title="📏 אורך מקסימלי לפי פורמט (תווים)"
-                 hint="גג עליון לקופי לכל פורמט. ערך ריק = משתמש בערך מהפלטפורמה.">
-          <Row minCol={140}>
-            {MAX_LENGTH_FORMATS.map(f => (
-              <FieldBox key={f.id} label={f.label}>
-                <input type="number" min="0" placeholder="ברירת מחדל"
-                       value={draft.copy_guidelines.max_lengths_per_format[f.id] ?? ""}
-                       onChange={e => patchMaxLength(f.id, e.target.value)}
-                       style={input} />
-              </FieldBox>
-            ))}
-          </Row>
-        </Section>
+        <div style={{
+          background: "#fef3c7", border: "1px solid #fcd34d", borderRadius: radius.md,
+          padding: `${space(2.5)} ${space(3)}`, marginTop: space(3),
+          ...type.bodySmall, color: "#854d0e",
+        }}>
+          📏 <strong>מגבלות אורך לכל פורמט (Meta Feed 40 תווים וכו') אינן מוגדרות פה</strong> —
+          הן <strong>קביעות פלטפורמה</strong>, לא ערך עסקי. מקור האמת הוא <strong>"פלטפורמות + פורמטים"</strong>,
+          ושם הסוכן המדיה קורא ומעביר לסוכן הקופי כחלק מההוראות.
+        </div>
       </div>
 
       <div style={card}>
@@ -220,7 +197,86 @@ export default function CopyCreativeTab() {
           </div>
         </Section>
 
-        <Section title="🏷 מיקום לוגו">
+        <Section title="🖼 לוגו"
+                 hint="קובץ הלוגו הראשי. סוכן הקריאייטיב יקבל את הקובץ הזה כקלט ל-OpenAI כדי לוודא שהוא משולב נכון בכל מודעה.">
+          {draft.creative_guidelines.logo_file ? (
+            <div style={{
+              display: "flex", alignItems: "center", gap: space(3),
+              padding: space(3), background: color.surfaceMuted, borderRadius: radius.md,
+              border: `1px solid ${color.borderDefault}`,
+            }}>
+              {draft.creative_guidelines.logo_file.access_url ? (
+                <img src={draft.creative_guidelines.logo_file.access_url} alt="לוגו"
+                     style={{ maxHeight: 60, maxWidth: 120, objectFit: "contain",
+                              background: "#fff", padding: 8, borderRadius: 6 }} />
+              ) : <span style={{ fontSize: 32 }}>🖼</span>}
+              <div style={{ flex: 1 }}>
+                <div style={{ ...type.bodyStrong, color: color.fgDefault }}>
+                  {draft.creative_guidelines.logo_file.name}
+                </div>
+                <button onClick={() => patchCreative("logo_file", null)} style={{
+                  ...type.small, color: color.dangerSoftFg, background: "transparent",
+                  border: "none", padding: 0, cursor: "pointer", marginTop: space(1), fontFamily,
+                }}>🗑 הסירי</button>
+              </div>
+            </div>
+          ) : (
+            <FileUpload
+              folderId={null}
+              purpose="brand_logo"
+              accept="image/*"
+              label="גררי לוגו לכאן או לחצי לבחירה"
+              hint="PNG עם רקע שקוף עדיף · עד 25MB"
+              onUploaded={(res) => patchCreative("logo_file", res)}
+            />
+          )}
+        </Section>
+
+        <Section title="📂 תמונות רפרנס וקריאייטיב מוצלחים"
+                 hint="דוגמאות של מודעות שעבדו טוב בעבר, סטייל גיידים, או רפרנסים שאת אוהבת. סוכן הקריאייטיב יקבל את הקבצים האלה כקלט ויקח מהם השראה.">
+          {(draft.creative_guidelines.reference_images || []).length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: space(2), marginBottom: space(3) }}>
+              {draft.creative_guidelines.reference_images.map((img, i) => (
+                <div key={i} style={{
+                  position: "relative",
+                  border: `1px solid ${color.borderDefault}`, borderRadius: radius.md,
+                  padding: space(2), background: color.surfaceMuted,
+                }}>
+                  {img.access_url ? (
+                    <img src={img.access_url} alt={img.name}
+                         style={{ maxHeight: 80, maxWidth: 120, objectFit: "cover",
+                                  display: "block", borderRadius: 4 }} />
+                  ) : <span style={{ fontSize: 32 }}>📷</span>}
+                  <div style={{ ...type.small, color: color.fgMuted, marginTop: space(1),
+                                maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis",
+                                whiteSpace: "nowrap" }}>
+                    {img.name}
+                  </div>
+                  <button onClick={() => patchCreative("reference_images",
+                                                       draft.creative_guidelines.reference_images.filter((_, j) => j !== i))}
+                          style={{
+                            position: "absolute", top: -8, insetInlineEnd: -8,
+                            width: 24, height: 24, borderRadius: "50%",
+                            border: "none", background: color.dangerSoftFg, color: "#fff",
+                            cursor: "pointer", fontSize: 14, fontWeight: 700, fontFamily,
+                          }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <FileUpload
+            folderId={null}
+            purpose="brand_reference"
+            accept="image/*"
+            label="הוסיפי תמונת רפרנס"
+            hint="ניתן להוסיף עד 20 תמונות · כל אחת עד 25MB"
+            onUploaded={(res) => patchCreative("reference_images",
+                                                [...(draft.creative_guidelines.reference_images || []), res])}
+          />
+        </Section>
+
+        <Section title="🏷 מיקום לוגו"
+                 hint="מיקום מועדף ברוב המודעות. סוכן הקריאייטיב יכבד את זה אלא אם פורמט ספציפי דורש אחרת.">
           <Row>
             <FieldBox label="היכן הלוגו מופיע בכל מודעה?">
               <select value={draft.creative_guidelines.logo_placement}
