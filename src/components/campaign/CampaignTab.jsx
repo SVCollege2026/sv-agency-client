@@ -1,11 +1,6 @@
 /**
  * CampaignTab.jsx — orchestrator לטאב "🎯 פעילות שיווקית".
- *
- * Layout:
- *   • Section header (clear: this is the Marketing Activity area of Campaign Management)
- *   • Underline-style sub-tabs (visually subordinate to the 3 main tabs above)
- *   • NotificationBell aligned to the side
- *   • Section content
+ * Uses design tokens for consistent visual hierarchy.
  */
 import React, { useState } from "react";
 import FolderBoard from "./FolderBoard.jsx";
@@ -16,6 +11,7 @@ import SchoolBudgetPanel from "./SchoolBudgetPanel.jsx";
 import NotificationBell from "./NotificationBell.jsx";
 import BlockersInbox from "./BlockersInbox.jsx";
 import ArtifactsApprovalPanel from "./ArtifactsApprovalPanel.jsx";
+import { color, radius, shadow, space, type, transition, fontFamily } from "./_tokens.js";
 
 const SUB_TABS = [
   { id: "board",     label: "לוח קמפיינים",     icon: "🗂", desc: "כל תיקיות הקמפיין לפי סטטוס" },
@@ -33,36 +29,38 @@ export default function CampaignTab() {
   const current = SUB_TABS.find(t => t.id === sub) || SUB_TABS[0];
 
   return (
-    <div style={{ direction: "rtl" }}>
-      {/* Section banner — clearly distinct from the main tabs above */}
+    <div style={{ direction: "rtl", fontFamily }}>
+      {/* Section banner — clean blue gradient, clearly distinct from main tabs */}
       <div style={{
-        background: "linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%)",
-        border: "1px solid #fde68a",
-        borderRadius: 12,
-        padding: "16px 20px",
-        marginBottom: 14,
+        background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)",
+        border: `1px solid ${color.borderDefault}`,
+        borderRadius: radius.lg,
+        padding: `${space(4)} ${space(5)}`,
+        marginBottom: space(3),
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
         flexWrap: "wrap",
-        gap: 12,
+        gap: space(3),
+        boxShadow: shadow.sm,
       }}>
         <div>
-          <div style={{ fontSize: 11, color: "#a16207", fontWeight: 700, letterSpacing: 0.5 }}>
+          <div style={{ ...type.caption, color: color.fgSubtle, textTransform: "uppercase" }}>
             ניהול קמפיינים · פעילות שיווקית
           </div>
-          <h2 style={{ margin: "4px 0 0", fontSize: 20, color: "#0f172a" }}>
-            🎯 {current.icon} {current.label}
+          <h2 style={{ ...type.h2, margin: `${space(1)} 0 0`, display: "flex", alignItems: "center", gap: space(2) }}>
+            <span style={{ fontSize: 22 }}>{current.icon}</span>
+            {current.label}
           </h2>
-          <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>{current.desc}</div>
+          <div style={{ ...type.bodySmall, color: color.fgMuted, marginTop: space(1) }}>{current.desc}</div>
         </div>
         <NotificationBell />
       </div>
 
-      {/* Sub-tabs — underline style (clearly subordinate) */}
+      {/* Sub-tabs — underline style, subordinate to main tabs */}
       <div style={{
-        display: "flex", gap: 4, borderBottom: "2px solid #e2e8f0",
-        marginBottom: 18, overflowX: "auto",
+        display: "flex", gap: space(1), borderBottom: `2px solid ${color.borderSubtle}`,
+        marginBottom: space(4), overflowX: "auto",
       }}>
         {SUB_TABS.map(t => {
           const active = sub === t.id;
@@ -71,15 +69,17 @@ export default function CampaignTab() {
               key={t.id}
               onClick={() => { setSub(t.id); setFolderId(null); }}
               style={{
-                padding: "10px 16px", border: "none", background: "transparent",
+                padding: `${space(2.5)} ${space(4)}`, border: "none", background: "transparent",
                 cursor: "pointer", fontSize: 13, fontWeight: active ? 700 : 500,
-                color: active ? "#1e3a5f" : "#64748b",
-                borderBottom: `3px solid ${active ? "#1e3a5f" : "transparent"}`,
-                marginBottom: -2,
-                whiteSpace: "nowrap", transition: "all 0.15s",
+                color: active ? color.primary : color.fgMuted,
+                borderBottom: `3px solid ${active ? color.primary : "transparent"}`,
+                marginBottom: -2, whiteSpace: "nowrap", transition: transition.fast,
+                fontFamily,
               }}
+              onMouseEnter={e => { if (!active) e.currentTarget.style.color = color.fgDefault; }}
+              onMouseLeave={e => { if (!active) e.currentTarget.style.color = color.fgMuted; }}
             >
-              <span style={{ marginInlineEnd: 6 }}>{t.icon}</span>
+              <span style={{ marginInlineEnd: space(1.5) }}>{t.icon}</span>
               {t.label}
             </button>
           );

@@ -9,6 +9,7 @@ import {
   listMediaRules, listBudgetSources,
   getDryRunStatus, listNotificationChannels, toggleNotificationChannel,
 } from "../../api.js";
+import { useToast } from "./Toast.jsx";
 
 const card = {
   background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb",
@@ -87,6 +88,7 @@ const FieldBox = ({ label, hint, children }) => (
 );
 
 function GeneralTab() {
+  const toast = useToast();
   const [dryRun, setDryRun] = useState(true);
   const [defaultCheckWindow, setDefaultCheckWindow] = useState(7);
   const [minDataDays, setMinDataDays] = useState(3);
@@ -119,9 +121,8 @@ function GeneralTab() {
         holidays_list: holidays,
       };
       await updateGeneralSettings({ payload, updated_by: "marketing_manager" });
-      setMsg("✓ נשמר בהצלחה");
-      setTimeout(() => setMsg(null), 2500);
-    } catch (e) { setMsg(`שגיאה: ${e.message}`); }
+      toast.success("⚙ ההגדרות נשמרו");
+    } catch (e) { toast.error(`שגיאה: ${e.message}`); }
     finally { setBusy(false); }
   }
 

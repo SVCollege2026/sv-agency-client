@@ -10,9 +10,11 @@ import EcosystemPage from "./pages/EcosystemPage.jsx";
 import MediaReportsPage from "./pages/MediaReportsPage.jsx";
 import ForecastingPage from "./pages/ForecastingPage.jsx";
 import GoalsPage from "./pages/GoalsPage.jsx";
+import { ToastProvider } from "./components/campaign/Toast.jsx";
 
 export default function App() {
   return (
+    <ToastProvider>
     <Routes>
       {/* All routes share the global Layout (fixed top bar + bug button) */}
       <Route element={<Layout />}>
@@ -53,5 +55,6 @@ export default function App() {
 
       </Route>
     </Routes>
+    </ToastProvider>
   );
 }

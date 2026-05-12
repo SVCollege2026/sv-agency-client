@@ -1,57 +1,21 @@
 /**
  * FolderBoard.jsx — Monday-style Kanban board for campaign folders.
- *
- * Groups folders by status into vertical columns. Each card shows the
- * primary fields with a color-coded left border matching the status.
- *
- * Replaces the table-style FolderList (looked like "80s folders").
+ * Uses design tokens, soft shadows, hover lift, skeleton loading, toasts.
  */
 import React, { useState, useEffect } from "react";
 import { listCampaignFolders, createCampaignFolder } from "../../api.js";
+import { color, radius, shadow, space, type, transition, button, input as inputStyle, emptyState } from "./_tokens.js";
+import { useToast } from "./Toast.jsx";
+import { SkeletonBoard } from "./Skeleton.jsx";
 
-// ─── Status groups — order + color per Spec 03 §3 + StatusPill ──────────
 const COLUMNS = [
-  { id: "draft",           label: "טיוטה",         color: "#94a3b8", bg: "#f1f5f9" },
-  { id: "in_progress",     label: "בעבודה",        color: "#0369a1", bg: "#e0f2fe" },
-  { id: "ready_to_launch", label: "מוכן לעלייה",   color: "#15803d", bg: "#dcfce7" },
-  { id: "live",            label: "באוויר",        color: "#166534", bg: "#bbf7d0" },
-  { id: "closing",         label: "בסגירה",        color: "#a16207", bg: "#fef3c7" },
-  { id: "closed",          label: "סגור",          color: "#b91c1c", bg: "#fee2e2" },
+  { id: "draft",           label: "טיוטה",         dot: "#94a3b8", strip: "#94a3b8", soft: "#f8fafc" },
+  { id: "in_progress",     label: "בעבודה",        dot: "#0369a1", strip: "#0369a1", soft: "#f0f9ff" },
+  { id: "ready_to_launch", label: "מוכן לעלייה",   dot: "#15803d", strip: "#15803d", soft: "#f0fdf4" },
+  { id: "live",            label: "באוויר",        dot: "#16a34a", strip: "#16a34a", soft: "#ecfdf5" },
+  { id: "closing",         label: "בסגירה",        dot: "#a16207", strip: "#a16207", soft: "#fffbeb" },
+  { id: "closed",          label: "סגור",          dot: "#b91c1c", strip: "#b91c1c", soft: "#fef2f2" },
 ];
-
-const colHeader = (col, count) => ({
-  display: "flex", alignItems: "center", justifyContent: "space-between",
-  padding: "10px 14px", borderRadius: "10px 10px 0 0",
-  background: col.bg, color: col.color,
-  fontWeight: 700, fontSize: 13, borderBottom: `3px solid ${col.color}`,
-});
-
-const cardBase = (color) => ({
-  background: "#ffffff",
-  border: "1px solid #e2e8f0",
-  borderInlineStart: `4px solid ${color}`,
-  borderRadius: 8,
-  padding: 12,
-  marginBottom: 10,
-  cursor: "pointer",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
-  transition: "all 0.15s ease",
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-});
-
-const fieldLine = {
-  fontSize: 12,
-  color: "#64748b",
-  display: "flex",
-  alignItems: "center",
-  gap: 4,
-};
-
-const dot = (color) => ({
-  width: 8, height: 8, borderRadius: "50%", background: color, display: "inline-block",
-});
 
 function formatDate(iso) {
   if (!iso) return "—";
@@ -59,24 +23,21 @@ function formatDate(iso) {
 }
 
 export default function FolderBoard({ onSelectFolder, refreshKey = 0 }) {
+  const toast = useToast();
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError]     = useState(null);
   const [showNew, setShowNew] = useState(false);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
 
   async function refresh() {
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
       const data = await listCampaignFolders();
       setFolders(Array.isArray(data) ? data : []);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
   }
 
   useEffect(() => { refresh(); /* eslint-disable-next-line */ }, [refreshKey]);
@@ -87,11 +48,11 @@ export default function FolderBoard({ onSelectFolder, refreshKey = 0 }) {
     try {
       const folder = await createCampaignFolder({ course_name: newName.trim(), created_by: "marketing_manager" });
       setNewName(""); setShowNew(false);
+      toast.success(`✓ נוצרה תיקיית קמפיין: ${folder.course_name}`);
       await refresh();
       onSelectFolder && onSelectFolder(folder.id);
-    } catch (e) {
-      alert(`שגיאה: ${e.message}`);
-    } finally { setCreating(false); }
+    } catch (e) { toast.error(`שגיאה ביצירת תיקייה: ${e.message}`); }
+    finally { setCreating(false); }
   }
 
   const grouped = COLUMNS.reduce((acc, col) => {
@@ -101,138 +62,153 @@ export default function FolderBoard({ onSelectFolder, refreshKey = 0 }) {
 
   return (
     <div style={{ direction: "rtl" }}>
-      {/* Top toolbar */}
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        marginBottom: 16, flexWrap: "wrap", gap: 10,
+        marginBottom: space(4), flexWrap: "wrap", gap: space(3),
       }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-          <h3 style={{ margin: 0, color: "#0f172a", fontSize: 18 }}>📋 לוח קמפיינים</h3>
-          <span style={{ fontSize: 13, color: "#64748b" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: space(3) }}>
+          <h3 style={{ ...type.h2, margin: 0 }}>📋 לוח קמפיינים</h3>
+          <span style={{ ...type.bodySmall, color: color.fgSubtle }}>
             {folders.length} {folders.length === 1 ? "תיקייה" : "תיקיות"} סה"כ
           </span>
         </div>
-        <button
-          onClick={() => setShowNew(s => !s)}
-          style={{
-            padding: "9px 16px", background: "#1e3a5f", color: "#fff",
-            border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 700,
-            boxShadow: "0 2px 4px rgba(30, 58, 95, 0.2)",
-          }}
-        >➕ תיקייה חדשה</button>
+        <button onClick={() => setShowNew(s => !s)} style={button.primary}
+                onMouseEnter={e => e.currentTarget.style.background = color.primaryHover}
+                onMouseLeave={e => e.currentTarget.style.background = color.primary}>
+          ➕ תיקייה חדשה
+        </button>
       </div>
 
       {showNew && (
         <div style={{
-          background: "#fff", border: "1px solid #cbd5e1", borderRadius: 10,
-          padding: 14, marginBottom: 16, boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+          background: color.surface, border: `1px solid ${color.borderDefault}`,
+          borderRadius: radius.card, padding: space(4), marginBottom: space(4),
+          boxShadow: shadow.sm,
         }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: "#0f172a" }}>תיקיית קמפיין חדשה</div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ ...type.label, marginBottom: space(2) }}>תיקיית קמפיין חדשה</div>
+          <div style={{ display: "flex", gap: space(2) }}>
             <input
               value={newName}
               onChange={e => setNewName(e.target.value)}
               placeholder="שם הקורס / הפעילות"
               autoFocus
-              style={{ flex: 1, padding: "10px 12px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 14 }}
+              style={{ ...inputStyle, flex: 1 }}
             />
             <button onClick={createFolder} disabled={creating || !newName.trim()}
-              style={{
-                padding: "10px 18px", background: "#16a34a", color: "#fff", border: "none",
-                borderRadius: 6, cursor: creating ? "not-allowed" : "pointer", fontWeight: 700,
-              }}
-            >{creating ? "..." : "צור"}</button>
-            <button onClick={() => { setShowNew(false); setNewName(""); }}
-              style={{
-                padding: "10px 16px", background: "transparent", color: "#475569",
-                border: "1px solid #cbd5e1", borderRadius: 6, cursor: "pointer",
-              }}
-            >ביטול</button>
+              style={{ ...button.success, opacity: creating || !newName.trim() ? 0.5 : 1 }}>
+              {creating ? "..." : "צור"}
+            </button>
+            <button onClick={() => { setShowNew(false); setNewName(""); }} style={button.secondary}>
+              ביטול
+            </button>
           </div>
         </div>
       )}
 
       {error && (
-        <div style={{ padding: 12, background: "#fee2e2", color: "#b91c1c", borderRadius: 8, marginBottom: 12 }}>
-          שגיאה: {error}
+        <div style={{
+          padding: space(3), background: color.dangerSoftBg, color: color.dangerSoftFg,
+          borderRadius: radius.md, marginBottom: space(3), ...type.bodySmall,
+        }}>שגיאה: {error}</div>
+      )}
+
+      {loading && <SkeletonBoard />}
+
+      {!loading && folders.length === 0 && (
+        <div style={{ ...emptyState, padding: space(12) }}>
+          <div style={{ fontSize: 56, marginBottom: space(3) }}>🌱</div>
+          <div style={{ ...type.h3, marginBottom: space(2) }}>אין עדיין תיקיות קמפיין</div>
+          <div style={{ ...type.bodySmall, color: color.fgSubtle, marginBottom: space(4) }}>
+            צרי את התיקייה הראשונה שלך כדי להתחיל בניהול קמפיינים
+          </div>
+          <button onClick={() => setShowNew(true)} style={button.primary}>
+            ➕ צרי תיקייה ראשונה
+          </button>
         </div>
       )}
 
-      {loading && <div style={{ padding: 20, color: "#64748b" }}>טוען...</div>}
-
-      {!loading && (
+      {!loading && folders.length > 0 && (
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-          gap: 14,
-          paddingBottom: 20,
+          gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+          gap: space(3), paddingBottom: space(5),
         }}>
           {COLUMNS.map(col => (
             <div key={col.id} style={{
-              background: "#f8fafc",
-              borderRadius: 10,
-              padding: "0 10px 10px",
-              border: "1px solid #e2e8f0",
-              minHeight: 140,
-              display: "flex", flexDirection: "column",
+              background: color.surfaceMuted, borderRadius: radius.card,
+              border: `1px solid ${color.borderSubtle}`,
+              minHeight: 160, display: "flex", flexDirection: "column",
             }}>
-              <div style={colHeader(col, grouped[col.id].length)}>
-                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={dot(col.color)} />
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: `${space(3)} ${space(4)}`, background: col.soft,
+                borderRadius: `${radius.card}px ${radius.card}px 0 0`,
+                borderBottom: `2px solid ${col.strip}`,
+              }}>
+                <span style={{ display: "flex", alignItems: "center", gap: space(2),
+                                color: col.strip, ...type.label, fontSize: 13 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: col.dot, display: "inline-block" }} />
                   {col.label}
                 </span>
                 <span style={{
-                  background: "rgba(255,255,255,0.6)", padding: "2px 9px",
-                  borderRadius: 999, fontSize: 12, fontWeight: 700, color: col.color,
+                  background: color.surface, padding: `${space(0.5)} ${space(2)}`,
+                  borderRadius: radius.pill, fontSize: 11, fontWeight: 700, color: col.strip,
+                  minWidth: 22, textAlign: "center",
                 }}>{grouped[col.id].length}</span>
               </div>
-              <div style={{ paddingTop: 10, flex: 1 }}>
+              <div style={{ padding: space(2), flex: 1 }}>
                 {grouped[col.id].length === 0 && (
                   <div style={{
-                    textAlign: "center", fontSize: 12, color: "#94a3b8",
-                    padding: "20px 8px", border: "1px dashed #e2e8f0", borderRadius: 6,
-                  }}>אין תיקיות במצב הזה</div>
+                    textAlign: "center", padding: space(4), color: color.fgSubtle,
+                    fontSize: 12, border: `1px dashed ${color.borderDefault}`,
+                    borderRadius: radius.sm,
+                  }}>—</div>
                 )}
                 {grouped[col.id].map(f => (
                   <div
                     key={f.id}
-                    style={cardBase(col.color)}
+                    className="campaign-card"
                     onClick={() => onSelectFolder && onSelectFolder(f.id)}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.transform = "translateY(-1px)";
-                      e.currentTarget.style.boxShadow = "0 4px 12px rgba(15, 23, 42, 0.08)";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.transform = "";
-                      e.currentTarget.style.boxShadow = "0 1px 3px rgba(15, 23, 42, 0.04)";
+                    style={{
+                      background: color.surface,
+                      border: `1px solid ${color.borderSubtle}`,
+                      borderInlineStart: `4px solid ${col.dot}`,
+                      borderRadius: radius.md,
+                      padding: space(3),
+                      marginBottom: space(2),
+                      cursor: "pointer",
+                      boxShadow: shadow.xs,
+                      transition: transition.base,
+                      display: "flex", flexDirection: "column", gap: space(2),
                     }}
                   >
-                    <div style={{ fontWeight: 700, color: "#0f172a", fontSize: 14, lineHeight: 1.3 }}>
+                    <div style={{ ...type.bodyStrong, color: color.fgDefault, lineHeight: "20px" }}>
                       {f.course_name}
                     </div>
                     {f.activity_label && (
-                      <div style={{ fontSize: 11, color: "#64748b" }}>{f.activity_label}</div>
+                      <div style={{ ...type.small, color: color.fgSubtle }}>{f.activity_label}</div>
                     )}
 
-                    <div style={fieldLine}>
+                    <div style={{ ...type.small, color: color.fgMuted, display: "flex", gap: space(1) }}>
                       <span>🚀</span>
-                      <span>תאריך עלייה: <strong style={{ color: "#334155" }}>{f.planned_go_live_date || "—"}</strong></span>
+                      <span>עולה לאוויר: <strong style={{ color: color.fgDefault }}>{f.planned_go_live_date || "טרם נקבע"}</strong></span>
                     </div>
 
                     {f.methodology_switch_date && (
-                      <div style={fieldLine}>
-                        <span>🔄</span>
-                        <span>{f.methodology_switch_date} → {f.methodology_switch_to}</span>
+                      <div style={{ ...type.small, color: color.fgMuted, display: "flex", gap: space(1) }}>
+                        <span>🎯</span>
+                        <span>{f.methodology_switch_date} → {f.methodology_switch_to === "conversion" ? "Conversion" : "Clicks"}</span>
                       </div>
                     )}
 
                     <div style={{
                       display: "flex", justifyContent: "space-between",
-                      paddingTop: 6, marginTop: 4, borderTop: "1px dashed #e2e8f0",
-                      fontSize: 11, color: "#94a3b8",
+                      paddingTop: space(2), marginTop: space(1),
+                      borderTop: `1px dashed ${color.borderSubtle}`,
+                      fontSize: 11, color: color.fgSubtle,
                     }}>
-                      <span>נוצרה: {formatDate(f.created_at)}</span>
-                      <span style={{ color: col.color, fontWeight: 700 }}>פתח ›</span>
+                      <span>{formatDate(f.created_at)}</span>
+                      <span style={{ color: col.strip, fontWeight: 700 }}>פתחי ›</span>
                     </div>
                   </div>
                 ))}
