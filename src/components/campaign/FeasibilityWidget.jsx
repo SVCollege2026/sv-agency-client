@@ -15,6 +15,7 @@
 import React, { useEffect, useState } from "react";
 import { checkFeasibility } from "../../api.js";
 import { color, radius, shadow, space, type, fontFamily, transition } from "./_tokens.js";
+import { ApprovalGuardLine } from "./ApprovalGuard.jsx";
 
 const VERDICT_STYLES = {
   realistic: {
@@ -204,34 +205,39 @@ export default function FeasibilityWidget({ folderId, goal, budget, onAcceptBudg
                 </span>
               </div>
               {onAcceptBudget && (
-                <div style={{ display: "flex", gap: space(2), flexWrap: "wrap" }}>
-                  <button onClick={() => onAcceptBudget(v.recommended_budget_ils)}
-                          disabled={acceptInProgress}
-                          style={{
-                            padding: `${space(2)} ${space(4)}`,
-                            background: style.fg, color: "#fff", border: "none",
-                            borderRadius: radius.md,
-                            cursor: acceptInProgress ? "not-allowed" : "pointer",
-                            fontSize: 13, fontWeight: 700, fontFamily,
-                            transition: transition.fast,
-                            opacity: acceptInProgress ? 0.6 : 1,
-                          }}>
-                    {acceptInProgress ? "יוצרת גרסה חדשה..." : "✓ קבלי המלצה — צרי גרסה חדשה של הבריף"}
-                  </button>
-                  <button onClick={() => onAcceptBudget(null)}
-                          disabled={acceptInProgress}
-                          style={{
-                            padding: `${space(2)} ${space(4)}`,
-                            background: "transparent", color: style.fgMuted,
-                            border: `1px solid ${style.border}`,
-                            borderRadius: radius.md,
-                            cursor: acceptInProgress ? "not-allowed" : "pointer",
-                            fontSize: 13, fontWeight: 700, fontFamily,
-                            opacity: acceptInProgress ? 0.6 : 1,
-                          }}>
-                    ✗ דחי
-                  </button>
-                </div>
+                <>
+                  <div style={{ display: "flex", gap: space(2), flexWrap: "wrap" }}>
+                    <button onClick={() => onAcceptBudget(v.recommended_budget_ils)}
+                            disabled={acceptInProgress}
+                            style={{
+                              padding: `${space(2)} ${space(4)}`,
+                              background: style.fg, color: "#fff", border: "none",
+                              borderRadius: radius.md,
+                              cursor: acceptInProgress ? "not-allowed" : "pointer",
+                              fontSize: 13, fontWeight: 700, fontFamily,
+                              transition: transition.fast,
+                              opacity: acceptInProgress ? 0.6 : 1,
+                            }}>
+                      {acceptInProgress ? "יוצרת גרסה חדשה..." : "✓ קבלי המלצה — צרי גרסה חדשה של הבריף"}
+                    </button>
+                    <button onClick={() => onAcceptBudget(null)}
+                            disabled={acceptInProgress}
+                            style={{
+                              padding: `${space(2)} ${space(4)}`,
+                              background: "transparent", color: style.fgMuted,
+                              border: `1px solid ${style.border}`,
+                              borderRadius: radius.md,
+                              cursor: acceptInProgress ? "not-allowed" : "pointer",
+                              fontSize: 13, fontWeight: 700, fontFamily,
+                              opacity: acceptInProgress ? 0.6 : 1,
+                            }}>
+                      ✗ דחי
+                    </button>
+                  </div>
+                  <ApprovalGuardLine>
+                    קבלת ההמלצה <strong>אינה משנה תקציב חי</strong>. היא יוצרת גרסה חדשה של הבריף עם התקציב המעודכן, שתוכלי לערוך לפני שמירה.
+                  </ApprovalGuardLine>
+                </>
               )}
             </div>
           )}

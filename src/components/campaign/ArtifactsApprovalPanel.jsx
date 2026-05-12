@@ -7,6 +7,7 @@ import { listArtifacts, approveArtifact, requestArtifactRevision, forwardArtifac
 import { color, radius, shadow, space, type, transition, button as btn, input as inputStyle, emptyState, pill, fontFamily } from "./_tokens.js";
 import { useToast } from "./Toast.jsx";
 import { SkeletonCard } from "./Skeleton.jsx";
+import { ApprovalGuardBanner } from "./ApprovalGuard.jsx";
 
 const ARTIFACT_TYPES = {
   media_plan:            { icon: "📊", label: "פריסת מדיה",         producer: "מחלקת מדיה" },
@@ -107,6 +108,8 @@ export default function ArtifactsApprovalPanel() {
 
   return (
     <div style={{ direction: "rtl", fontFamily }}>
+      <ApprovalGuardBanner context="artifacts" />
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: space(4), flexWrap: "wrap", gap: space(2) }}>
         <div style={{ display: "flex", gap: space(2) }}>
           <Pill active={filter === "pending"} onClick={() => setFilter("pending")} count={filter === "pending" ? items.length : null}>
