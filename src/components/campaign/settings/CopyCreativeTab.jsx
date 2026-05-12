@@ -50,8 +50,10 @@ export default function CopyCreativeTab() {
       visual_dos: [],
       visual_donts: [],
       brand_notes: "",
-      logo_file: null,           // { path, name, access_url }
-      reference_images: [],      // [{ path, name, access_url }]
+      logo_file: null,                 // { path, name, access_url }
+      reference_images: [],            // [{ path, name, access_url }]
+      design_instructions_file: null,  // { path, name, access_url } — Style guide PDF/Word
+      design_instructions_text: "",    // free-text fallback / supplement
     },
   });
   const [busy, setBusy] = useState(false);
@@ -83,6 +85,8 @@ export default function CopyCreativeTab() {
           brand_notes:      readPayload(p, "creative_guidelines.brand_notes", ""),
           logo_file:        readPayload(p, "creative_guidelines.logo_file", null),
           reference_images: readPayload(p, "creative_guidelines.reference_images", []),
+          design_instructions_file: readPayload(p, "creative_guidelines.design_instructions_file", null),
+          design_instructions_text: readPayload(p, "creative_guidelines.design_instructions_text", ""),
         },
       });
     } catch (e) { setError(e.message); }
@@ -291,6 +295,55 @@ export default function CopyCreativeTab() {
               </select>
             </FieldBox>
           </Row>
+        </Section>
+
+        <Section title="📄 הנחיות עיצוב (Style guide)"
+                 hint="קובץ הוראות עיצוב מלא (Style guide / Brand book) או טקסט הוראות. סוכן הקריאייטיבי מקבל את הקובץ כקלט לקריאה מלאה. בלי זה, הוא מסתמך רק על הפרמטרים שלמעלה.">
+          {draft.creative_guidelines.design_instructions_file ? (
+            <div style={{
+              display: "flex", alignItems: "center", gap: space(3),
+              padding: space(3), background: color.surfaceMuted, borderRadius: radius.md,
+              border: `1px solid ${color.borderDefault}`, marginBottom: space(3),
+            }}>
+              <span style={{ fontSize: 32 }}>📄</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ ...type.bodyStrong, color: color.fgDefault }}>
+                  {draft.creative_guidelines.design_instructions_file.name}
+                </div>
+                {draft.creative_guidelines.design_instructions_file.access_url && (
+                  <a href={draft.creative_guidelines.design_instructions_file.access_url}
+                     target="_blank" rel="noreferrer"
+                     style={{ ...type.small, color: color.primary, textDecoration: "underline" }}>
+                    הצג קובץ
+                  </a>
+                )}
+                <button onClick={() => patchCreative("design_instructions_file", null)} style={{
+                  ...type.small, color: color.dangerSoftFg, background: "transparent",
+                  border: "none", padding: 0, cursor: "pointer", marginInlineStart: space(3),
+                  fontFamily,
+                }}>🗑 הסירי</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ marginBottom: space(3) }}>
+              <FileUpload
+                folderId={null}
+                purpose="brand_style_guide"
+                accept=".pdf,.doc,.docx,.txt,.md"
+                label="העלי קובץ הנחיות עיצוב (PDF/Word/Text)"
+                hint="עד 25MB · קובץ אחד"
+                onUploaded={(res) => patchCreative("design_instructions_file", res)}
+              />
+            </div>
+          )}
+          <FieldBox label="או — הוראות חופשיות בטקסט (בנוסף או במקום הקובץ)"
+                    hint="לדוגמה: 'תמיד להציג טיפוגרפיה מודרנית', 'אסור להשתמש ב-gradient', 'חובה לכלול פס תחתון בצבע המותג'.">
+            <textarea value={draft.creative_guidelines.design_instructions_text}
+                      onChange={e => patchCreative("design_instructions_text", e.target.value)}
+                      placeholder="הוראות עיצוב חופשיות..."
+                      rows={4}
+                      style={textarea} />
+          </FieldBox>
         </Section>
 
         <Section title="✅ מותר ויזואלית">
