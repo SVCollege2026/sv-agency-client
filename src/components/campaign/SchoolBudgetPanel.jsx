@@ -1,8 +1,14 @@
 /**
- * SchoolBudgetPanel.jsx — תקציב בית-ספרי כללי. גמיש: שנתי, חודשי, או שניהם.
+ * SchoolBudgetPanel.jsx — תקציב בית-ספרי כללי (envelope בלבד).
+ *
+ * Manager sets only the "envelope": annual budget, monthly budget (optional),
+ * and free-text notes. The PLATFORM SPLIT is NOT a manager setting — it's a
+ * recommendation produced by `budget_allocation_agent` and approved via the
+ * artifacts flow ("דורש פעולה" tab). Previously this panel had a `media_split`
+ * editor; it has been removed because no agent consumed those values.
  */
 import React, { useState, useEffect } from "react";
-import { getSchoolBudget, updateSchoolBudget, listPlatformSettings } from "../../api.js";
+import { getSchoolBudget, updateSchoolBudget } from "../../api.js";
 import { useToast } from "./Toast.jsx";
 
 const card = {
@@ -25,17 +31,12 @@ export default function SchoolBudgetPanel() {
   const [annual,  setAnnual]  = useState("");
   const [monthly, setMonthly] = useState("");
   const [notes,   setNotes]   = useState("");
-  const [split,   setSplit]   = useState({});
-  const [platforms, setPlatforms] = useState([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg]   = useState(null);
 
   async function load() {
     try {
-      const [budget, plats] = await Promise.all([
-        getSchoolBudget(),
-        listPlatformSettings({ activeOnly: true }),
-      ]);
+      const budget = await getSchoolBudget();
       const a = budget.annual_budget_ils;
       const m = budget.monthly_budget_ils;
       setAnnualEnabled(a !== null && a !== undefined);
@@ -43,29 +44,20 @@ export default function SchoolBudgetPanel() {
       setAnnual(a ?? "");
       setMonthly(m ?? "");
       setNotes(budget.notes ?? "");
-      setSplit(budget.media_split || {});
-      setPlatforms(plats || []);
     } catch (e) { setMsg(`שגיאה: ${e.message}`); }
   }
 
   useEffect(() => { load(); }, []);
 
-  const splitSum = Object.values(split).reduce((a, b) => a + (Number(b) || 0), 0);
-  const splitOk = Math.abs(splitSum - 1) < 0.001 || splitSum === 0;
   const anyBudget = (annualEnabled && annual) || (monthlyEnabled && monthly);
-
-  function setPlat(platform, v) {
-    const num = v === "" ? 0 : Number(v);
-    setSplit(prev => ({ ...prev, [platform]: num }));
-  }
 
   async function save() {
     setBusy(true); setMsg(null);
     try {
       await updateSchoolBudget({
-        annual_budget_ils:  annualEnabled && annual  ? Number(annual)  : null,
+        annual_budget_ils:  annualEnabled && annual   ? Number(annual)  : null,
         monthly_budget_ils: monthlyEnabled && monthly ? Number(monthly) : null,
-        media_split:        split,
+        media_split:        {},  // intentionally empty — split is agent-recommended, not manager-set
         notes:              notes || null,
         updated_by:         "marketing_manager",
       });
@@ -137,40 +129,23 @@ export default function SchoolBudgetPanel() {
         </div>
       )}
 
-      <div style={{ marginBottom: 22 }}>
-        <label style={fieldLabel}>חלוקה למדיה (סכום ל-100%)</label>
-        <div style={hint}>איך התקציב יתחלק בין הפלטפורמות. אופציונלי — אפשר לחזור לזה מאוחר יותר.</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-          {platforms.map(p => (
-            <div key={p.platform} style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
-              background: "#f9fafb", borderRadius: 10, border: "1px solid #e5e7eb",
-            }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>
-                {p.platform === "meta" ? "📘 Meta" :
-                 p.platform === "google" ? "🔍 Google" :
-                 p.platform === "tiktok" ? "🎵 TikTok" :
-                 p.platform}
-              </span>
-              <input
-                type="number" step="0.05" min="0" max="1"
-                value={split[p.platform] ?? ""}
-                onChange={e => setPlat(p.platform, e.target.value)}
-                style={{ width: 80, padding: "5px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, background: "#fff" }}
-                placeholder="0.0"
-              />
-              <span style={{ fontSize: 12, color: "#6b7280", minWidth: 36 }}>= {Math.round((split[p.platform] || 0) * 100)}%</span>
-            </div>
-          ))}
+      <div style={{
+        background: "#e0f2fe", border: "1px solid #7dd3fc", borderRadius: 10,
+        padding: "14px 18px", marginBottom: 22,
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#075985", marginBottom: 6 }}>
+          💡 איך מתחלקים הכספים בין הפלטפורמות?
         </div>
-        {Object.keys(split).length > 0 && (
-          <div style={{
-            marginTop: 10, fontSize: 12, fontWeight: 700,
-            color: splitOk ? "#15803d" : "#b91c1c",
-          }}>
-            סך החלוקה: {Math.round(splitSum * 100)}% {splitOk ? "✓" : "⚠ צריך להסתכם ב-100%"}
-          </div>
-        )}
+        <div style={{ fontSize: 13, color: "#0c4a6e", lineHeight: 1.6 }}>
+          החלוקה בין Meta / Google / TikTok <strong>אינה הגדרה שאת קובעת מראש</strong> — היא <strong>המלצה</strong>
+          של סוכן ניהול התקציב, שמתבססת על:
+          <ul style={{ margin: "8px 0 8px 0", paddingInlineStart: 22 }}>
+            <li>תוצאות היסטוריות (CPL, CTR, איכות לידים לכל פלטפורמה)</li>
+            <li>חיזוי ביצועים לתקופה הקרובה</li>
+            <li>תנאי שוק נוכחיים ועונתיות</li>
+          </ul>
+          בכל פעם שתיקיית קמפיין נפתחת או שביצועים זזים — תקבלי המלצת חלוקה ב<strong>"דורש פעולה" → "המלצת תקציב"</strong>. שם תאשרי / תדחי / תבקשי שינוי.
+        </div>
       </div>
 
       <div style={{ marginBottom: 22 }}>
