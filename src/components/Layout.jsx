@@ -6,6 +6,8 @@
 import React from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import svcollegeLogo from "../assets/svcollege-logo.png";
+import UserAvatar from "./UserAvatar.jsx";
+import CommandPalette from "./CommandPalette.jsx";
 
 export default function Layout() {
   const navigate = useNavigate();
@@ -60,14 +62,7 @@ export default function Layout() {
               פורטל ניהול מחלקות
             </p>
           </div>
-          <div style={{
-            width: 32, height: 32, background: "#1e3a5f", borderRadius: 8,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontWeight: 700, fontSize: 12, color: "#93c5fd",
-            border: "1px solid #2d4a6e", fontFamily: "'Segoe UI', sans-serif", flexShrink: 0,
-          }}>
-            SV
-          </div>
+          <UserAvatar />
         </div>
       </header>
 
@@ -76,6 +71,8 @@ export default function Layout() {
         <Outlet />
       </div>
 
+      {/* Global Cmd+K palette */}
+      <CommandPalette />
     </div>
   );
 }

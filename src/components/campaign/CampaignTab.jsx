@@ -33,6 +33,22 @@ export default function CampaignTab() {
   const help = useHelpFirstVisit();
   const current = SUB_TABS.find(t => t.id === sub) || SUB_TABS[0];
 
+  // Listen for global "open help" event (dispatched from UserAvatar menu)
+  React.useEffect(() => {
+    const handler = () => help.setOpen(true);
+    window.addEventListener("sv:open-help", handler);
+    return () => window.removeEventListener("sv:open-help", handler);
+  }, [help]);
+
+  // Deep-link to a sub-tab via ?sub=... (used by CommandPalette)
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const wanted = params.get("sub");
+    if (wanted && SUB_TABS.some(t => t.id === wanted)) {
+      setSub(wanted);
+    }
+  }, []);
+
   return (
     <div style={{ direction: "rtl", fontFamily }}>
       {/* Section banner — clean blue gradient, clearly distinct from main tabs */}
