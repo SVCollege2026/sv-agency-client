@@ -12,6 +12,7 @@ import RecommendationsPanel from "./RecommendationsPanel.jsx";
 import CloseCampaignDialog from "./CloseCampaignDialog.jsx";
 import CampaignCharts from "./CampaignCharts.jsx";
 import Breadcrumb from "./Breadcrumb.jsx";
+import FeasibilityWidget from "./FeasibilityWidget.jsx";
 
 const card = {
   background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb",
@@ -130,6 +131,8 @@ export default function FolderDetail({ folderId, onBack }) {
         </div>
       </div>
 
+      <FeasibilityFromBrief briefs={briefs} folderId={folder.id} />
+
       <CampaignCharts folderId={folder.id} />
 
       {showMethodology && (
@@ -212,6 +215,25 @@ export default function FolderDetail({ folderId, onBack }) {
       )}
     </div>
   );
+}
+
+function FeasibilityFromBrief({ briefs, folderId }) {
+  // Pick the most recent current-version brief (across types — school_level + new_course).
+  const current = (briefs || []).find(b => b.is_current_version) || (briefs || [])[0];
+  const p = current?.brief_payload || {};
+  const gs = p.goals_structured || {};
+
+  const goal = gs.target_leads ? {
+    target_leads: gs.target_leads,
+    horizon_days: gs.horizon_days || 30,
+    cpl_ceiling:  gs.cpl_ceiling || null,
+  } : null;
+
+  let budget = null;
+  if (p.annual_budget)  budget = { envelope_ils: p.annual_budget,  envelope_period: "annual" };
+  else if (p.monthly_budget) budget = { envelope_ils: p.monthly_budget, envelope_period: "month" };
+
+  return <FeasibilityWidget folderId={folderId} goal={goal} budget={budget} />;
 }
 
 function Stat({ icon, label, value }) {

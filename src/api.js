@@ -281,6 +281,12 @@ export async function getDeterministicForecast(year = 2026) {
   return request("GET", `/api/forecasting/deterministic?year=${year}`);
 }
 
+/** Feasibility check — given goal + budget envelope, returns verdict + projection.
+ *  body: { goal: {target_leads, horizon_days, cpl_ceiling?}, budget: {envelope_ils, envelope_period}, folder_id? } */
+export async function checkFeasibility(body) {
+  return request("POST", "/api/forecasting/feasibility", body);
+}
+
 export async function listForecasts({ limit = 50, status = null, department = null } = {}) {
   const params = new URLSearchParams();
   params.set("limit", String(limit));

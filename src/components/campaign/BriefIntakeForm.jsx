@@ -10,6 +10,7 @@
 import React, { useState } from "react";
 import { submitCampaignRequest, uploadCampaignFile } from "../../api.js";
 import FileUpload from "./FileUpload.jsx";
+import FeasibilityWidget from "./FeasibilityWidget.jsx";
 import { useToast } from "./Toast.jsx";
 
 const BUDGET_SOURCES = [
@@ -81,6 +82,9 @@ export default function BriefIntakeForm({ folderId = null, onSubmitted = () => {
   const [monthlyBudget, setMonthlyBudget] = useState("");
   const [importantMedia, setImportantMedia] = useState("");
   const [schoolGoals, setSchoolGoals] = useState("");
+  const [schoolTargetLeads, setSchoolTargetLeads]   = useState("");
+  const [schoolHorizonDays, setSchoolHorizonDays]   = useState("30");
+  const [schoolCplCeiling,  setSchoolCplCeiling]    = useState("");
 
   // New course
   const [courseName, setCourseName] = useState("");
@@ -91,6 +95,9 @@ export default function BriefIntakeForm({ folderId = null, onSubmitted = () => {
   const [budgetSource, setBudgetSource] = useState("from_existing");
   const [message, setMessage] = useState("");
   const [courseGoals, setCourseGoals] = useState("");
+  const [courseTargetLeads, setCourseTargetLeads] = useState("");
+  const [courseHorizonDays, setCourseHorizonDays] = useState("30");
+  const [courseCplCeiling,  setCourseCplCeiling]  = useState("");
   const [adExamples, setAdExamples] = useState("");
   const [adExamplesFiles, setAdExamplesFiles] = useState([]);
   const [notes, setNotes] = useState("");
@@ -109,6 +116,11 @@ export default function BriefIntakeForm({ folderId = null, onSubmitted = () => {
         monthly_budget:  monthlyBudget ? Number(monthlyBudget) : null,
         important_media: importantMedia.split(",").map(s => s.trim()).filter(Boolean),
         goals:           schoolGoals,
+        goals_structured: {
+          target_leads: schoolTargetLeads ? Number(schoolTargetLeads) : null,
+          horizon_days: schoolHorizonDays ? Number(schoolHorizonDays) : 30,
+          cpl_ceiling:  schoolCplCeiling  ? Number(schoolCplCeiling)  : null,
+        },
         notes,
       };
     }
@@ -121,6 +133,11 @@ export default function BriefIntakeForm({ folderId = null, onSubmitted = () => {
       budget_source:     budgetSource,
       message,
       goals:             courseGoals,
+      goals_structured: {
+        target_leads: courseTargetLeads ? Number(courseTargetLeads) : null,
+        horizon_days: courseHorizonDays ? Number(courseHorizonDays) : 30,
+        cpl_ceiling:  courseCplCeiling  ? Number(courseCplCeiling)  : null,
+      },
       ad_examples_text:  adExamples,
       ad_examples_files: adExamplesFiles,
       notes,
@@ -254,9 +271,50 @@ export default function BriefIntakeForm({ folderId = null, onSubmitted = () => {
           <Field label="מדיות חשובות" hint="מופרדות בפסיק. לדוגמה: meta, google, tiktok">
             <input style={inputStyle} value={importantMedia} onChange={e => setImportantMedia(e.target.value)} />
           </Field>
-          <Field label="יעדים">
-            <textarea style={{ ...inputStyle, minHeight: 70 }} value={schoolGoals} onChange={e => setSchoolGoals(e.target.value)} placeholder="מספר נרשמים, CPL מקסימלי, יעדי הרשמה..." />
+          <div style={{
+            padding: 14, background: "#eff6ff", borderRadius: 10,
+            border: "1px solid #bfdbfe", marginBottom: 12,
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#1e3a8a", marginBottom: 4 }}>
+              🎯 יעד מספרי (לבדיקת היתכנות אוטומטית)
+            </div>
+            <div style={{ fontSize: 12, color: "#3730a3", marginBottom: 10 }}>
+              כשתזיני יעד + תקציב, המערכת תחשב מיד אם זה ריאלי לפי ה-CPL ההיסטורי, ואם לא — תציע תקציב חלופי או יעד חלופי.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+              <Field label="יעד לידים">
+                <input style={inputStyle} type="number" min="0" value={schoolTargetLeads}
+                       onChange={e => setSchoolTargetLeads(e.target.value)} placeholder="100" />
+              </Field>
+              <Field label="תקופה (ימים)">
+                <input style={inputStyle} type="number" min="1" max="365" value={schoolHorizonDays}
+                       onChange={e => setSchoolHorizonDays(e.target.value)} placeholder="30" />
+              </Field>
+              <Field label="CPL מקסימלי (₪) — אופציונלי">
+                <input style={inputStyle} type="number" min="0" value={schoolCplCeiling}
+                       onChange={e => setSchoolCplCeiling(e.target.value)} placeholder="80" />
+              </Field>
+            </div>
+          </div>
+          <Field label="יעדים נוספים בטקסט חופשי (אופציונלי)" hint="הקשר עסקי, מטרות איכותיות, הערות לסוכנים">
+            <textarea style={{ ...inputStyle, minHeight: 70 }} value={schoolGoals} onChange={e => setSchoolGoals(e.target.value)} placeholder="לדוגמה: מיקוד באוכלוסיית 25-40, חשוב להציג סטטיסטיקות הצלחה אמיתיות..." />
           </Field>
+
+          <FeasibilityWidget
+            folderId={folderId}
+            goal={schoolTargetLeads ? {
+              target_leads: Number(schoolTargetLeads),
+              horizon_days: Number(schoolHorizonDays || 30),
+              cpl_ceiling:  schoolCplCeiling ? Number(schoolCplCeiling) : null,
+            } : null}
+            budget={annualBudget ? {
+              envelope_ils:    Number(annualBudget),
+              envelope_period: "annual",
+            } : monthlyBudget ? {
+              envelope_ils:    Number(monthlyBudget),
+              envelope_period: "month",
+            } : null}
+          />
 
           <h4 style={sectionTitle}>📌 נקודות תשומת לב</h4>
           <Field label="הערות חופשיות לצוות" hint="כל מה שחשוב שמחלקת המדיה והקריאייטיב יידעו: דגשים, סייגים, חוויה מהשנה הקודמת...">
@@ -318,7 +376,32 @@ export default function BriefIntakeForm({ folderId = null, onSubmitted = () => {
           <Field label="מסר מרכזי / דגשים מיוחדים">
             <textarea style={{ ...inputStyle, minHeight: 70 }} value={message} onChange={e => setMessage(e.target.value)} />
           </Field>
-          <Field label="יעדים">
+          <div style={{
+            padding: 14, background: "#eff6ff", borderRadius: 10,
+            border: "1px solid #bfdbfe", marginBottom: 12,
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#1e3a8a", marginBottom: 4 }}>
+              🎯 יעד מספרי (לבדיקת היתכנות אוטומטית)
+            </div>
+            <div style={{ fontSize: 12, color: "#3730a3", marginBottom: 10 }}>
+              ברגע שתזיני יעד לידים + תאריך עלייה, המערכת תרוץ feasibility מול ה-CPL ההיסטורי ותציע תקציב מתאים.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+              <Field label="יעד לידים">
+                <input style={inputStyle} type="number" min="0" value={courseTargetLeads}
+                       onChange={e => setCourseTargetLeads(e.target.value)} placeholder="100" />
+              </Field>
+              <Field label="תקופה (ימים)">
+                <input style={inputStyle} type="number" min="1" max="365" value={courseHorizonDays}
+                       onChange={e => setCourseHorizonDays(e.target.value)} placeholder="30" />
+              </Field>
+              <Field label="CPL מקסימלי (₪) — אופציונלי">
+                <input style={inputStyle} type="number" min="0" value={courseCplCeiling}
+                       onChange={e => setCourseCplCeiling(e.target.value)} placeholder="80" />
+              </Field>
+            </div>
+          </div>
+          <Field label="יעדים נוספים בטקסט חופשי (אופציונלי)">
             <textarea style={{ ...inputStyle, minHeight: 60 }} value={courseGoals} onChange={e => setCourseGoals(e.target.value)} />
           </Field>
 
