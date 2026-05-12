@@ -4,8 +4,9 @@
 import React, { useState, useEffect } from "react";
 import {
   getCampaignFolder, listFolderBriefs, listRecommendations,
-  scheduleMethodologySwitch, listWorkflowBlockers,
+  scheduleMethodologySwitch, listWorkflowBlockers, submitCampaignRequest,
 } from "../../api.js";
+import { useToast } from "./Toast.jsx";
 import StatusPill from "./StatusPill.jsx";
 import BriefIntakeForm from "./BriefIntakeForm.jsx";
 import RecommendationsPanel from "./RecommendationsPanel.jsx";
@@ -131,7 +132,7 @@ export default function FolderDetail({ folderId, onBack }) {
         </div>
       </div>
 
-      <FeasibilityFromBrief briefs={briefs} folderId={folder.id} />
+      <FeasibilityFromBrief briefs={briefs} folderId={folder.id} onChanged={() => setRefresh(r => r + 1)} />
 
       <CampaignCharts folderId={folder.id} />
 
@@ -217,7 +218,10 @@ export default function FolderDetail({ folderId, onBack }) {
   );
 }
 
-function FeasibilityFromBrief({ briefs, folderId }) {
+function FeasibilityFromBrief({ briefs, folderId, onChanged }) {
+  const toast = useToast();
+  const [accepting, setAccepting] = useState(false);
+
   // Pick the most recent current-version brief (across types — school_level + new_course).
   const current = (briefs || []).find(b => b.is_current_version) || (briefs || [])[0];
   const p = current?.brief_payload || {};
@@ -229,11 +233,61 @@ function FeasibilityFromBrief({ briefs, folderId }) {
     cpl_ceiling:  gs.cpl_ceiling || null,
   } : null;
 
-  let budget = null;
-  if (p.annual_budget)  budget = { envelope_ils: p.annual_budget,  envelope_period: "annual" };
-  else if (p.monthly_budget) budget = { envelope_ils: p.monthly_budget, envelope_period: "month" };
+  // Which budget field this brief uses — needed for the accept handler
+  const budgetPeriod = p.annual_budget ? "annual" : (p.monthly_budget ? "month" : null);
+  const budget = budgetPeriod ? {
+    envelope_ils:    budgetPeriod === "annual" ? p.annual_budget : p.monthly_budget,
+    envelope_period: budgetPeriod,
+  } : null;
 
-  return <FeasibilityWidget folderId={folderId} goal={goal} budget={budget} />;
+  async function onAcceptBudget(recommendedIls) {
+    if (recommendedIls == null) {
+      // User clicked "dismiss" — log but don't mutate
+      toast.info("ההמלצה נדחתה. תוכלי לחזור אליה בכל עת.");
+      return;
+    }
+    if (!current) {
+      toast.error("אין בריף נוכחי לעדכון");
+      return;
+    }
+    setAccepting(true);
+    try {
+      // Build a new brief revision with the recommended budget swapped in.
+      const newPayload = { ...p };
+      if (budgetPeriod === "annual")     newPayload.annual_budget  = recommendedIls;
+      else if (budgetPeriod === "month") newPayload.monthly_budget = recommendedIls;
+
+      await submitCampaignRequest({
+        folder_id:    folderId,
+        request_type: current.request_type,
+        brief_type:   current.brief_type || "structured_form",
+        brief_payload: newPayload,
+        parent_request_id: current.id,  // versioning chain
+        submitter: "marketing_manager",
+        metadata: {
+          source: "feasibility_recommendation_accepted",
+          previous_budget_ils: budget?.envelope_ils,
+          new_budget_ils: recommendedIls,
+        },
+      });
+      toast.success(`✓ נוצרה גרסה חדשה של הבריף עם תקציב מעודכן: ₪${recommendedIls.toLocaleString("he-IL")}`);
+      onChanged && onChanged();
+    } catch (e) {
+      toast.error(`שגיאה ביצירת גרסה חדשה: ${e.message}`);
+    } finally {
+      setAccepting(false);
+    }
+  }
+
+  return (
+    <FeasibilityWidget
+      folderId={folderId}
+      goal={goal}
+      budget={budget}
+      onAcceptBudget={current ? onAcceptBudget : undefined}
+      acceptInProgress={accepting}
+    />
+  );
 }
 
 function Stat({ icon, label, value }) {
