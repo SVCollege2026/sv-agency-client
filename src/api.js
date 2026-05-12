@@ -692,6 +692,19 @@ export async function listMakeHealthEvents({ status = "open", limit = 50 } = {})
   return request("GET", `/api/make-dept/health/events?${p.toString()}`);
 }
 
+/** Closed-loop verification: ensures Meta leads from the last N hours
+ *  actually arrived in Fireberry. */
+export async function verifyMetaToFireberry({ hoursBack = 24 } = {}) {
+  return request("POST", `/api/make-dept/verify/meta-to-fireberry?hours_back=${hoursBack}`);
+}
+
+/** Manager-side request for a NEW make.com scenario. Opens a blocker
+ *  for manual build — system never mutates make.com. */
+export async function requestNewMakeScenario(body) {
+  // body: { purpose, platform?, urgency, requested_by?, related_folder_id?, notes? }
+  return request("POST", "/api/make-dept/request-new-scenario", body);
+}
+
 // ─── Campaign Management — Platform Connector (Phase 10) ───────────────────
 
 export async function startPlatformConnection(body) {
