@@ -43,6 +43,8 @@ export default function ArtifactsApprovalPanel() {
   const [error, setError]   = useState(null);
   const [filter, setFilter] = useState("pending");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selected, setSelected] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   async function load() {
     setLoading(true); setError(null);
@@ -56,11 +58,52 @@ export default function ArtifactsApprovalPanel() {
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter, refreshKey]);
 
+  // Reset selection when filter changes or content is reloaded
+  useEffect(() => { setSelected(new Set()); }, [filter, refreshKey]);
+
   const grouped = items.reduce((acc, a) => {
     const key = a.folder_name || "כללי / ללא תיקייה";
     (acc[key] ||= []).push(a);
     return acc;
   }, {});
+
+  const isApprovable = a => a.status !== "approved" && a.status !== "revision_required";
+  const approvableItems = items.filter(isApprovable);
+
+  function toggleOne(id) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleGroup(list) {
+    const ids = list.filter(isApprovable).map(a => a.id);
+    const allSelected = ids.length > 0 && ids.every(id => selected.has(id));
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (allSelected) ids.forEach(id => next.delete(id));
+      else ids.forEach(id => next.add(id));
+      return next;
+    });
+  }
+
+  function clearSelection() { setSelected(new Set()); }
+
+  async function approveSelected() {
+    if (selected.size === 0) return;
+    setBulkBusy(true);
+    const ids = Array.from(selected);
+    let ok = 0, fail = 0;
+    const results = await Promise.allSettled(ids.map(id => approveArtifact(id)));
+    results.forEach(r => r.status === "fulfilled" ? ok++ : fail++);
+    if (ok > 0) toast.success(`✓ אושרו ${ok} תוצרים`);
+    if (fail > 0) toast.error(`${fail} תוצרים נכשלו באישור`);
+    setBulkBusy(false);
+    clearSelection();
+    setRefreshKey(k => k + 1);
+  }
 
   return (
     <div style={{ direction: "rtl", fontFamily }}>
@@ -97,19 +140,85 @@ export default function ArtifactsApprovalPanel() {
         </div>
       )}
 
-      {Object.entries(grouped).map(([folderName, list]) => (
-        <div key={folderName} style={card}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: space(3), marginBottom: space(4) }}>
-            <h3 style={{ ...type.h3, margin: 0 }}>📁 {folderName}</h3>
-            <span style={{ ...type.bodySmall, color: color.fgSubtle }}>
-              {list.length} {list.length === 1 ? "תוצר" : "תוצרים"}
-            </span>
+      {Object.entries(grouped).map(([folderName, list]) => {
+        const groupApprovable = list.filter(isApprovable);
+        const groupIds = groupApprovable.map(a => a.id);
+        const allChecked = groupIds.length > 0 && groupIds.every(id => selected.has(id));
+        const someChecked = groupIds.some(id => selected.has(id));
+        return (
+          <div key={folderName} style={card}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: space(3), marginBottom: space(4), flexWrap: "wrap" }}>
+              <h3 style={{ ...type.h3, margin: 0 }}>📁 {folderName}</h3>
+              <span style={{ ...type.bodySmall, color: color.fgSubtle }}>
+                {list.length} {list.length === 1 ? "תוצר" : "תוצרים"}
+              </span>
+              {groupApprovable.length > 0 && (
+                <label style={{
+                  display: "inline-flex", alignItems: "center", gap: space(1.5),
+                  cursor: "pointer", marginInlineStart: "auto",
+                  ...type.bodySmall, color: color.fgMuted,
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={allChecked}
+                    ref={el => { if (el) el.indeterminate = !allChecked && someChecked; }}
+                    onChange={() => toggleGroup(list)}
+                    style={{ width: 16, height: 16, cursor: "pointer", accentColor: color.primary }}
+                  />
+                  {allChecked ? "נקי בחירה בקבוצה" : "סמני את כל התוצרים בקבוצה"}
+                </label>
+              )}
+            </div>
+            {list.map(art => (
+              <ArtifactCard
+                key={art.id}
+                artifact={art}
+                onChanged={() => setRefreshKey(k => k + 1)}
+                toast={toast}
+                selectable={isApprovable(art)}
+                isSelected={selected.has(art.id)}
+                onToggleSelect={() => toggleOne(art.id)}
+              />
+            ))}
           </div>
-          {list.map(art => (
-            <ArtifactCard key={art.id} artifact={art} onChanged={() => setRefreshKey(k => k + 1)} toast={toast} />
-          ))}
+        );
+      })}
+
+      {selected.size > 0 && (
+        <div style={{
+          position: "fixed", bottom: space(5), insetInlineStart: "50%",
+          transform: "translateX(50%)", zIndex: 80,
+          background: color.fgDefault, color: color.fgOnDark,
+          borderRadius: radius.pill, boxShadow: shadow.xl,
+          padding: `${space(2.5)} ${space(4)}`,
+          display: "flex", alignItems: "center", gap: space(3),
+          direction: "rtl", fontFamily,
+        }}>
+          <span style={{ ...type.bodyStrong, color: color.fgOnDark }}>
+            {selected.size} נבחרו
+          </span>
+          <button onClick={clearSelection} disabled={bulkBusy} style={{
+            background: "transparent", color: color.fgOnDark,
+            border: `1px solid rgba(255,255,255,0.3)`,
+            borderRadius: radius.pill, padding: `${space(1.5)} ${space(3)}`,
+            cursor: bulkBusy ? "not-allowed" : "pointer",
+            fontSize: 13, fontWeight: 600, fontFamily,
+            opacity: bulkBusy ? 0.5 : 1,
+          }}>
+            נקי
+          </button>
+          <button onClick={approveSelected} disabled={bulkBusy} style={{
+            background: color.success || "#16a34a", color: color.fgOnDark,
+            border: "none", borderRadius: radius.pill,
+            padding: `${space(2)} ${space(4)}`,
+            cursor: bulkBusy ? "not-allowed" : "pointer",
+            fontSize: 13, fontWeight: 700, fontFamily,
+            opacity: bulkBusy ? 0.6 : 1,
+          }}>
+            {bulkBusy ? "מאשרת..." : `✓ אישור ${selected.size} תוצרים`}
+          </button>
         </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -137,7 +246,7 @@ function Pill({ active, onClick, count, children }) {
   );
 }
 
-function ArtifactCard({ artifact, onChanged, toast }) {
+function ArtifactCard({ artifact, onChanged, toast, selectable = false, isSelected = false, onToggleSelect }) {
   const meta = ARTIFACT_TYPES[artifact.artifact_type] || { icon: "📎", label: artifact.artifact_type, producer: "—" };
   const statusInfo = STATUS_TONES[artifact.status] || { tone: "neutral", label: artifact.status };
   const [expanded, setExpanded]       = useState(false);
@@ -157,12 +266,23 @@ function ArtifactCard({ artifact, onChanged, toast }) {
 
   return (
     <div style={{
-      border: `1px solid ${color.borderSubtle}`, borderRadius: radius.md,
-      padding: space(4), marginBottom: space(3), background: color.surfaceMuted,
+      border: `1px solid ${isSelected ? color.primary : color.borderSubtle}`,
+      borderRadius: radius.md,
+      padding: space(4), marginBottom: space(3),
+      background: isSelected ? (color.primarySoftBg || "#eff6ff") : color.surfaceMuted,
       transition: transition.base,
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: space(3), flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: space(3), flex: 1, minWidth: 220 }}>
+          {selectable && (
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={onToggleSelect}
+              style={{ width: 18, height: 18, cursor: "pointer", accentColor: color.primary, flexShrink: 0 }}
+              aria-label="סמני תוצר לאישור באצווה"
+            />
+          )}
           <div style={{ fontSize: 32 }}>{meta.icon}</div>
           <div>
             <div style={{ ...type.bodyStrong, color: color.fgDefault }}>{artifact.title || meta.label}</div>

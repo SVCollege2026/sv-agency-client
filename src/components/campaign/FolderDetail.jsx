@@ -10,6 +10,8 @@ import StatusPill from "./StatusPill.jsx";
 import BriefIntakeForm from "./BriefIntakeForm.jsx";
 import RecommendationsPanel from "./RecommendationsPanel.jsx";
 import CloseCampaignDialog from "./CloseCampaignDialog.jsx";
+import CampaignCharts from "./CampaignCharts.jsx";
+import Breadcrumb from "./Breadcrumb.jsx";
 
 const card = {
   background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb",
@@ -68,6 +70,14 @@ export default function FolderDetail({ folderId, onBack }) {
 
   return (
     <div style={{ direction: "rtl" }}>
+      <div style={{ marginBottom: 12 }}>
+        <Breadcrumb items={[
+          { label: "ניהול קמפיינים", onClick: onBack },
+          { label: "לוח קמפיינים",   onClick: onBack },
+          { label: folder.course_name },
+        ]} />
+      </div>
+
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
         marginBottom: 16, flexWrap: "wrap", gap: 10,
@@ -119,6 +129,8 @@ export default function FolderDetail({ folderId, onBack }) {
           <Stat icon="✅" label="המלצות שמחכות" value={String(recs.filter(r => r.decision_status === "pending").length)} />
         </div>
       </div>
+
+      <CampaignCharts folderId={folder.id} />
 
       {showMethodology && (
         <MethodologySection folderId={folder.id} current={folder} onDone={() => { setShowMethodology(false); setRefresh(r => r + 1); }} />
