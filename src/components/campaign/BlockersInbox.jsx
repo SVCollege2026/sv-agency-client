@@ -76,8 +76,15 @@ export default function BlockersInbox() {
       {loading && <div style={{ color: "#64748b" }}>טוען...</div>}
 
       {!loading && rows.length === 0 && (
-        <div style={{ color: "#64748b", textAlign: "center", padding: 32, fontSize: 14 }}>
-          🎉 הכל מטופל! אין משימות פתוחות כרגע.
+        <div style={{
+          textAlign: "center", padding: "48px 24px",
+          background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12,
+        }}>
+          <div style={{ fontSize: 56, marginBottom: 12 }}>🎉</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#15803d", marginBottom: 6 }}>הכל מטופל!</div>
+          <div style={{ fontSize: 13, color: "#166534", lineHeight: 1.6, maxWidth: 380, margin: "0 auto" }}>
+            אין משימות פתוחות כרגע. ברגע שמחלקה תכין תוצר חדש שמחכה לאישור, או שיופיע אירוע שדורש את ההחלטה שלך — זה יופיע פה.
+          </div>
         </div>
       )}
 

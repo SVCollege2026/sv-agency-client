@@ -21,6 +21,7 @@ import {
   ErrorBanner, LoadingBlock, input, select, primaryBtn, secondaryBtn,
   ghostBtn, dangerBtn, fieldLabel, fieldHint, readPayload,
 } from "./_shared.jsx";
+import { HelpIcon } from "../Tooltip.jsx";
 
 const PLATFORMS = [
   { id: "meta",   label: "📘 Meta" },
@@ -29,10 +30,26 @@ const PLATFORMS = [
 ];
 
 const METRIC_DEFAULTS = {
-  cpl_high_ils:           { label: "CPL גבוה מדי (₪)",        defaults: { meta: 120, google: 140, tiktok: 110 } },
-  ctr_low_pct:            { label: "CTR נמוך מדי (%)",         defaults: { meta: 0.8, google: 1.0, tiktok: 1.2 } },
-  frequency_cap:          { label: "תדירות מקס לאדם",          defaults: { meta: 5, google: 6, tiktok: 4 } },
-  spend_velocity_pct:     { label: "מהירות שריפת תקציב (%)",    defaults: { meta: 35, google: 35, tiktok: 35 } },
+  cpl_high_ils: {
+    label: "CPL גבוה מדי (₪)",
+    help:  "Cost Per Lead — כמה עולה ליצור ליד אחד בממוצע. נמדד כ-spend / leads. כשה-CPL עולה מעל הסף הזה — המערכת תזהה signal.",
+    defaults: { meta: 120, google: 140, tiktok: 110 },
+  },
+  ctr_low_pct: {
+    label: "CTR נמוך מדי (%)",
+    help:  "Click-Through Rate — אחוז הקליקים מבין החשיפות. CTR נמוך משמעו שהמודעה לא מצליחה למשוך תשומת לב. נמוך מהסף → signal.",
+    defaults: { meta: 0.8, google: 1.0, tiktok: 1.2 },
+  },
+  frequency_cap: {
+    label: "תדירות מקס לאדם",
+    help:  "כמה פעמים אדם אחד נחשף לאותה מודעה. מעל הסף → המודעה 'נשרפת', ה-CTR יורד, וה-CPL עולה.",
+    defaults: { meta: 5, google: 6, tiktok: 4 },
+  },
+  spend_velocity_pct: {
+    label: "מהירות שריפת תקציב (%)",
+    help:  "כמה אחוז מהתקציב היומי נשרף בחלון זמן קצר. ערך גבוה משמעו שהקמפיין שורף תקציב מהר מדי — סיכון של חוסר אופטימיזציה.",
+    defaults: { meta: 35, google: 35, tiktok: 35 },
+  },
 };
 
 const DEFAULT_QA_DIMENSIONS = [
@@ -239,7 +256,10 @@ export default function RulesTab() {
             <tbody>
               {Object.entries(METRIC_DEFAULTS).map(([metric, def]) => (
                 <tr key={metric}>
-                  <td style={tdLabelStyle}>{def.label}</td>
+                  <td style={tdLabelStyle}>
+                    {def.label}
+                    {def.help && <HelpIcon text={def.help} />}
+                  </td>
                   {PLATFORMS.map(p => (
                     <td key={p.id} style={tdStyle}>
                       <input
@@ -278,18 +298,21 @@ export default function RulesTab() {
                  hint="פעולות שעלולות לפגוע בקמפיין — סגירה / קיצוץ תקציב כבד / עצירת קריאייטיב. כאן את מגדירה מתי בכלל מותר להמליץ עליהן.">
           <HighRiskPolicyEditor
             label="🛑 עצירת קמפיין (Stop)"
+            help='פעולה דרסטית — הקמפיין כולו יורד מהאוויר. רק אם כל התנאים מתקיימים והמדיניות מאופשרת.'
             policy={draft.high_risk_policies.allow_stop}
             onChange={(k, v) => patchHighRisk("allow_stop", k, v)}
             extraField={null}
           />
           <HighRiskPolicyEditor
             label="✂ קיצוץ תקציב כבד (>30%)"
+            help='הורדת תקציב יומי ביותר מ-30%. שימושי כשקמפיין שורף בלי לידים. דורש כל התנאים: ימי underperformance + אחוז הפסד.'
             policy={draft.high_risk_policies.allow_heavy_cut}
             onChange={(k, v) => patchHighRisk("allow_heavy_cut", k, v)}
             extraField={{ key: "max_cut_pct", label: "אחוז קיצוץ מקסימלי", suffix: "%" }}
           />
           <HighRiskPolicyEditor
             label="⏸ עצירת קריאייטיב"
+            help='השהיית קריאייטיב ספציפי שלא מצליח (CTR נמוך / frequency גבוה). פחות דרסטי מעצירת קמפיין שלם.'
             policy={draft.high_risk_policies.allow_pause_creative}
             onChange={(k, v) => patchHighRisk("allow_pause_creative", k, v)}
             extraField={null}
@@ -377,7 +400,7 @@ export default function RulesTab() {
   );
 }
 
-function HighRiskPolicyEditor({ label, policy, onChange, extraField }) {
+function HighRiskPolicyEditor({ label, help, policy, onChange, extraField }) {
   return (
     <div style={{
       padding: space(3), marginBottom: space(3),
@@ -389,6 +412,7 @@ function HighRiskPolicyEditor({ label, policy, onChange, extraField }) {
         <input type="checkbox" checked={policy.enabled} onChange={e => onChange("enabled", e.target.checked)}
                style={{ width: 18, height: 18, accentColor: color.primary, cursor: "pointer" }} />
         <span style={{ ...type.bodyStrong, color: color.fgDefault }}>{label}</span>
+        {help && <HelpIcon text={help} />}
       </label>
       {policy.enabled && (
         <Row>

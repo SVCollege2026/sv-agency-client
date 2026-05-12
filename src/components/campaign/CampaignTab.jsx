@@ -12,6 +12,7 @@ import NotificationBell from "./NotificationBell.jsx";
 import BlockersInbox from "./BlockersInbox.jsx";
 import ArtifactsApprovalPanel from "./ArtifactsApprovalPanel.jsx";
 import MakeHub from "./MakeHub.jsx";
+import HelpCenter, { useHelpFirstVisit } from "./HelpCenter.jsx";
 import { color, radius, shadow, space, type, transition, fontFamily } from "./_tokens.js";
 
 const SUB_TABS = [
@@ -28,6 +29,7 @@ export default function CampaignTab() {
   const [sub, setSub] = useState("board");
   const [folderId, setFolderId] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const help = useHelpFirstVisit();
   const current = SUB_TABS.find(t => t.id === sub) || SUB_TABS[0];
 
   return (
@@ -56,8 +58,22 @@ export default function CampaignTab() {
           </h2>
           <div style={{ ...type.bodySmall, color: color.fgMuted, marginTop: space(1) }}>{current.desc}</div>
         </div>
-        <NotificationBell />
+        <div style={{ display: "flex", alignItems: "center", gap: space(2) }}>
+          <button onClick={() => help.setOpen(true)} style={{
+            background: color.surfaceMuted, border: `1px solid ${color.borderDefault}`,
+            borderRadius: radius.pill, padding: `${space(1.5)} ${space(3)}`,
+            fontSize: 13, fontWeight: 600, color: color.fgDefault, cursor: "pointer",
+            fontFamily, display: "inline-flex", alignItems: "center", gap: space(1),
+            transition: transition.fast,
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = color.surface}
+          onMouseLeave={e => e.currentTarget.style.background = color.surfaceMuted}>
+            <span>❓</span><span>עזרה</span>
+          </button>
+          <NotificationBell />
+        </div>
       </div>
+      <HelpCenter open={help.open} onClose={() => help.setOpen(false)} />
 
       {/* Sub-tabs — underline style, subordinate to main tabs */}
       <div style={{
