@@ -153,6 +153,16 @@ function RecommendationCard({ rec, onChanged }) {
             🔁 חוזרת ({rec.times_seen} פעמים)
           </span>
         )}
+        {/* Spec 02 §8 — policy version change indicator. The writer marks the
+            qa_feedback_note with "policy_changed_on:<date>" when the policy_id
+            differs from the previous run for the same fingerprint. */}
+        {rec.qa_feedback_note && rec.qa_feedback_note.includes("policy_changed_on:") && (
+          <span title="ה-policy שונה מאז ההמלצה הקודמת — שיקול דעת מחודש"
+                style={{ background: "#fef9c3", color: "#854d0e", padding: "2px 10px",
+                          borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
+            🔄 policy שונה
+          </span>
+        )}
         <span style={{ marginInlineStart: "auto", fontSize: 11, color: "#9ca3af" }}>
           {relTime(rec.created_at)}
         </span>
