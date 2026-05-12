@@ -43,7 +43,7 @@ const VERDICT_STYLES = {
   },
 };
 
-export default function FeasibilityWidget({ folderId, goal, budget, onAcceptBudget }) {
+export default function FeasibilityWidget({ folderId, goal, budget, onAcceptBudget, acceptInProgress = false }) {
   const [verdict, setVerdict] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
@@ -205,22 +205,30 @@ export default function FeasibilityWidget({ folderId, goal, budget, onAcceptBudg
               </div>
               {onAcceptBudget && (
                 <div style={{ display: "flex", gap: space(2), flexWrap: "wrap" }}>
-                  <button onClick={() => onAcceptBudget(v.recommended_budget_ils)} style={{
-                    padding: `${space(2)} ${space(4)}`,
-                    background: style.fg, color: "#fff", border: "none",
-                    borderRadius: radius.md, cursor: "pointer",
-                    fontSize: 13, fontWeight: 700, fontFamily,
-                    transition: transition.fast,
-                  }}>
-                    ✓ קבלי המלצה — עדכני תקציב
+                  <button onClick={() => onAcceptBudget(v.recommended_budget_ils)}
+                          disabled={acceptInProgress}
+                          style={{
+                            padding: `${space(2)} ${space(4)}`,
+                            background: style.fg, color: "#fff", border: "none",
+                            borderRadius: radius.md,
+                            cursor: acceptInProgress ? "not-allowed" : "pointer",
+                            fontSize: 13, fontWeight: 700, fontFamily,
+                            transition: transition.fast,
+                            opacity: acceptInProgress ? 0.6 : 1,
+                          }}>
+                    {acceptInProgress ? "יוצרת גרסה חדשה..." : "✓ קבלי המלצה — צרי גרסה חדשה של הבריף"}
                   </button>
-                  <button onClick={() => onAcceptBudget(null)} style={{
-                    padding: `${space(2)} ${space(4)}`,
-                    background: "transparent", color: style.fgMuted,
-                    border: `1px solid ${style.border}`,
-                    borderRadius: radius.md, cursor: "pointer",
-                    fontSize: 13, fontWeight: 700, fontFamily,
-                  }}>
+                  <button onClick={() => onAcceptBudget(null)}
+                          disabled={acceptInProgress}
+                          style={{
+                            padding: `${space(2)} ${space(4)}`,
+                            background: "transparent", color: style.fgMuted,
+                            border: `1px solid ${style.border}`,
+                            borderRadius: radius.md,
+                            cursor: acceptInProgress ? "not-allowed" : "pointer",
+                            fontSize: 13, fontWeight: 700, fontFamily,
+                            opacity: acceptInProgress ? 0.6 : 1,
+                          }}>
                     ✗ דחי
                   </button>
                 </div>
