@@ -30,6 +30,7 @@ export default function FolderBoard({ onSelectFolder, refreshKey = 0 }) {
   const [showNew, setShowNew] = useState(false);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState("");
 
   async function refresh() {
     setLoading(true); setError(null);
@@ -55,8 +56,16 @@ export default function FolderBoard({ onSelectFolder, refreshKey = 0 }) {
     finally { setCreating(false); }
   }
 
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? folders.filter(f =>
+        (f.course_name || "").toLowerCase().includes(q) ||
+        (f.activity_label || "").toLowerCase().includes(q)
+      )
+    : folders;
+
   const grouped = COLUMNS.reduce((acc, col) => {
-    acc[col.id] = folders.filter(f => f.status === col.id);
+    acc[col.id] = filtered.filter(f => f.status === col.id);
     return acc;
   }, {});
 
@@ -69,14 +78,43 @@ export default function FolderBoard({ onSelectFolder, refreshKey = 0 }) {
         <div style={{ display: "flex", alignItems: "baseline", gap: space(3) }}>
           <h3 style={{ ...type.h2, margin: 0 }}>📋 לוח קמפיינים</h3>
           <span style={{ ...type.bodySmall, color: color.fgSubtle }}>
-            {folders.length} {folders.length === 1 ? "תיקייה" : "תיקיות"} סה"כ
+            {q
+              ? `${filtered.length} מתוך ${folders.length}`
+              : `${folders.length} ${folders.length === 1 ? "תיקייה" : "תיקיות"} סה"כ`}
           </span>
         </div>
-        <button onClick={() => setShowNew(s => !s)} style={button.primary}
-                onMouseEnter={e => e.currentTarget.style.background = color.primaryHover}
-                onMouseLeave={e => e.currentTarget.style.background = color.primary}>
-          ➕ תיקייה חדשה
-        </button>
+        <div style={{ display: "flex", gap: space(2), alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ position: "relative" }}>
+            <span style={{
+              position: "absolute", insetInlineStart: space(2.5),
+              top: "50%", transform: "translateY(-50%)",
+              color: color.fgSubtle, fontSize: 14, pointerEvents: "none",
+            }}>🔎</span>
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="חיפוש לפי שם קורס..."
+              style={{ ...inputStyle, paddingInlineStart: space(7), minWidth: 240 }}
+            />
+            {q && (
+              <button
+                onClick={() => setQuery("")}
+                style={{
+                  position: "absolute", insetInlineEnd: space(1.5),
+                  top: "50%", transform: "translateY(-50%)",
+                  background: "transparent", border: "none", cursor: "pointer",
+                  color: color.fgMuted, fontSize: 16, padding: 4, lineHeight: 1,
+                }}
+                aria-label="נקי חיפוש"
+              >×</button>
+            )}
+          </div>
+          <button onClick={() => setShowNew(s => !s)} style={button.primary}
+                  onMouseEnter={e => e.currentTarget.style.background = color.primaryHover}
+                  onMouseLeave={e => e.currentTarget.style.background = color.primary}>
+            ➕ תיקייה חדשה
+          </button>
+        </div>
       </div>
 
       {showNew && (
@@ -127,7 +165,18 @@ export default function FolderBoard({ onSelectFolder, refreshKey = 0 }) {
         </div>
       )}
 
-      {!loading && folders.length > 0 && (
+      {!loading && folders.length > 0 && filtered.length === 0 && (
+        <div style={{ ...emptyState, padding: space(10) }}>
+          <div style={{ fontSize: 44, marginBottom: space(2) }}>🔍</div>
+          <div style={{ ...type.h3, marginBottom: space(2) }}>לא נמצאו תיקיות לחיפוש זה</div>
+          <div style={{ ...type.bodySmall, color: color.fgSubtle, marginBottom: space(3) }}>
+            נסי מילה אחרת או נקי את החיפוש כדי לראות הכל.
+          </div>
+          <button onClick={() => setQuery("")} style={button.secondary}>נקי חיפוש</button>
+        </div>
+      )}
+
+      {!loading && filtered.length > 0 && (
         <div style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
