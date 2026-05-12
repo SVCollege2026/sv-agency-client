@@ -58,10 +58,9 @@ export default function BudgetApprovalsTab() {
   const toast = useToast();
   const [loaded, setLoaded]   = useState(null);
   const [draft, setDraft]     = useState({
-    budget_caps:          { meta: { min: 0, max: 5000 }, google: { min: 0, max: 5000 }, tiktok: { min: 0, max: 3000 } },
-    budget_defaults:      {},
-    split_deviation_pct:  10,
-    approval_rules:       {},
+    budget_caps:     { meta: { min: 0, max: 5000 }, google: { min: 0, max: 5000 }, tiktok: { min: 0, max: 3000 } },
+    budget_defaults: {},
+    approval_rules:  {},
   });
   const [busy, setBusy]       = useState(false);
   const [loading, setLoading] = useState(true);
@@ -89,14 +88,13 @@ export default function BudgetApprovalsTab() {
       });
 
       setDraft({
-        budget_caps:         readPayload(p, "budget_caps", {
+        budget_caps:     readPayload(p, "budget_caps", {
           meta:   { min: 0, max: 5000 },
           google: { min: 0, max: 5000 },
           tiktok: { min: 0, max: 3000 },
         }),
-        budget_defaults:     readPayload(p, "budget_defaults", {}),
-        split_deviation_pct: Number(readPayload(p, "split_deviation_pct", 10)),
-        approval_rules:      readPayload(p, "approval_rules", defaultApprovals),
+        budget_defaults: readPayload(p, "budget_defaults", {}),
+        approval_rules:  readPayload(p, "approval_rules", defaultApprovals),
       });
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
@@ -162,8 +160,23 @@ export default function BudgetApprovalsTab() {
       <div style={card}>
         <ErrorBanner error={error} />
 
+        <div style={{
+          background: "#e0f2fe", border: "1px solid #7dd3fc", borderRadius: radius.md,
+          padding: `${space(3)} ${space(4)}`, marginBottom: space(5),
+          ...type.bodySmall, color: "#075985", lineHeight: 1.6,
+        }}>
+          💡 <strong>הבדל חשוב — guardrails ≠ חלוקה.</strong>
+          <div style={{ marginTop: space(1.5) }}>
+            התקרות שלמטה הן <strong>guardrails</strong> לסוכן המדיה: תקציב מקסימלי / מינימלי יומי שמותר לו להמליץ עליו לכל פלטפורמה.
+          </div>
+          <div style={{ marginTop: space(1) }}>
+            ה<strong>חלוקה</strong> בין הפלטפורמות (Meta vs Google vs TikTok) <strong>אינה הגדרה</strong> — היא <strong>המלצה</strong>
+            של סוכן ניהול התקציב, מבוססת על תוצאות היסטוריות וחיזוי. ראי <strong>"דורש פעולה" → "המלצת תקציב"</strong> כדי לאשר את החלוקה הנוכחית.
+          </div>
+        </div>
+
         <Section title="💵 תקרות תקציב יומיות לכל פלטפורמה"
-                 hint="מינימום ומקסימום לפעילות יומית לכל פלטפורמה. המערכת לא תאשר שינוי תקציב מחוץ לטווח הזה בלי אישור מפורש.">
+                 hint="מינימום ומקסימום לפעילות יומית לכל פלטפורמה. המערכת לא תוציא המלצת חלוקה שחורגת מהטווח הזה.">
           <table style={tableStyle}>
             <thead>
               <tr>
@@ -207,17 +220,6 @@ export default function BudgetApprovalsTab() {
                 </div>
               </FieldBox>
             ))}
-          </Row>
-        </Section>
-
-        <Section title="📊 סטייה מותרת מחלוקת המדיה"
-                 hint='אם החלוקה המתוכננת היא Meta 50% / Google 30% / TikTok 20%, סטייה מותרת של 10% אומרת שהמערכת תקבל בפועל 40-60% / 20-40% / 10-30% בלי אזעקה.'>
-          <Row>
-            <FieldBox label="סטייה מותרת (% מהחלוקה)">
-              <input type="number" min="0" max="50" value={draft.split_deviation_pct}
-                     onChange={e => setDraft(prev => ({ ...prev, split_deviation_pct: Number(e.target.value) }))}
-                     style={input} />
-            </FieldBox>
           </Row>
         </Section>
 
