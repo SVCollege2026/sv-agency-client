@@ -1,36 +1,35 @@
 /**
- * SettingsPanel.jsx — orchestrator for the 7 settings sub-tabs.
+ * SettingsPanel.jsx — slimmed orchestrator (manager-facing only).
  *
- * Each tab is a self-contained component under `settings/`:
- *   • GeneralTab          — dry-run, working hours, weekends, holidays, blackouts
- *   • RulesTab            — signal thresholds, context windows, high-risk policies,
- *                           QA dimensions, media_rules CRUD
- *   • BudgetApprovalsTab  — daily caps, defaults by course type, split deviation,
- *                           approval rules per artifact type
- *   • PlatformsFormatsTab — platform on/off + per-format editor (aspect / char limits)
- *   • CopyCreativeTab     — brand voice, forbidden words, disclaimers, CTAs,
- *                           creative visual guidelines
- *   • NotificationsTab    — channels, per-event preferences, quiet hours, severity routing
- *   • ClosureTab          — closure reason categories, mandatory questions, cool-down
+ * Per manager mandate: "אני לא צריכה להגדיר מיליון דברים בהגדרות של הספים".
+ * The over-engineered tabs (RulesTab, BudgetApprovalsTab, PlatformsFormatsTab)
+ * have been REMOVED from her view — the agents own those decisions:
+ *   • signal thresholds → dynamic_threshold_agent (computes from history)
+ *   • budget caps + defaults → media_dept (per campaign, smart)
+ *   • per-format char limits + image sizes → platform facts (hardcoded by Meta/Google)
+ *
+ * What stays — what an actual ad agency CLIENT defines once a year:
+ *   ⚙ כללי           — Dry Run, working hours, weekends, holidays, blackouts
+ *   ✏ שפת מותג       — voice, forbidden words, disclaimers, CTAs, brand assets
+ *   🔔 התראות         — channels + per-event prefs + quiet hours
+ *   🛑 סגירת קמפיינים — reason categories, mandatory questions
+ *
+ * The deleted tab files remain on disk (RulesTab.jsx, BudgetApprovalsTab.jsx,
+ * PlatformsFormatsTab.jsx) — not imported anywhere. They can be revived later
+ * if needed for an admin/debug view, but they're NOT shown to the manager.
  */
 import React, { useState } from "react";
 import { color, radius, space, type, transition, fontFamily } from "./_tokens.js";
 import GeneralTab          from "./settings/GeneralTab.jsx";
-import RulesTab            from "./settings/RulesTab.jsx";
-import BudgetApprovalsTab  from "./settings/BudgetApprovalsTab.jsx";
-import PlatformsFormatsTab from "./settings/PlatformsFormatsTab.jsx";
 import CopyCreativeTab     from "./settings/CopyCreativeTab.jsx";
 import NotificationsTab    from "./settings/NotificationsTab.jsx";
 import ClosureTab          from "./settings/ClosureTab.jsx";
 
 const TABS = [
-  { id: "general",   icon: "⚙",  label: "כללי + מצב בטוח",     component: GeneralTab },
-  { id: "rules",     icon: "📐", label: "חוקים וספים",           component: RulesTab },
-  { id: "budgets",   icon: "💰", label: "תקציב ואישורים",       component: BudgetApprovalsTab },
-  { id: "platforms", icon: "📱", label: "פלטפורמות + פורמטים", component: PlatformsFormatsTab },
-  { id: "copy",      icon: "✏",  label: "קופי + קריאייטיב",      component: CopyCreativeTab },
-  { id: "notify",    icon: "🔔", label: "התראות",                 component: NotificationsTab },
-  { id: "closure",   icon: "🛑", label: "סגירת קמפיינים",       component: ClosureTab },
+  { id: "general", icon: "⚙",  label: "כללי + מצב בטוח",  component: GeneralTab },
+  { id: "brand",   icon: "✏",  label: "שפת מותג + נכסים", component: CopyCreativeTab },
+  { id: "notify",  icon: "🔔", label: "התראות",            component: NotificationsTab },
+  { id: "closure", icon: "🛑", label: "סגירת קמפיינים",   component: ClosureTab },
 ];
 
 export default function SettingsPanel() {
@@ -42,9 +41,11 @@ export default function SettingsPanel() {
       <div style={{
         background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: radius.md,
         padding: `${space(3)} ${space(4)}`, marginBottom: space(4),
-        ...type.bodySmall, color: "#1e3a8a",
+        ...type.bodySmall, color: "#1e3a8a", lineHeight: 1.6,
       }}>
-        💡 ההגדרות כאן חלות על <strong>כלל המערכת</strong>. שינוי משפיע על כל הקורסים והסוכנים. כל שינוי מתועד ב-`settings_change_log`.
+        💡 <strong>הגדרות פעם בשנה.</strong> כאן רק ערכים שאת קובעת ושלא משתנים יום-יום:
+        טון מותג, צבעים, לוגו, מתי לא לפעול. <strong>ספים, חלוקת תקציב, גדלי מודעות, חוקי החלטה
+        של מתי-להמליץ-מה</strong> — אלו של הסוכנים החכמים, לא שלך.
       </div>
 
       <div style={{

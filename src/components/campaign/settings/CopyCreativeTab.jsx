@@ -279,23 +279,15 @@ export default function CopyCreativeTab() {
           />
         </Section>
 
-        <Section title="🏷 מיקום לוגו"
-                 hint="מיקום מועדף ברוב המודעות. סוכן הקריאייטיב יכבד את זה אלא אם פורמט ספציפי דורש אחרת.">
-          <Row>
-            <FieldBox label="היכן הלוגו מופיע בכל מודעה?">
-              <select value={draft.creative_guidelines.logo_placement}
-                      onChange={e => patchCreative("logo_placement", e.target.value)}
-                      style={select}>
-                <option value="top_right">למעלה-ימין</option>
-                <option value="top_left">למעלה-שמאל</option>
-                <option value="bottom_right">למטה-ימין</option>
-                <option value="bottom_left">למטה-שמאל</option>
-                <option value="center">מרכז</option>
-                <option value="no_logo">בלי לוגו</option>
-              </select>
-            </FieldBox>
-          </Row>
-        </Section>
+        <div style={{
+          background: "#fef3c7", border: "1px solid #fcd34d", borderRadius: radius.md,
+          padding: `${space(2.5)} ${space(3)}`, marginBottom: space(4),
+          ...type.bodySmall, color: "#854d0e",
+        }}>
+          🏷 <strong>מיקום הלוגו אינו הגדרה</strong>. הסוכן הקריאייטיב מחליט פר פורמט
+          לפי הקריאייטיב הספציפי, צבעי המותג והרענון השוטף. את יכולה להגדיר חוקים
+          (חובה להופיע / אסור לחתוך / מינימום פיקסלים) — בשדה <strong>"הוראות עיצוב חופשיות"</strong> למעלה.
+        </div>
 
         <Section title="📄 הנחיות עיצוב (Style guide)"
                  hint="קובץ הוראות עיצוב מלא (Style guide / Brand book) או טקסט הוראות. סוכן הקריאייטיבי מקבל את הקובץ כקלט לקריאה מלאה. בלי זה, הוא מסתמך רק על הפרמטרים שלמעלה.">
