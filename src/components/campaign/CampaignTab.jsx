@@ -11,6 +11,7 @@ import SchoolBudgetPanel from "./SchoolBudgetPanel.jsx";
 import NotificationBell from "./NotificationBell.jsx";
 import BlockersInbox from "./BlockersInbox.jsx";
 import ArtifactsApprovalPanel from "./ArtifactsApprovalPanel.jsx";
+import MakeHub from "./MakeHub.jsx";
 import { color, radius, shadow, space, type, transition, fontFamily } from "./_tokens.js";
 
 const SUB_TABS = [
@@ -19,6 +20,7 @@ const SUB_TABS = [
   { id: "approvals", label: "תוצרים לאישור",    icon: "✋", desc: "כל מה שמחלקות הסוכנים הכינו ומחכה לאישור שלך — קופי, קריאייטיב, פריסות מדיה ותקציבים" },
   { id: "tasks",     label: "דורש פעולה",       icon: "✅", desc: "אישורים מהירים, תיקונים והחלטות שמחכות לך" },
   { id: "budget",    label: "תקציב בית-ספרי",   icon: "💰", desc: "תכנית התקציב הכוללת" },
+  { id: "make",      label: "MAKE",             icon: "🔌", desc: "תרחישי make.com — אילו רלוונטיים למערכת + בריאות שוטפת" },
   { id: "settings",  label: "הגדרות מערכת",     icon: "⚙",  desc: "חוקי המלצה, ערוצי התראה, פלטפורמות" },
 ];
 
@@ -102,6 +104,7 @@ export default function CampaignTab() {
       {sub === "approvals" && <ArtifactsApprovalPanel />}
       {sub === "tasks"     && <BlockersInbox />}
       {sub === "budget"    && <SchoolBudgetPanel />}
+      {sub === "make"      && <MakeHub />}
       {sub === "settings"  && <SettingsPanel />}
     </div>
   );
