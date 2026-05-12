@@ -4,6 +4,7 @@
  */
 import React, { useState } from "react";
 import { decideRecommendation } from "../../api.js";
+import { ApprovalGuardBanner } from "./ApprovalGuard.jsx";
 
 const QA_DIMENSIONS = [
   { id: "correct",          label: "✅ נכונה" },
@@ -86,6 +87,7 @@ export default function RecommendationsPanel({ folderId, recommendations = [], o
       <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 14 }}>
         המערכת זיהתה דברים שדורשים את תשומת לבך. את יכולה לאשר את ההמלצה, לדחות, או לדחות לעת עתה.
       </div>
+      <ApprovalGuardBanner context="recommendations" />
       {recommendations.map(r => (
         <RecommendationCard key={r.id} rec={r} onChanged={onChanged} />
       ))}

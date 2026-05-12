@@ -13,6 +13,7 @@ import BlockersInbox from "./BlockersInbox.jsx";
 import ArtifactsApprovalPanel from "./ArtifactsApprovalPanel.jsx";
 import MakeHub from "./MakeHub.jsx";
 import HelpCenter, { useHelpFirstVisit } from "./HelpCenter.jsx";
+import { ApprovalGuardBadge } from "./ApprovalGuard.jsx";
 import { color, radius, shadow, space, type, transition, fontFamily } from "./_tokens.js";
 
 const SUB_TABS = [
@@ -58,7 +59,8 @@ export default function CampaignTab() {
           </h2>
           <div style={{ ...type.bodySmall, color: color.fgMuted, marginTop: space(1) }}>{current.desc}</div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: space(2) }}>
+        <div style={{ display: "flex", alignItems: "center", gap: space(2), flexWrap: "wrap" }}>
+          <ApprovalGuardBadge />
           <button onClick={() => help.setOpen(true)} style={{
             background: color.surfaceMuted, border: `1px solid ${color.borderDefault}`,
             borderRadius: radius.pill, padding: `${space(1.5)} ${space(3)}`,
