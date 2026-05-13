@@ -63,6 +63,50 @@ function fmtDate(v) {
   return `${s[2]}/${s[1]}/${s[0]}`;
 }
 
+// היום הנוכחי כ-YYYY-MM-DD לפי השעון של המשתמש
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// מוסיף N ימים ל-YYYY-MM-DD ומחזיר YYYY-MM-DD
+function addDays(iso, days) {
+  if (!iso) return null;
+  const d = new Date(`${String(iso).slice(0, 10)}T00:00:00`);
+  if (isNaN(d.getTime())) return null;
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * אוטומציה: סטטוס רישום + תאריך סיום הרשמה נגזרים מ-start_date.
+ * הכלל (אושר 11/05/2026):
+ *   • registration_end_date = start_date + 14 ימים (תמיד, מתעלם מ-Fireberry)
+ *   • registration_status:
+ *       - today > registration_end_date  →  "הסתיים"
+ *       - אחרת                           →  "פתוח להרשמה"
+ *
+ * ⚠ אוטומציה client-side בלבד. ה-DB ממשיך לשמור את הערכים מ-Fireberry —
+ *   רק התצוגה נגזרת. cycles ללא start_date (e.g., "מוקלט") יחזירו את
+ *   הערכים הגולמיים מ-Fireberry כ-fallback.
+ */
+function deriveRegistration(cycle, today = todayIso()) {
+  if (!cycle.start_date) {
+    return {
+      status:  cycle.registration_status,
+      endDate: cycle.registration_end_date,
+      derived: false,
+    };
+  }
+  const endDate = addDays(cycle.start_date, 14);
+  const ended   = today > endDate;
+  return {
+    status:  ended ? "הסתיים" : "פתוח להרשמה",
+    endDate,
+    derived: true,
+  };
+}
+
 function fmtDateTime(v) {
   if (!v) return "—";
   return new Date(v).toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" });
@@ -503,10 +547,14 @@ export default function CoursesCyclesPanel() {
   }, [filterYear]);
 
   // ── Filtered cycles for the cycles table ──
+  // הסינון פתוח/סגור משתמש בסטטוס הנגזר (האוטומציה: start_date + 14 ימים),
+  // לא בערך הגולמי מ-Fireberry. כך התצוגה והסינון עקביים.
   const filteredCycles = useMemo(() => {
+    const today = todayIso();
     return cyclesInYear.filter((c) => {
       if (filterCourse && c.product_id !== filterCourse) return false;
-      const open = (c.registration_status || "").includes("פתוח") || (c.registration_status || "").includes("פעיל");
+      const { status } = deriveRegistration(c, today);
+      const open = (status || "").includes("פתוח") || (status || "").includes("פעיל");
       if (filterOpen === "open"   && !open) return false;
       if (filterOpen === "closed" &&  open) return false;
       return true;
@@ -771,6 +819,8 @@ export default function CoursesCyclesPanel() {
                 .map((c, idx, arr) => {
                   const prevCourse = idx > 0 ? arr[idx - 1].course_name : null;
                   const isFirstOfCourse = c.course_name !== prevCourse;
+                  // אוטומציה: סיום הרשמה + סטטוס נגזרים מ-start_date + 14 ימים
+                  const reg = deriveRegistration(c);
                   return (
                     <tr key={c.cycle_id} style={{
                       background: idx % 2 ? T.rowAltBg : T.cardBg,
@@ -781,8 +831,8 @@ export default function CoursesCyclesPanel() {
                         {isFirstOfCourse ? (c.course_name || "—") : ""}
                       </td>
                       <td style={S.td}>{fmtDate(c.start_date)}</td>
-                      <td style={S.tdSecondary}>{fmtDate(c.registration_end_date)}</td>
-                      <td style={S.td}><StatusBadge status={c.registration_status} /></td>
+                      <td style={S.tdSecondary}>{fmtDate(reg.endDate)}</td>
+                      <td style={S.td}><StatusBadge status={reg.status} /></td>
                       <td style={S.tdSecondary}>{fmtNum(c.total_enrollees)}</td>
                       <td style={{ ...S.td, color: T.cDeals }}>{fmtMoney(c.total_deals_amount)}</td>
                       <td style={{ ...S.td, color: T.cCollected }}>{fmtMoney(c.total_collected)}</td>
