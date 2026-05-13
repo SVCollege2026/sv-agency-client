@@ -11,10 +11,11 @@ import { ApprovalGuardBanner } from "./ApprovalGuard.jsx";
 
 const ARTIFACT_TYPES = {
   media_plan:            { icon: "📊", label: "פריסת מדיה",         producer: "מחלקת מדיה" },
+  keyword_research:      { icon: "🔍", label: "מחקר ביטויים",        producer: "מחלקת מדיה" },
   budget_recommendation: { icon: "💰", label: "המלצת תקציב",        producer: "מחלקת מדיה" },
-  market_research:       { icon: "🔍", label: "מחקר תחום ומתחרים",  producer: "מחלקת מדיה" },
+  market_research:       { icon: "📚", label: "מחקר תחום ומתחרים",  producer: "מחלקת מדיה" },
   ad_copy_meta:          { icon: "📘", label: "קופי ל-Meta",         producer: "מחלקת קופי" },
-  ad_copy_google:        { icon: "🔍", label: "קופי ל-Google",       producer: "מחלקת קופי" },
+  ad_copy_google:        { icon: "🔎", label: "קופי ל-Google",       producer: "מחלקת קופי" },
   ad_copy_tiktok:        { icon: "🎵", label: "קופי ל-TikTok",       producer: "מחלקת קופי" },
   lead_form_copy:        { icon: "📝", label: "קופי לטופס Lead",    producer: "מחלקת קופי" },
   creative_concept:      { icon: "🎨", label: "כיוון קריאייטיב",     producer: "מחלקת קריאייטיב" },

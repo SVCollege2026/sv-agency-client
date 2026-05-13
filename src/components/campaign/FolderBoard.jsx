@@ -1,28 +1,30 @@
 /**
- * FolderBoard.jsx — Monday-style board, מותאם לתחום ניהול הקמפיינים.
+ * FolderBoard.jsx — לוח קמפיינים בסגנון Monday/Slack (ספק 03 §3).
  *
- * עיקרון אינליין: כל תא נערך במקום, אין ניווט לעמודים פנימיים כדי לכתוב
- * משהו פשוט. רק החצן "›" בקצה השורה פותח את תצוגת הפירוט המלאה.
+ * עיקרון: יחסי לקוח ↔ משרד פרסום. לולאת הערות:
+ *   מחלקה מכינה  →  ⏳ ממתין לאישור
+ *   מנהלת מוסיפה הערות (textarea) →  💬 יש הערות (revision_required)
+ *   מחלקה מתקנת → גרסה חדשה לצד הקודמת → ⚠️ גרסה N
+ *   לולאה עד  →  ✓ אושר
  *
- * 3 קבוצות מתקפלות (מתוכננים / באוויר / הסתיימו) — קמפיינים זורמים
- * אוטומטית בין הקבוצות לפי שינוי הסטטוס. "+הוסיפי" מופיע רק במתוכננים.
+ * הכל אינליין — אין ניווט החוצה כדי לשנות תא. רק "›" פותח פירוט מלא.
  *
- * עמודות (25+):
- *   ─ כללי ─ שם · פעילות · בעלים · סטטוס · עדיפות
- *   ─ זמנים ─ עלייה · סגירת רישום · methodology
- *   ─ יעדים ─ תקציב · לידים יעד · CPL יעד
- *   ─ מסמכים ─ פריסת מדיה · מחקר ביטויי · בריף
- *   ─ קריאייטיב ─ קונספט · קריאייטיב מוכן
- *   ─ קופי ─ Meta · PMax · TikTok · טופס Lead
- *   ─ אופרציה ─ MAKE · המלצות פתוחות · חוסמים
- *   ─ הקשר ─ קורס Fireberry · הערות
- *   ─ פתח ─ ›
+ * ארכיטקטורה (ספק 01 §5):
+ *   - בקשה לתקציבאית → POST /api/workflow/requests עם intent='change' →
+ *     account_manager_agent מסווג → workflow_controller פותח workflow_item →
+ *     traffic_router מנתב → notification_agent שולח התראות.
+ *   - הוספת הערות → requestArtifactRevision (קיים) → המחלקה רואה ופותחת תיקון.
+ *   - אישור artifact → approveArtifact (קיים).
+ *   - מנהלת יוצרת artifact משלה (העלי גרסה משלי) → createArtifactByManager
+ *     → internal_review → media_dept QA → approved (לא דילוג על QA — ספק 01 §13).
  */
 import React, { useState, useEffect, useRef } from "react";
 import {
   listCampaignFolders, createCampaignFolder, updateCampaignFolder,
   listArtifacts, listBudgetAllocations, uploadCampaignFile,
-  listRecommendations, listWorkflowBlockers,
+  listRecommendations, listWorkflowBlockers, listAllFoldersFiles,
+  approveArtifact, requestArtifactRevision, createArtifactByManager,
+  decideRecommendation, submitCampaignRequest,
 } from "../../api.js";
 import {
   color, radius, shadow, space, type, transition,
@@ -31,7 +33,11 @@ import {
 import { useToast } from "./Toast.jsx";
 import { SkeletonBoard } from "./Skeleton.jsx";
 
-// ─── Status definitions (lifecycle של תיקייה) ───────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// Constants
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Lifecycle status (ספק 01 §13)
 const STATUS_DEFS = {
   draft:           { label: "טיוטה",         bg: "#cbd5e1", fg: "#1e293b" },
   in_progress:     { label: "בעבודה",        bg: "#fdba74", fg: "#7c2d12" },
@@ -42,72 +48,56 @@ const STATUS_DEFS = {
 };
 const ALL_STATUSES = Object.keys(STATUS_DEFS);
 
-// ─── Priority pill (metadata.priority) ──────────────────────────────────────
-const PRIORITY_DEFS = {
-  low:      { label: "נמוכה",  bg: "#e0e7ff", fg: "#4338ca" },
-  normal:   { label: "רגילה",  bg: "#dbeafe", fg: "#1e40af" },
-  high:     { label: "גבוהה",  bg: "#fef3c7", fg: "#a16207" },
-  critical: { label: "קריטית", bg: "#fee2e2", fg: "#b91c1c" },
-};
-const ALL_PRIORITIES = Object.keys(PRIORITY_DEFS);
-
-// ─── Group definitions (auto-flow לפי סטטוס) ─────────────────────────────
+// Auto-flow groups
 const GROUPS = [
   { id: "planned",   label: "קמפיינים מתוכננים לעלייה", statuses: ["draft", "in_progress", "ready_to_launch"], strip: "#3b82f6" },
   { id: "live",      label: "קמפיינים באוויר",          statuses: ["live"],                                    strip: "#16a34a" },
   { id: "completed", label: "קמפיינים שהסתיימו",        statuses: ["closing", "closed"],                       strip: "#dc2626" },
 ];
 
-// ─── Column definitions ─────────────────────────────────────────────────────
-// section: לתיוג ויזואלי בעתיד. center: מרכז את התוכן בתא.
-const COLUMNS = [
-  // — General —
-  { id: "task",        label: "שם הקמפיין",   width: 220, section: "כללי" },
-  { id: "activity",    label: "פעילות",        width: 130, section: "כללי" },
-  { id: "owner",       label: "בעלים",         width: 110, section: "כללי", center: true },
-  { id: "status",      label: "סטטוס",         width: 140, section: "כללי", center: true },
-  { id: "priority",    label: "עדיפות",        width: 110, section: "כללי", center: true },
-  // — Timing —
-  { id: "due",         label: "תאריך עלייה",   width: 130, section: "זמנים", center: true },
-  { id: "reg_close",   label: "סגירת רישום",   width: 130, section: "זמנים", center: true },
-  { id: "methodology", label: "methodology",   width: 170, section: "זמנים", center: true },
-  // — Goals —
-  { id: "budget",      label: "תקציב",         width: 100, section: "יעדים", center: true },
-  { id: "target_leads",label: "לידים יעד",     width: 100, section: "יעדים", center: true },
-  { id: "target_cpl",  label: "CPL יעד",       width: 100, section: "יעדים", center: true },
-  // — Documents —
-  { id: "media_plan",  label: "פריסת מדיה",    width: 130, section: "מסמכים", center: true },
-  { id: "keywords",    label: "מחקר ביטויי",   width: 130, section: "מסמכים", center: true },
-  { id: "brief",       label: "בריף",          width: 110, section: "מסמכים", center: true },
-  // — Creative —
-  { id: "concept",     label: "קונספט קריאייטיב", width: 130, section: "קריאייטיב", center: true },
-  { id: "rendered",    label: "קריאייטיב מוכן",   width: 130, section: "קריאייטיב", center: true },
-  // — Copy per platform —
-  { id: "meta",        label: "מודעות Meta",   width: 120, section: "קופי", center: true },
-  { id: "pmax",        label: "מודעות PMax",   width: 120, section: "קופי", center: true },
-  { id: "tiktok",      label: "מודעות TikTok", width: 120, section: "קופי", center: true },
-  { id: "lead_form",   label: "קופי טופס",     width: 110, section: "קופי", center: true },
-  // — Operations —
-  { id: "make",        label: "תרחישי MAKE",   width: 120, section: "אופרציה", center: true },
-  { id: "recs",        label: "המלצות פתוחות", width: 120, section: "אופרציה", center: true },
-  { id: "blockers",    label: "חוסמים פתוחים", width: 120, section: "אופרציה", center: true },
-  // — Reference —
-  { id: "fireberry",   label: "קורס Fireberry", width: 130, section: "הקשר", center: true },
-  { id: "notes",       label: "הערות",          width: 200, section: "הקשר" },
-  // — Open detail —
-  { id: "actions",     label: "",               width: 50,  section: "",      center: true },
+// Per-artifact-type column definitions
+const ARTIFACT_COLS = [
+  { id: "media_plan",       label: "פריסת מדיה",    icon: "📊", purpose: "media_plan" },
+  { id: "keyword_research", label: "מחקר ביטויים",  icon: "🔍", purpose: "keyword_research" },
+  { id: "ad_copy_meta",     label: "קופי Meta",     icon: "📘" },
+  { id: "ad_copy_google",   label: "קופי Google",   icon: "🔎" },
+  { id: "ad_copy_tiktok",   label: "קופי TikTok",   icon: "🎵" },
+  { id: "lead_form_copy",   label: "טופס Lead",     icon: "📝" },
+  { id: "creative_rendered",label: "קריאייטיב",     icon: "🖼" },
+  { id: "budget_recommendation", label: "תקציב מומלץ", icon: "💰" },
+  { id: "make_scenario",    label: "MAKE",          icon: "🔌" },
 ];
 
-const ROW_TEMPLATE = COLUMNS.map(c => `${c.width}px`).join(" ");
-const TOTAL_WIDTH  = COLUMNS.reduce((s, c) => s + c.width, 0) + 8 + 28;
+const FILE_ACCEPT = ".xlsx,.xls,.csv,.pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.gif";
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// Change request kinds (for "בקשה לתקציבאית" dialog)
+const CHANGE_KINDS = [
+  { id: "video_upload",      label: "העלאת וידיאו לקמפיין" },
+  { id: "creative_change",   label: "שינוי קריאייטיב נקודתי" },
+  { id: "remarketing",       label: "הוספת רימרקטינג" },
+  { id: "budget_change",     label: "שינוי תקציב" },
+  { id: "audience_change",   label: "שינוי קהל" },
+  { id: "general",           label: "אחר (תיאור חופשי)" },
+];
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════════════════════════════════════════
+
 function fmtDate(iso) {
   if (!iso) return "";
   try { return new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "short", year: "2-digit" }); }
   catch { return iso; }
 }
-
+function fmtDateTime(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("he-IL", { day: "numeric", month: "short" })
+         + " · "
+         + d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+  } catch { return iso; }
+}
 function fmtMoney(num) {
   if (num == null || num === 0 || num === "") return "";
   const n = Number(num);
@@ -117,62 +107,75 @@ function fmtMoney(num) {
   return `₪${n.toLocaleString("he-IL")}`;
 }
 
-function fmtNum(num) {
-  if (num == null || num === 0 || num === "") return "";
-  const n = Number(num);
-  if (isNaN(n)) return "";
-  return n.toLocaleString("he-IL");
+// Build version chains: for a given folder + artifact_type, return the chain
+// of artifacts ordered oldest → newest (using parent_artifact_id pointers).
+function buildVersionChain(artifacts, folderId, artifactType) {
+  const all = artifacts.filter(a => a.folder_id === folderId && a.artifact_type === artifactType);
+  if (all.length === 0) return [];
+  // Sort by version_number ascending (DB stores it natively)
+  return all.slice().sort((a, b) => (a.version_number || 1) - (b.version_number || 1));
 }
 
-function ownerInitial(name) {
-  const t = String(name || "").trim();
-  return t ? t.charAt(0).toUpperCase() : "?";
+// Determine the pill state for a chain
+function pillStateForChain(chain) {
+  if (!chain || chain.length === 0) return { state: "missing" };
+  const current = chain[chain.length - 1];
+  const status  = current.status;
+  const v       = current.version_number || 1;
+  if (status === "approved")          return { state: "approved", current, version: v };
+  if (status === "revision_required") return { state: "has_notes", current, version: v };
+  if (status === "rejected")          return { state: "rejected", current, version: v };
+  // anything else (draft, internal_review, qa_passed, waiting_for_marketing_approval)
+  if (v > 1) return { state: "new_version", current, version: v };
+  return { state: "pending", current, version: v };
 }
 
-function addDays(iso, days) {
-  if (!iso) return null;
-  try {
-    const d = new Date(iso);
-    d.setDate(d.getDate() + days);
-    return d.toISOString().slice(0, 10);
-  } catch { return null; }
-}
+// ═══════════════════════════════════════════════════════════════════════════
+// Artifact pill (5 states)
+// ═══════════════════════════════════════════════════════════════════════════
 
-// ─── Owner avatar ───────────────────────────────────────────────────────────
-function OwnerAvatar({ name }) {
-  const initial = ownerInitial(name);
-  if (initial === "?") {
+function ArtifactPill({ chain, onClick }) {
+  const { state, version } = pillStateForChain(chain);
+  const map = {
+    missing:     { bg: "transparent", fg: "#cbd5e1",  text: "—",            border: false },
+    pending:     { bg: "#fef3c7",     fg: "#a16207",  text: "⏳ ממתין",      border: true  },
+    has_notes:   { bg: "#ede9fe",     fg: "#6d28d9",  text: "💬 יש הערות",  border: true  },
+    new_version: { bg: "#fed7aa",     fg: "#9a3412",  text: `⚠️ גרסה ${version}`, border: true },
+    approved:    { bg: "#dcfce7",     fg: "#166534",  text: "✓ אושר",       border: true  },
+    rejected:    { bg: "#fee2e2",     fg: "#b91c1c",  text: "✗ נדחה",       border: true  },
+  };
+  const s = map[state] || map.missing;
+  if (state === "missing") {
     return (
-      <div style={{
-        width: 26, height: 26, borderRadius: "50%",
-        background: color.surfaceMuted, border: `1px dashed ${color.borderDefault}`,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        color: color.fgSubtle, fontSize: 12, fontFamily, flexShrink: 0,
-      }}>?</div>
+      <button onClick={e => { e.stopPropagation(); onClick && onClick(); }}
+              title="אין תוצר עדיין — לחיצה לפתיחה"
+              style={{
+                background: "transparent", color: "#cbd5e1",
+                border: `1px dashed #e5e7eb`, padding: "3px 10px",
+                borderRadius: 4, fontSize: 11, fontFamily, cursor: "pointer",
+                width: "100%", textAlign: "center",
+              }}>+ העלי</button>
     );
   }
-  const palette = ["#0369a1", "#16a34a", "#a16207", "#b91c1c", "#7c3aed", "#0891b2", "#be185d", "#475569"];
-  const code = initial.charCodeAt(0);
-  const bg = palette[code % palette.length];
   return (
-    <div title={name} style={{
-      width: 26, height: 26, borderRadius: "50%",
-      background: bg, color: "#fff",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: 12, fontWeight: 700, fontFamily, flexShrink: 0,
-    }}>{initial}</div>
+    <button onClick={e => { e.stopPropagation(); onClick && onClick(); }}
+            title="לחיצה לפתיחת היסטוריית גרסאות + אישור/הערות"
+            style={{
+              background: s.bg, color: s.fg, border: "none",
+              padding: "4px 10px", borderRadius: 4,
+              fontSize: 11, fontWeight: 700, fontFamily,
+              cursor: "pointer", width: "100%", textAlign: "center",
+              transition: transition.fast,
+            }}>{s.text}</button>
   );
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// Inline cell editors
-// ════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// Inline editors (text / number / date / status)
+// ═══════════════════════════════════════════════════════════════════════════
 
-function InlineInput({
-  value, type: inputType = "text", placeholder = "",
-  formatter = (v) => v, prefix = "",
-  onSave,
-}) {
+function InlineInput({ value, type: inputType = "text", placeholder = "",
+                       formatter = (v) => v, onSave }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value == null ? "" : String(value));
   const inputRef = useRef(null);
@@ -191,18 +194,12 @@ function InlineInput({
     if (val.trim() === original.trim()) return;
     await onSave(val.trim() === "" ? null : val.trim());
   }
-
-  function cancel() {
-    setVal(value == null ? "" : String(value));
-    setEditing(false);
-  }
+  function cancel() { setVal(value == null ? "" : String(value)); setEditing(false); }
 
   if (editing) {
     return (
       <input
-        ref={inputRef}
-        type={inputType}
-        value={val}
+        ref={inputRef} type={inputType} value={val}
         onChange={e => setVal(e.target.value)}
         onBlur={commit}
         onKeyDown={e => {
@@ -220,30 +217,20 @@ function InlineInput({
       />
     );
   }
-
-  const display = value == null || value === "" ? "" : `${prefix}${formatter(value)}`;
+  const display = value == null || value === "" ? "" : formatter(value);
   return (
-    <div
-      onClick={e => { e.stopPropagation(); setEditing(true); }}
-      title="לחיצה לעריכה"
-      style={{
-        cursor: "text",
-        padding: "3px 6px",
-        borderRadius: 4,
-        minHeight: 24,
-        width: "100%",
-        textAlign: inputType === "number" ? "center" : "right",
-        color: display ? color.fgDefault : color.fgSubtle,
-        fontSize: 12, fontFamily, fontWeight: display ? 500 : 400,
-        background: "transparent",
-        transition: transition.fast,
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-      }}
-      onMouseEnter={e => e.currentTarget.style.background = "#f3f4f6"}
-      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-    >
+    <div onClick={e => { e.stopPropagation(); setEditing(true); }}
+         title="לחיצה לעריכה"
+         style={{
+           cursor: "text", padding: "3px 6px", borderRadius: 4, minHeight: 24,
+           width: "100%", textAlign: inputType === "number" ? "center" : "right",
+           color: display ? color.fgDefault : color.fgSubtle,
+           fontSize: 12, fontFamily, fontWeight: display ? 500 : 400,
+           background: "transparent", transition: transition.fast,
+           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+         }}
+         onMouseEnter={e => e.currentTarget.style.background = "#f3f4f6"}
+         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
       {display || placeholder || <span style={{ color: "#cbd5e1" }}>+</span>}
     </div>
   );
@@ -252,107 +239,81 @@ function InlineInput({
 function InlineDate({ value, onSave, placeholder = "+ תאריך" }) {
   const [editing, setEditing] = useState(false);
   const inputRef = useRef(null);
-
   useEffect(() => {
     if (editing && inputRef.current) {
       inputRef.current.focus();
-      try { inputRef.current.showPicker?.(); } catch { /* not all browsers */ }
+      try { inputRef.current.showPicker?.(); } catch { /* unsupported */ }
     }
   }, [editing]);
-
   async function commit(newVal) {
     setEditing(false);
     if ((newVal || null) === (value || null)) return;
     await onSave(newVal || null);
   }
-
   if (editing) {
     return (
-      <input
-        ref={inputRef}
-        type="date"
-        defaultValue={value || ""}
-        onBlur={e => commit(e.target.value)}
-        onChange={e => commit(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
-        }}
-        onClick={e => e.stopPropagation()}
-        style={{
-          width: "100%", padding: "4px 6px",
-          border: `2px solid ${color.primary}`, borderRadius: 4,
-          fontSize: 12, fontFamily, background: "#fff",
-          outline: "none", textAlign: "center", direction: "rtl",
-        }}
-      />
+      <input ref={inputRef} type="date" defaultValue={value || ""}
+             onBlur={e => commit(e.target.value)}
+             onChange={e => commit(e.target.value)}
+             onKeyDown={e => { if (e.key === "Escape") { e.preventDefault(); setEditing(false); } }}
+             onClick={e => e.stopPropagation()}
+             style={{
+               width: "100%", padding: "4px 6px",
+               border: `2px solid ${color.primary}`, borderRadius: 4,
+               fontSize: 12, fontFamily, background: "#fff",
+               outline: "none", textAlign: "center", direction: "rtl",
+             }} />
     );
   }
-
   return (
-    <div
-      onClick={e => { e.stopPropagation(); setEditing(true); }}
-      title="לחיצה לעריכת תאריך"
-      style={{
-        cursor: "text", padding: "3px 6px", borderRadius: 4,
-        minHeight: 24, width: "100%", textAlign: "center",
-        color: value ? color.fgDefault : color.fgSubtle,
-        fontSize: 12, fontFamily, fontWeight: value ? 500 : 400,
-        transition: transition.fast,
-      }}
-      onMouseEnter={e => e.currentTarget.style.background = "#f3f4f6"}
-      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-    >
+    <div onClick={e => { e.stopPropagation(); setEditing(true); }}
+         title="לחיצה לעריכת תאריך"
+         style={{
+           cursor: "text", padding: "3px 6px", borderRadius: 4,
+           minHeight: 24, width: "100%", textAlign: "center",
+           color: value ? color.fgDefault : color.fgSubtle,
+           fontSize: 12, fontFamily, fontWeight: value ? 500 : 400,
+           transition: transition.fast,
+         }}
+         onMouseEnter={e => e.currentTarget.style.background = "#f3f4f6"}
+         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
       {value ? fmtDate(value) : <span style={{ color: "#cbd5e1" }}>{placeholder}</span>}
     </div>
   );
 }
 
-// Generic pill-with-dropdown (used for Status + Priority)
-function PillPicker({ value, defs, onChange, allKeys, disabled = false }) {
+function StatusPicker({ value, onChange }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
-  const def = defs[value] || { label: value || "—", bg: "#e2e8f0", fg: "#475569" };
-
+  const def = STATUS_DEFS[value] || { label: value || "—", bg: "#e2e8f0", fg: "#475569" };
   useEffect(() => {
     if (!open) return;
     const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
-
   return (
-    <div ref={ref}
-         style={{ position: "relative", display: "block", width: "100%" }}
+    <div ref={ref} style={{ position: "relative", width: "100%" }}
          onClick={e => e.stopPropagation()}>
-      <button
-        onClick={() => !disabled && setOpen(o => !o)}
-        disabled={disabled}
-        title="לחיצה לשינוי"
-        style={{
-          width: "100%",
-          background: def.bg, color: def.fg, border: "none",
-          padding: "6px 10px", borderRadius: 4,
-          fontSize: 11, fontWeight: 700, fontFamily,
-          cursor: disabled ? "not-allowed" : "pointer",
-          textAlign: "center", opacity: disabled ? 0.6 : 1,
-          transition: transition.fast,
-        }}
-      >{def.label}</button>
+      <button onClick={() => setOpen(o => !o)} title="לחיצה לשינוי סטטוס"
+              style={{
+                width: "100%", background: def.bg, color: def.fg, border: "none",
+                padding: "6px 10px", borderRadius: 4,
+                fontSize: 11, fontWeight: 700, fontFamily,
+                cursor: "pointer", textAlign: "center", transition: transition.fast,
+              }}>{def.label}</button>
       {open && (
         <div style={{
-          position: "absolute", top: "calc(100% + 4px)",
-          insetInlineStart: 0,
-          background: color.surface,
-          border: `1px solid ${color.borderDefault}`,
+          position: "absolute", top: "calc(100% + 4px)", insetInlineStart: 0,
+          background: color.surface, border: `1px solid ${color.borderDefault}`,
           borderRadius: radius.md, boxShadow: shadow.lg,
           zIndex: 30, padding: 4, minWidth: 130,
         }}>
-          {allKeys.map(k => {
-            const sd = defs[k];
-            const active = k === value;
+          {ALL_STATUSES.map(s => {
+            const sd = STATUS_DEFS[s];
+            const active = s === value;
             return (
-              <div key={k}
-                   onClick={() => { onChange(k); setOpen(false); }}
+              <div key={s} onClick={() => { onChange(s); setOpen(false); }}
                    style={{
                      padding: "4px 6px", cursor: "pointer", borderRadius: 4,
                      background: active ? color.surfaceMuted : "transparent",
@@ -361,10 +322,8 @@ function PillPicker({ value, defs, onChange, allKeys, disabled = false }) {
                    onMouseEnter={e => e.currentTarget.style.background = color.surfaceMuted}
                    onMouseLeave={e => e.currentTarget.style.background = active ? color.surfaceMuted : "transparent"}>
                 <span style={{
-                  background: sd.bg, color: sd.fg,
-                  padding: "3px 10px", borderRadius: 4,
-                  fontSize: 11, fontWeight: 700, fontFamily,
-                  display: "block", textAlign: "center",
+                  background: sd.bg, color: sd.fg, padding: "3px 10px", borderRadius: 4,
+                  fontSize: 11, fontWeight: 700, fontFamily, display: "block", textAlign: "center",
                 }}>{sd.label}</span>
               </div>
             );
@@ -375,193 +334,455 @@ function PillPicker({ value, defs, onChange, allKeys, disabled = false }) {
   );
 }
 
-// File-upload cell — shows count + paperclip
-function InlineFileUpload({ files, busy, onUpload, accept }) {
-  const inputRef = useRef(null);
-  function pick(e) {
-    e.stopPropagation();
-    if (!busy) inputRef.current?.click();
+// ═══════════════════════════════════════════════════════════════════════════
+// Modal — version history popover for an artifact column
+// ═══════════════════════════════════════════════════════════════════════════
+
+function VersionHistoryModal({ folder, col, chain, onClose, onChanged, toast }) {
+  const [noteText, setNoteText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [uploadFile, setUploadFile] = useState(null);
+  const fileRef = useRef(null);
+
+  const current = chain[chain.length - 1];
+
+  async function approveCurrent() {
+    if (!current) return;
+    setBusy(true);
+    try {
+      await approveArtifact(current.id);
+      toast.success(`✓ ${col.label} אושר`);
+      onChanged();
+      onClose();
+    } catch (e) { toast.error(`שגיאה: ${e.message}`); }
+    finally { setBusy(false); }
   }
-  function onChange(e) {
-    const f = e.target.files?.[0];
-    if (f) onUpload(f);
-    e.target.value = "";
+  async function sendNotes() {
+    if (!current) return;
+    if (!noteText.trim()) { toast.warning("יש לכתוב הערות"); return; }
+    setBusy(true);
+    try {
+      await requestArtifactRevision(current.id, { revision_note: noteText.trim() });
+      toast.success(`💬 הערות נשלחו ל${col.label} — המחלקה מתחילה תיקון`);
+      setNoteText("");
+      onChanged();
+      onClose();
+    } catch (e) { toast.error(`שגיאה: ${e.message}`); }
+    finally { setBusy(false); }
+  }
+  async function uploadMyVersion() {
+    if (!uploadFile) { toast.warning("בחרי קובץ קודם"); return; }
+    setBusy(true);
+    try {
+      // Step 1: upload file to storage
+      const purpose = col.purpose || col.id;
+      const fileRes = await uploadCampaignFile(uploadFile, { folderId: folder.id, purpose });
+      // Step 2: create artifact-by-manager pointing to the uploaded file
+      await createArtifactByManager({
+        folder_id: folder.id,
+        artifact_type: col.id,
+        title: `${col.label} — גרסה ידנית של מנהלת השיווק`,
+        attached_file_path: fileRes.path,
+        notes: noteText.trim() || null,
+      });
+      toast.success(`📤 הועלתה גרסה משלך — נכנסה ל-QA פנימי`);
+      setUploadFile(null);
+      setNoteText("");
+      onChanged();
+      onClose();
+    } catch (e) { toast.error(`שגיאה: ${e.message}`); }
+    finally { setBusy(false); }
   }
 
   return (
-    <div onClick={pick}
-         title={files.length > 0 ? `${files.length} קבצים — להוספה נוספת` : "העלאת Excel/PDF/PPT/Word/תמונה"}
-         style={{
-           cursor: busy ? "wait" : "pointer",
-           padding: "3px 6px", borderRadius: 4,
-           minHeight: 24, width: "100%",
-           display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
-           transition: transition.fast,
-         }}
-         onMouseEnter={e => !busy && (e.currentTarget.style.background = "#f3f4f6")}
-         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-      <input ref={inputRef} type="file" accept={accept}
-             onChange={onChange} onClick={e => e.stopPropagation()}
-             style={{ display: "none" }} />
-      {busy ? (
-        <span style={{ fontSize: 11, color: color.fgMuted, fontFamily }}>מעלה...</span>
-      ) : files.length > 0 ? (
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)",
+      zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center",
+      padding: space(4), direction: "rtl",
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: color.surface, borderRadius: radius.lg,
+        maxWidth: 640, width: "100%", maxHeight: "85vh", overflow: "auto",
+        boxShadow: shadow.xl, padding: space(5), fontFamily,
+      }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", gap: space(2), marginBottom: space(2) }}>
+          <span style={{ fontSize: 26 }}>{col.icon}</span>
+          <div style={{ flex: 1 }}>
+            <h3 style={{ ...type.h3, margin: 0 }}>{col.label} — {folder.course_name}</h3>
+            <div style={{ ...type.caption, color: color.fgSubtle }}>
+              {chain.length} גרסאות · אחרונה: {current ? fmtDateTime(current.updated_at || current.created_at) : "—"}
+            </div>
+          </div>
+          <button onClick={onClose} aria-label="סגירה" style={{
+            background: "transparent", border: "none", cursor: "pointer",
+            fontSize: 24, color: color.fgMuted, padding: 4,
+          }}>×</button>
+        </div>
+
+        {/* Version chain */}
+        {chain.length === 0 && (
+          <div style={{
+            textAlign: "center", padding: space(4), color: color.fgSubtle,
+            background: color.surfaceMuted, borderRadius: radius.md,
+            ...type.bodySmall, marginBottom: space(3),
+          }}>
+            עדיין לא קיים תוצר {col.label} בתיקייה. את יכולה להעלות גרסה משלך למטה.
+          </div>
+        )}
+
+        {chain.length > 0 && (
+          <div style={{ marginBottom: space(3) }}>
+            {chain.slice().reverse().map((art, idx) => {
+              const isLatest = idx === 0;
+              const ps = pillStateForChain([art]);
+              return (
+                <div key={art.id} style={{
+                  border: `1px solid ${isLatest ? color.primary : color.borderSubtle}`,
+                  borderRadius: radius.md, padding: space(3), marginBottom: space(2),
+                  background: isLatest ? "#eff6ff" : color.surfaceMuted,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: space(2), marginBottom: space(1) }}>
+                    <span style={{ ...type.bodyStrong, color: color.fgDefault }}>
+                      גרסה {art.version_number || 1} {isLatest && <span style={{ color: color.primary }}>(אחרונה)</span>}
+                    </span>
+                    <ArtifactPill chain={[art]} onClick={() => {}} />
+                    <span style={{ ...type.caption, color: color.fgSubtle, marginInlineStart: "auto" }}>
+                      {fmtDateTime(art.updated_at || art.created_at)}
+                    </span>
+                  </div>
+                  {art.title && (
+                    <div style={{ ...type.bodySmall, color: color.fgMuted, marginBottom: space(1) }}>
+                      {art.title}
+                    </div>
+                  )}
+                  {/* Producer info */}
+                  <div style={{ ...type.caption, color: color.fgSubtle }}>
+                    מקור: {art.producing_department === "manager"
+                      ? "📤 הועלה ע\"י מנהלת השיווק"
+                      : `${art.producing_department}/${art.producing_agent || "agent"}`}
+                  </div>
+                  {/* Attached file (if manager-created) */}
+                  {art.payload?.attached_file?.access_url && (
+                    <div style={{ marginTop: space(1) }}>
+                      <a href={art.payload.attached_file.access_url} target="_blank" rel="noreferrer"
+                         style={{ color: color.primary, fontSize: 12, textDecoration: "none" }}>
+                        📎 הורדת קובץ מצורף
+                      </a>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Action area */}
+        {current && (
+          <div style={{
+            borderTop: `2px solid ${color.borderDefault}`,
+            paddingTop: space(3), marginTop: space(2),
+          }}>
+            <div style={{ ...type.label, marginBottom: space(2) }}>
+              📝 פעולה על גרסה {current.version_number || 1}
+            </div>
+            <textarea
+              value={noteText}
+              onChange={e => setNoteText(e.target.value)}
+              placeholder="הוסיפי הערות לגרסה זו (חופשי — מה לשנות, מה לתקן)..."
+              rows={3}
+              style={{ ...inputStyle, resize: "vertical", marginBottom: space(2), fontFamily }}
+            />
+            <div style={{ display: "flex", gap: space(2), flexWrap: "wrap" }}>
+              <button onClick={sendNotes} disabled={busy || !noteText.trim()} style={{
+                ...button.primary, background: "#7c3aed", opacity: (busy || !noteText.trim()) ? 0.5 : 1,
+              }}>💬 שלחי הערות</button>
+              <button onClick={approveCurrent} disabled={busy} style={{
+                ...button.success, opacity: busy ? 0.5 : 1,
+              }}>✓ אישור סופי</button>
+            </div>
+          </div>
+        )}
+
+        {/* Upload-my-version */}
+        <div style={{
+          borderTop: `1px dashed ${color.borderDefault}`,
+          paddingTop: space(3), marginTop: space(3),
+        }}>
+          <div style={{ ...type.label, marginBottom: space(2) }}>
+            📤 או — העלי גרסה משלך (יוצרת artifact חדש בשרשרת)
+          </div>
+          <input ref={fileRef} type="file" accept={FILE_ACCEPT}
+                 onChange={e => setUploadFile(e.target.files?.[0] || null)}
+                 style={{ display: "block", marginBottom: space(2), fontFamily, fontSize: 13 }} />
+          {uploadFile && (
+            <div style={{ ...type.bodySmall, color: color.fgMuted, marginBottom: space(2) }}>
+              📎 {uploadFile.name} ({Math.round(uploadFile.size / 1024)} KB)
+            </div>
+          )}
+          <button onClick={uploadMyVersion} disabled={busy || !uploadFile} style={{
+            ...button.secondary,
+            opacity: (busy || !uploadFile) ? 0.5 : 1,
+          }}>{busy ? "מעלה..." : "📤 העלי כגרסה חדשה"}</button>
+          <div style={{ ...type.caption, color: color.fgSubtle, marginTop: space(2) }}>
+            הקובץ יהפוך לגרסה {(current?.version_number || 0) + 1}, יעבור QA פנימי, ויסומן כ-approved (את ה-source-of-truth).
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Modal — "בקשה לתקציבאית" — submits to /api/workflow/requests
+// ═══════════════════════════════════════════════════════════════════════════
+
+function RequestToAccountManagerModal({ folder, onClose, onSent, toast }) {
+  const [kind, setKind]       = useState("video_upload");
+  const [subject, setSubject] = useState("");
+  const [body, setBody]       = useState("");
+  const [attachedFile, setAttachedFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef(null);
+
+  async function submit() {
+    if (!subject.trim()) { toast.warning("יש לכתוב נושא"); return; }
+    setBusy(true);
+    try {
+      let attachmentPath = null;
+      if (attachedFile) {
+        const res = await uploadCampaignFile(attachedFile, {
+          folderId: folder.id, purpose: "manager_request",
+        });
+        attachmentPath = res.path;
+      }
+      await submitCampaignRequest({
+        folder_id:   folder.id,
+        request_type: "change_request",
+        brief_type:  "structured_form",
+        brief_payload: {
+          intent:     "change",
+          change_kind: kind,
+          subject:    subject.trim(),
+          body:       body.trim(),
+          attachment_path: attachmentPath,
+        },
+        submitter: "marketing_manager",
+      });
+      toast.success("✉ הבקשה נשלחה לתקציבאית — תקבלי התראה כשתחזור עם תוצרים");
+      onSent && onSent();
+      onClose();
+    } catch (e) { toast.error(`שגיאה בשליחה: ${e.message}`); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)",
+      zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center",
+      padding: space(4), direction: "rtl",
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: color.surface, borderRadius: radius.lg,
+        maxWidth: 540, width: "100%", boxShadow: shadow.xl,
+        padding: space(5), fontFamily,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: space(2), marginBottom: space(3) }}>
+          <span style={{ fontSize: 28 }}>✉</span>
+          <h3 style={{ ...type.h3, margin: 0, flex: 1 }}>
+            בקשה לתקציבאית — {folder.course_name}
+          </h3>
+          <button onClick={onClose} aria-label="סגירה" style={{
+            background: "transparent", border: "none", cursor: "pointer",
+            fontSize: 24, color: color.fgMuted, padding: 4,
+          }}>×</button>
+        </div>
+        <div style={{ ...type.bodySmall, color: color.fgMuted, marginBottom: space(3) }}>
+          הבקשה תועבר לסוכן <strong>account_manager</strong>, שמסווג ומפזר אותה למחלקה הרלוונטית.
+          תקבלי התראה כשהמחלקה מסיימת.
+        </div>
+
+        <div style={{ marginBottom: space(3) }}>
+          <label style={{ ...type.label, display: "block", marginBottom: space(1) }}>סוג בקשה</label>
+          <select value={kind} onChange={e => setKind(e.target.value)}
+                  style={{ ...inputStyle, fontFamily }}>
+            {CHANGE_KINDS.map(k => <option key={k.id} value={k.id}>{k.label}</option>)}
+          </select>
+        </div>
+
+        <div style={{ marginBottom: space(3) }}>
+          <label style={{ ...type.label, display: "block", marginBottom: space(1) }}>נושא</label>
+          <input value={subject} onChange={e => setSubject(e.target.value)}
+                 placeholder='לדוגמה: "להחליף וידיאו ב-Meta לקריאייטיב חדש"'
+                 style={{ ...inputStyle, fontFamily }} />
+        </div>
+
+        <div style={{ marginBottom: space(3) }}>
+          <label style={{ ...type.label, display: "block", marginBottom: space(1) }}>פירוט (אופציונלי)</label>
+          <textarea value={body} onChange={e => setBody(e.target.value)}
+                    placeholder="הסבר מפורט יותר, הקשר עסקי, דדליין..."
+                    rows={3}
+                    style={{ ...inputStyle, resize: "vertical", fontFamily }} />
+        </div>
+
+        <div style={{ marginBottom: space(4) }}>
+          <label style={{ ...type.label, display: "block", marginBottom: space(1) }}>צירוף קובץ (אופציונלי)</label>
+          <input ref={fileRef} type="file" accept={FILE_ACCEPT}
+                 onChange={e => setAttachedFile(e.target.files?.[0] || null)}
+                 style={{ display: "block", fontFamily, fontSize: 13 }} />
+          {attachedFile && (
+            <div style={{ ...type.caption, color: color.fgMuted, marginTop: space(1) }}>
+              📎 {attachedFile.name}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: space(2), justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={button.secondary}>ביטול</button>
+          <button onClick={submit} disabled={busy || !subject.trim()}
+                  style={{ ...button.primary, opacity: (busy || !subject.trim()) ? 0.5 : 1 }}>
+            {busy ? "שולחת..." : "✉ שלחי לתקציבאית"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Live-group subitems (recommendations + change requests, per spec 02 §6)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function LiveSubitems({ folder, recommendations, onChanged, toast }) {
+  const recs = recommendations.filter(r => r.folder_id === folder.id);
+  if (recs.length === 0) {
+    return (
+      <div style={{ padding: space(3), color: color.fgSubtle, ...type.bodySmall, fontStyle: "italic" }}>
+        אין המלצות פתוחות מהמערכת לקמפיין זה — הכל זורם תקין. בקשה לתקציבאית? לחצי "💬 בקשה" בשורה הראשית.
+      </div>
+    );
+  }
+  return (
+    <div style={{ padding: `${space(2)} ${space(3)}`, background: "#fafbfc" }}>
+      {recs.map(r => <SubitemRow key={r.id} rec={r} onChanged={onChanged} toast={toast} />)}
+    </div>
+  );
+}
+
+function SubitemRow({ rec, onChanged, toast }) {
+  const [busy, setBusy] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+  const [reason, setReason] = useState("");
+
+  async function decide(decision) {
+    if (decision === "reject" && !reason.trim()) {
+      toast.warning("דחייה דורשת סיבה");
+      return;
+    }
+    setBusy(true);
+    try {
+      await decideRecommendation(rec.id, {
+        decided_by: "marketing_manager",
+        decision,
+        reason: reason.trim() || null,
+        qa_feedback_dimensions: [],
+      });
+      toast.success(`המלצה ${decision === "approve" ? "אושרה" : decision === "reject" ? "נדחתה" : "נדחתה לעת עתה"}`);
+      onChanged();
+    } catch (e) { toast.error(`שגיאה: ${e.message}`); }
+    finally { setBusy(false); }
+  }
+
+  const noteRaw = rec.qa_feedback_note || "";
+  const policyChanged = noteRaw.includes("policy_changed_on:");
+  const repeated      = (rec.times_seen || 1) > 1;
+
+  return (
+    <div style={{
+      border: `1px solid ${color.borderSubtle}`, borderRadius: radius.md,
+      padding: space(3), marginBottom: space(2), background: color.surface,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: space(2), marginBottom: space(1.5) }}>
+        <span style={{ ...type.caption, color: color.fgSubtle, fontWeight: 700 }}>
+          📅 {fmtDate(rec.created_at)}
+        </span>
         <span style={{
-          background: "#dcfce7", color: "#166534",
-          padding: "2px 8px", borderRadius: 999,
-          fontSize: 11, fontWeight: 700, fontFamily,
-          display: "inline-flex", alignItems: "center", gap: 3,
-        }}>📎 {files.length}</span>
-      ) : (
-        <span style={{ color: "#cbd5e1", fontSize: 12, fontFamily }}>+ קובץ</span>
+          background: rec.platform === "meta" ? "#dbeafe" : rec.platform === "google" ? "#fef3c7" : "#f1f5f9",
+          color: "#1e3a8a", padding: "2px 8px", borderRadius: 999,
+          fontSize: 10, fontWeight: 700, fontFamily,
+        }}>{rec.platform}</span>
+        {rec.requires_approval && (
+          <span style={{
+            background: "#fef3c7", color: "#a16207",
+            padding: "2px 8px", borderRadius: 999, fontSize: 10, fontWeight: 700, fontFamily,
+          }}>⚠ דורש אישור</span>
+        )}
+        {/* ספק 02 §8 — chips */}
+        {repeated && (
+          <span title="ההמלצה חוזרת בריצות עוקבות" style={{
+            background: "#e0e7ff", color: "#4338ca",
+            padding: "2px 8px", borderRadius: 999, fontSize: 10, fontWeight: 700, fontFamily,
+          }}>🔁 חוזרת ({rec.times_seen})</span>
+        )}
+        {policyChanged && (
+          <span title="ה-policy שונה מאז ההמלצה הקודמת" style={{
+            background: "#fef9c3", color: "#854d0e",
+            padding: "2px 8px", borderRadius: 999, fontSize: 10, fontWeight: 700, fontFamily,
+          }}>🔄 policy שונה</span>
+        )}
+      </div>
+      <div style={{ ...type.bodyStrong, color: color.fgDefault, marginBottom: space(1) }}>
+        💡 {rec.chosen_action} — {rec.recommendation_text || "המלצה"}
+      </div>
+      {rec.human_explanation && (
+        <div style={{ ...type.bodySmall, color: color.fgMuted, marginBottom: space(2),
+                       whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
+          {rec.human_explanation}
+        </div>
+      )}
+      {rec.decision_status === "pending" && (
+        <>
+          {showNotes && (
+            <input value={reason} onChange={e => setReason(e.target.value)}
+                   placeholder="סיבה (חובה לדחייה)"
+                   style={{ ...inputStyle, marginBottom: space(2) }} />
+          )}
+          <div style={{ display: "flex", gap: space(1.5), flexWrap: "wrap" }}>
+            <button onClick={() => decide("approve")} disabled={busy} style={{
+              ...button.success, padding: `${space(1.5)} ${space(3)}`, fontSize: 12,
+              opacity: busy ? 0.5 : 1,
+            }}>✓ אשרי</button>
+            <button onClick={() => { setShowNotes(true); decide("reject"); }} disabled={busy} style={{
+              ...button.danger, padding: `${space(1.5)} ${space(3)}`, fontSize: 12,
+              opacity: busy ? 0.5 : 1,
+            }}>✗ דחי</button>
+            <button onClick={() => decide("snooze")} disabled={busy} style={{
+              ...button.secondary, padding: `${space(1.5)} ${space(3)}`, fontSize: 12,
+              opacity: busy ? 0.5 : 1,
+            }}>⏸ דחי לעת עתה</button>
+          </div>
+        </>
+      )}
+      {rec.decision_status !== "pending" && (
+        <div style={{ ...type.caption, color: color.fgSubtle }}>
+          הוחלט: {rec.decision_status}
+        </div>
       )}
     </div>
   );
 }
 
-// Read-only artifact status
-function ArtifactStatusCell({ stats }) {
-  if (!stats || stats.total === 0) {
-    return <span style={{ color: "#cbd5e1", fontSize: 12, fontFamily }}>—</span>;
-  }
-  if (stats.approved > 0) {
-    return (
-      <span title={`${stats.approved} מאושרים`} style={{
-        background: "#dcfce7", color: "#166534",
-        padding: "2px 8px", borderRadius: 999,
-        fontSize: 11, fontWeight: 700, fontFamily,
-      }}>✓{stats.approved > 1 ? ` ${stats.approved}` : ""}</span>
-    );
-  }
-  if (stats.revision > 0) {
-    return (
-      <span title="דרוש תיקון" style={{
-        background: "#fee2e2", color: "#b91c1c",
-        padding: "2px 8px", borderRadius: 999,
-        fontSize: 11, fontWeight: 700, fontFamily,
-      }}>↻ תיקון</span>
-    );
-  }
-  return (
-    <span title="ממתין לאישור" style={{
-      background: "#fef3c7", color: "#a16207",
-      padding: "2px 8px", borderRadius: 999,
-      fontSize: 11, fontWeight: 700, fontFamily,
-    }}>⏳</span>
-  );
-}
+// ═══════════════════════════════════════════════════════════════════════════
+// Main FolderBoard
+// ═══════════════════════════════════════════════════════════════════════════
 
-// Methodology display: shows current state + planned switch
-function MethodologyCell({ folder }) {
-  const switchDate = folder.methodology_switch_date;
-  const switchTo   = folder.methodology_switch_to;
-  if (!switchDate || !switchTo) {
-    return <span style={{ color: "#cbd5e1", fontSize: 12, fontFamily }}>—</span>;
-  }
-  const targetLabel = switchTo === "conversion" ? "Conversion" : "Clicks";
-  return (
-    <span style={{
-      background: "#e0e7ff", color: "#4338ca",
-      padding: "2px 8px", borderRadius: 4,
-      fontSize: 11, fontWeight: 600, fontFamily,
-      display: "inline-flex", alignItems: "center", gap: 4,
-    }} title={`מעבר ל-${targetLabel} בתאריך ${fmtDate(switchDate)}`}>
-      🎯 {fmtDate(switchDate)} → {targetLabel}
-    </span>
-  );
-}
-
-// Count cell (for recommendations / blockers)
-function CountCell({ count, color: tone = "warning", title }) {
-  if (!count || count === 0) {
-    return <span style={{ color: "#cbd5e1", fontSize: 12, fontFamily }}>—</span>;
-  }
-  const tones = {
-    warning: { bg: "#fef3c7", fg: "#a16207" },
-    danger:  { bg: "#fee2e2", fg: "#b91c1c" },
-    info:    { bg: "#dbeafe", fg: "#1e40af" },
-  };
-  const t = tones[tone] || tones.warning;
-  return (
-    <span title={title || `${count}`} style={{
-      background: t.bg, color: t.fg,
-      padding: "2px 9px", borderRadius: 999,
-      fontSize: 11, fontWeight: 700, fontFamily,
-    }}>{count}</span>
-  );
-}
-
-// Fireberry course link cell (read-only display)
-function FireberryCell({ courseId }) {
-  if (!courseId) {
-    return <span style={{ color: "#cbd5e1", fontSize: 12, fontFamily }}>—</span>;
-  }
-  const display = String(courseId).length > 8
-    ? `${String(courseId).slice(0, 8)}…`
-    : String(courseId);
-  return (
-    <span title={`Fireberry: ${courseId}`} style={{
-      background: "#fff7ed", color: "#9a3412",
-      padding: "2px 8px", borderRadius: 4,
-      fontSize: 11, fontWeight: 700, fontFamily,
-    }}>🔥 {display}</span>
-  );
-}
-
-// ─── Data summarizers ──────────────────────────────────────────────────────
-function summarizeArtifacts(artifacts, folderId) {
-  const filtered = artifacts.filter(a => a.folder_id === folderId);
-  const byType = {};
-  for (const a of filtered) {
-    const t = a.artifact_type || "other";
-    if (!byType[t]) byType[t] = { approved: 0, pending: 0, revision: 0, total: 0 };
-    byType[t].total += 1;
-    if (a.status === "approved") byType[t].approved += 1;
-    else if (a.status === "revision_required" || a.status === "rejected") byType[t].revision += 1;
-    else byType[t].pending += 1;
-  }
-  return byType;
-}
-
-function countPendingRecs(recs, folderId) {
-  return recs.filter(r => r.folder_id === folderId && r.decision_status === "pending").length;
-}
-
-function countOpenBlockers(blockers, folderId) {
-  return blockers.filter(b => {
-    const meta = b.metadata || {};
-    return (b.folder_id === folderId || meta.folder_id === folderId)
-        && (b.status === "open" || !b.status);
-  }).length;
-}
-
-function budgetForFolder(allocations, folderId, metadataBudget) {
-  // Prefer metadata.budget_ils (manager-set), fall back to allocations sum
-  if (metadataBudget != null && metadataBudget !== "") return Number(metadataBudget);
-  const list = allocations.filter(a => a.folder_id === folderId);
-  if (list.length === 0) return null;
-  const total = list.reduce((sum, a) => {
-    const status = a.decision_status || "approved";
-    if (status === "approved" || status === "pending") {
-      return sum + Number(a.amount_ils || a.amount || 0);
-    }
-    return sum;
-  }, 0);
-  return total > 0 ? total : null;
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// Main component
-// ════════════════════════════════════════════════════════════════════════════
 export default function FolderBoard({ onSelectFolder, refreshKey = 0 }) {
   const toast = useToast();
   const [folders, setFolders]         = useState([]);
   const [artifacts, setArtifacts]     = useState([]);
-  const [allocations, setAllocations] = useState([]);
   const [recommendations, setRecs]    = useState([]);
   const [blockers, setBlockers]       = useState([]);
-  const [filesByFolder, setFilesByFolder] = useState({});
-  const [uploadBusy, setUploadBusy] = useState({});
+  const [filesByFolder, setFiles]     = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
   const [showNew, setShowNew] = useState(false);
@@ -569,29 +790,32 @@ export default function FolderBoard({ onSelectFolder, refreshKey = 0 }) {
   const [creating, setCreating] = useState(false);
   const [query, setQuery]       = useState("");
   const [collapsed, setCollapsed] = useState({});
+  const [expandedRows, setExpandedRows] = useState({});  // for live group subitems
+  const [versionModal, setVersionModal] = useState(null);  // { folder, col, chain }
+  const [requestModal, setRequestModal] = useState(null);  // { folder }
 
   async function refresh() {
     setLoading(true); setError(null);
     try {
-      const [f, a, b, r, bl] = await Promise.all([
+      const [f, a, r, bl, files] = await Promise.all([
         listCampaignFolders(),
+        // NB: include ALL versions, not only is_current_version, so popover shows full chain
         listArtifacts({ limit: 500 }).catch(() => []),
-        listBudgetAllocations().catch(() => []),
         listRecommendations({ limit: 200 }).catch(() => []),
         listWorkflowBlockers({ onlyOpen: true }).catch(() => []),
+        listAllFoldersFiles().catch(() => ({})),
       ]);
       setFolders(Array.isArray(f) ? f : []);
       setArtifacts(Array.isArray(a) ? a : []);
-      setAllocations(Array.isArray(b) ? b : []);
       setRecs(Array.isArray(r) ? r : []);
       setBlockers(Array.isArray(bl) ? bl : []);
+      setFiles(typeof files === "object" && files ? files : {});
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
   }
-
   useEffect(() => { refresh(); /* eslint-disable-next-line */ }, [refreshKey]);
 
   async function createFolder() {
@@ -605,19 +829,14 @@ export default function FolderBoard({ onSelectFolder, refreshKey = 0 }) {
       setNewName(""); setShowNew(false);
       toast.success(`✓ נוצר קמפיין: ${folder.course_name}`);
       await refresh();
-    } catch (e) {
-      toast.error(`שגיאה ביצירת קמפיין: ${e.message}`);
-    } finally {
-      setCreating(false);
-    }
+    } catch (e) { toast.error(`שגיאה ביצירה: ${e.message}`); }
+    finally { setCreating(false); }
   }
 
   async function patchFolder(folder, patch) {
     try {
       const body = { ...patch };
-      if (patch.metadata) {
-        body.metadata = { ...(folder.metadata || {}), ...patch.metadata };
-      }
+      if (patch.metadata) body.metadata = { ...(folder.metadata || {}), ...patch.metadata };
       await updateCampaignFolder(folder.id, body);
       setFolders(prev => prev.map(f => f.id === folder.id ? { ...f, ...body } : f));
     } catch (e) {
@@ -626,51 +845,22 @@ export default function FolderBoard({ onSelectFolder, refreshKey = 0 }) {
     }
   }
 
-  async function uploadFile(folder, purpose, file) {
-    const key = `${folder.id}-${purpose}`;
-    setUploadBusy(b => ({ ...b, [key]: true }));
-    try {
-      const res = await uploadCampaignFile(file, { folderId: folder.id, purpose });
-      toast.success(`✓ הועלה: ${res.name || file.name}`);
-      setFilesByFolder(prev => {
-        const folderFiles = prev[folder.id] || {};
-        const purposeFiles = folderFiles[purpose] || [];
-        return {
-          ...prev,
-          [folder.id]: {
-            ...folderFiles,
-            [purpose]: [...purposeFiles, res],
-          },
-        };
-      });
-    } catch (e) {
-      toast.error(`שגיאה בהעלאה: ${e.message}`);
-    } finally {
-      setUploadBusy(b => { const next = { ...b }; delete next[key]; return next; });
-    }
-  }
-
-  function toggleGroup(groupId) {
-    setCollapsed(c => ({ ...c, [groupId]: !c[groupId] }));
-  }
+  function toggleGroup(id) { setCollapsed(c => ({ ...c, [id]: !c[id] })); }
+  function toggleRow(id)   { setExpandedRows(r => ({ ...r, [id]: !r[id] })); }
 
   const q = query.trim().toLowerCase();
   const filtered = q
     ? folders.filter(f =>
         (f.course_name || "").toLowerCase().includes(q) ||
-        (f.activity_label || "").toLowerCase().includes(q) ||
-        (f.created_by || "").toLowerCase().includes(q)
-      )
+        (f.activity_label || "").toLowerCase().includes(q))
     : folders;
-
   const groupedFolders = GROUPS.map(g => ({
-    ...g,
-    folders: filtered.filter(f => g.statuses.includes(f.status)),
+    ...g, folders: filtered.filter(f => g.statuses.includes(f.status)),
   }));
 
   return (
     <div style={{ direction: "rtl", fontFamily }}>
-      {/* ─── Top toolbar ─────────────────────────────────────────────────── */}
+      {/* Top toolbar */}
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
         marginBottom: space(3), flexWrap: "wrap", gap: space(2),
@@ -678,40 +868,16 @@ export default function FolderBoard({ onSelectFolder, refreshKey = 0 }) {
         <div style={{ display: "flex", alignItems: "baseline", gap: space(3) }}>
           <h3 style={{ ...type.h2, margin: 0 }}>📋 לוח קמפיינים</h3>
           <span style={{ ...type.bodySmall, color: color.fgSubtle }}>
-            {q
-              ? `${filtered.length} מתוך ${folders.length}`
-              : `${folders.length} ${folders.length === 1 ? "קמפיין" : "קמפיינים"}`}
+            {q ? `${filtered.length} מתוך ${folders.length}` : `${folders.length} ${folders.length === 1 ? "קמפיין" : "קמפיינים"}`}
           </span>
         </div>
         <div style={{ display: "flex", gap: space(2), alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ position: "relative" }}>
-            <span style={{
-              position: "absolute", insetInlineStart: space(2.5),
-              top: "50%", transform: "translateY(-50%)",
-              color: color.fgSubtle, fontSize: 14, pointerEvents: "none",
-            }}>🔎</span>
-            <input
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="חיפוש לפי שם / פעילות / בעלים..."
-              style={{ ...inputStyle, paddingInlineStart: space(7), minWidth: 240 }}
-            />
-            {q && (
-              <button onClick={() => setQuery("")} aria-label="נקי חיפוש"
-                style={{
-                  position: "absolute", insetInlineEnd: space(1.5),
-                  top: "50%", transform: "translateY(-50%)",
-                  background: "transparent", border: "none", cursor: "pointer",
-                  color: color.fgMuted, fontSize: 16, padding: 4, lineHeight: 1,
-                }}>×</button>
-            )}
-          </div>
-          <button
-            onClick={() => setShowNew(s => !s)}
-            style={button.primary}
-            onMouseEnter={e => e.currentTarget.style.background = color.primaryHover}
-            onMouseLeave={e => e.currentTarget.style.background = color.primary}
-          >➕ קמפיין חדש</button>
+          <input value={query} onChange={e => setQuery(e.target.value)}
+                 placeholder="חיפוש לפי שם / פעילות..."
+                 style={{ ...inputStyle, minWidth: 240 }} />
+          <button onClick={() => setShowNew(s => !s)} style={button.primary}>
+            ➕ קמפיין חדש
+          </button>
         </div>
       </div>
 
@@ -723,24 +889,17 @@ export default function FolderBoard({ onSelectFolder, refreshKey = 0 }) {
         }}>
           <div style={{ ...type.label, marginBottom: space(2) }}>קמפיין חדש</div>
           <div style={{ display: "flex", gap: space(2) }}>
-            <input
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-              placeholder="שם הקורס / הפעילות"
-              autoFocus
-              onKeyDown={e => e.key === "Enter" && createFolder()}
-              style={{ ...inputStyle, flex: 1 }}
-            />
+            <input value={newName} onChange={e => setNewName(e.target.value)}
+                   placeholder="שם הקורס / הפעילות" autoFocus
+                   onKeyDown={e => e.key === "Enter" && createFolder()}
+                   style={{ ...inputStyle, flex: 1 }} />
             <button onClick={createFolder} disabled={creating || !newName.trim()}
-              style={{ ...button.success, opacity: creating || !newName.trim() ? 0.5 : 1 }}>
+                    style={{ ...button.success, opacity: (creating || !newName.trim()) ? 0.5 : 1 }}>
               {creating ? "..." : "צור"}
             </button>
             <button onClick={() => { setShowNew(false); setNewName(""); }} style={button.secondary}>
               ביטול
             </button>
-          </div>
-          <div style={{ ...type.caption, color: color.fgSubtle, marginTop: space(2) }}>
-            רק שם הקמפיין נדרש כדי להתחיל. כל שאר העמודות (תאריך, תקציב, מסמכים, יעדים...) ניתנים לעריכה ישירות בלוח אחרי שיצרת.
           </div>
         </div>
       )}
@@ -762,24 +921,9 @@ export default function FolderBoard({ onSelectFolder, refreshKey = 0 }) {
         }}>
           <div style={{ fontSize: 56, marginBottom: space(3) }}>🌱</div>
           <div style={{ ...type.h3, marginBottom: space(2) }}>אין עדיין קמפיינים</div>
-          <div style={{ ...type.bodySmall, color: color.fgSubtle, marginBottom: space(4) }}>
-            צרי את הקמפיין הראשון שלך כדי להתחיל
-          </div>
           <button onClick={() => setShowNew(true)} style={button.primary}>
             ➕ צרי קמפיין ראשון
           </button>
-        </div>
-      )}
-
-      {!loading && folders.length > 0 && filtered.length === 0 && (
-        <div style={{
-          textAlign: "center", padding: space(10),
-          background: color.surface, borderRadius: radius.card,
-          border: `1px solid ${color.borderDefault}`,
-        }}>
-          <div style={{ fontSize: 44, marginBottom: space(2) }}>🔍</div>
-          <div style={{ ...type.h3, marginBottom: space(2) }}>לא נמצאו קמפיינים לחיפוש זה</div>
-          <button onClick={() => setQuery("")} style={button.secondary}>נקי חיפוש</button>
         </div>
       )}
 
@@ -789,50 +933,84 @@ export default function FolderBoard({ onSelectFolder, refreshKey = 0 }) {
           border: `1px solid ${color.borderDefault}`, boxShadow: shadow.sm,
           overflow: "hidden",
         }}>
-          {/* Hint about horizontal scroll */}
           <div style={{
             padding: `${space(2)} ${space(3)}`,
             background: "#fffbeb", borderBottom: `1px solid #fef3c7`,
             ...type.caption, color: "#92400e", fontFamily,
           }}>
-            ↔ הלוח רחב — גוללי הצידה כדי לראות את כל העמודות (יעדים, מסמכים, קופי, אופרציה ועוד)
+            ↔ הלוח רחב — גוללי הצידה לראיית כל הסוגים. ▾ ליד קמפיין באוויר חושף המלצות. קליק על pill פותח גרסאות + הוספת הערות.
           </div>
           <div style={{ overflowX: "auto" }}>
-            <div style={{ minWidth: TOTAL_WIDTH }}>
+            <div style={{ minWidth: 1500 }}>
               {groupedFolders.map(group => (
                 <Group key={group.id}
                        group={group}
                        folders={group.folders}
                        collapsed={!!collapsed[group.id]}
                        onToggle={() => toggleGroup(group.id)}
+                       expandedRows={expandedRows}
+                       onToggleRow={toggleRow}
                        artifacts={artifacts}
-                       allocations={allocations}
                        recommendations={recommendations}
                        blockers={blockers}
                        filesByFolder={filesByFolder}
-                       uploadBusy={uploadBusy}
                        onPatchFolder={patchFolder}
-                       onUploadFile={uploadFile}
                        onOpenFolder={onSelectFolder}
-                       onAddCampaign={() => setShowNew(true)} />
+                       onAddCampaign={() => setShowNew(true)}
+                       onOpenVersionModal={(folder, col, chain) => setVersionModal({ folder, col, chain })}
+                       onOpenRequestModal={(folder) => setRequestModal({ folder })}
+                       toast={toast} />
               ))}
             </div>
           </div>
         </div>
       )}
+
+      {versionModal && (
+        <VersionHistoryModal
+          folder={versionModal.folder}
+          col={versionModal.col}
+          chain={versionModal.chain}
+          onClose={() => setVersionModal(null)}
+          onChanged={refresh}
+          toast={toast} />
+      )}
+
+      {requestModal && (
+        <RequestToAccountManagerModal
+          folder={requestModal.folder}
+          onClose={() => setRequestModal(null)}
+          onSent={refresh}
+          toast={toast} />
+      )}
     </div>
   );
 }
 
-// ════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 // Group section
-// ════════════════════════════════════════════════════════════════════════════
-function Group({ group, folders, collapsed, onToggle, artifacts, allocations,
-                 recommendations, blockers, filesByFolder, uploadBusy,
-                 onPatchFolder, onUploadFile, onOpenFolder, onAddCampaign }) {
-  const statusCounts = {};
-  for (const f of folders) statusCounts[f.status] = (statusCounts[f.status] || 0) + 1;
+// ═══════════════════════════════════════════════════════════════════════════
 
+const COLUMNS_CORE = [
+  { id: "expand",   label: "",            width: 28,  center: true },
+  { id: "task",     label: "שם הקמפיין",  width: 220 },
+  { id: "status",   label: "סטטוס",       width: 130, center: true },
+  { id: "due",      label: "תאריך עלייה", width: 110, center: true },
+  { id: "method",   label: "methodology", width: 130, center: true },
+  { id: "budget",   label: "תקציב",       width: 90,  center: true },
+];
+const COLUMNS_TAIL = [
+  { id: "blockers",  label: "⚠ חוסמים",     width: 90,  center: true },
+  { id: "request",   label: "💬 בקשה",      width: 90,  center: true },
+  { id: "actions",   label: "",             width: 50,  center: true },
+];
+const ALL_COLUMNS = [...COLUMNS_CORE, ...ARTIFACT_COLS.map(c => ({ ...c, width: 110, center: true })), ...COLUMNS_TAIL];
+const ROW_TEMPLATE = ALL_COLUMNS.map(c => `${c.width}px`).join(" ");
+
+function Group({ group, folders, collapsed, onToggle, expandedRows, onToggleRow,
+                 artifacts, recommendations, blockers, filesByFolder,
+                 onPatchFolder, onOpenFolder, onAddCampaign,
+                 onOpenVersionModal, onOpenRequestModal, toast }) {
   return (
     <div style={{ borderBottom: `1px solid ${color.borderDefault}` }}>
       {/* Group header */}
@@ -840,21 +1018,18 @@ function Group({ group, folders, collapsed, onToggle, artifacts, allocations,
            style={{
              display: "flex", alignItems: "center", gap: space(2),
              padding: `${space(2.5)} ${space(3)}`,
-             cursor: "pointer", background: color.surface,
-             userSelect: "none",
+             cursor: "pointer", background: color.surface, userSelect: "none",
            }}
            onMouseEnter={e => e.currentTarget.style.background = color.surfaceMuted}
            onMouseLeave={e => e.currentTarget.style.background = color.surface}>
         <span style={{
           display: "inline-block",
           transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
-          transition: "transform 120ms",
-          color: color.fgMuted, fontSize: 12, width: 14,
+          transition: "transform 120ms", color: color.fgMuted, fontSize: 12, width: 14,
         }}>▾</span>
-        <span style={{
-          color: group.strip,
-          ...type.bodyStrong, fontSize: 14, fontFamily,
-        }}>{group.label}</span>
+        <span style={{ color: group.strip, ...type.bodyStrong, fontSize: 14, fontFamily }}>
+          {group.label}
+        </span>
         <span style={{
           background: color.surfaceMuted, color: color.fgMuted,
           padding: "1px 9px", borderRadius: 999,
@@ -867,14 +1042,14 @@ function Group({ group, folders, collapsed, onToggle, artifacts, allocations,
           {/* Column headers */}
           <div style={{
             display: "grid",
-            gridTemplateColumns: `8px 28px ${ROW_TEMPLATE}`,
+            gridTemplateColumns: `8px ${ROW_TEMPLATE}`,
             background: color.surfaceMuted,
             borderTop: `1px solid ${color.borderSubtle}`,
             borderBottom: `1px solid ${color.borderSubtle}`,
           }}>
-            <div /> <div />
-            {COLUMNS.map(c => (
-              <div key={c.id} title={c.section} style={{
+            <div />
+            {ALL_COLUMNS.map(c => (
+              <div key={c.id} style={{
                 padding: `${space(2)} ${space(2)}`,
                 ...type.caption, color: color.fgSubtle,
                 fontWeight: 700, letterSpacing: 0.3,
@@ -886,7 +1061,7 @@ function Group({ group, folders, collapsed, onToggle, artifacts, allocations,
             ))}
           </div>
 
-          {/* Empty state */}
+          {/* Empty group */}
           {folders.length === 0 && (
             <div style={{ display: "grid", gridTemplateColumns: `8px 1fr` }}>
               <div style={{ background: group.strip, opacity: 0.7 }} />
@@ -897,112 +1072,66 @@ function Group({ group, folders, collapsed, onToggle, artifacts, allocations,
                 {group.id === "planned"
                   ? "אין קמפיינים בתכנון. הוסיפי חדש למטה."
                   : group.id === "live"
-                    ? "אין קמפיינים פעילים כרגע. קמפיין יזרום לכאן ברגע שתעדכני אותו לסטטוס \"באוויר\"."
-                    : "אין קמפיינים שהסתיימו עדיין. קמפיין יזרום לכאן ברגע שתעדכני אותו ל\"בסגירה\" או \"סגור\"."}
+                    ? "אין קמפיינים פעילים. קמפיין יזרום לכאן ברגע שתעדכני אותו לסטטוס \"באוויר\"."
+                    : "אין קמפיינים שהסתיימו עדיין."}
               </div>
             </div>
           )}
 
           {/* Rows */}
           {folders.map(f => (
-            <Row key={f.id}
-                 folder={f}
-                 group={group}
-                 artifactsByType={summarizeArtifacts(artifacts, f.id)}
-                 budgetIls={budgetForFolder(allocations, f.id, f.metadata?.budget_ils)}
-                 pendingRecs={countPendingRecs(recommendations, f.id)}
-                 openBlockers={countOpenBlockers(blockers, f.id)}
-                 mediaPlanFiles={(filesByFolder[f.id] || {}).media_plan || []}
-                 keywordFiles={(filesByFolder[f.id] || {}).keyword_research || []}
-                 briefFiles={(filesByFolder[f.id] || {}).brief || []}
-                 mediaPlanBusy={!!uploadBusy[`${f.id}-media_plan`]}
-                 keywordBusy={!!uploadBusy[`${f.id}-keyword_research`]}
-                 briefBusy={!!uploadBusy[`${f.id}-brief`]}
-                 onPatch={(patch) => onPatchFolder(f, patch)}
-                 onUploadMediaPlan={(file) => onUploadFile(f, "media_plan", file)}
-                 onUploadKeywords={(file) => onUploadFile(f, "keyword_research", file)}
-                 onUploadBrief={(file) => onUploadFile(f, "brief", file)}
-                 onOpen={() => onOpenFolder && onOpenFolder(f.id)} />
+            <React.Fragment key={f.id}>
+              <Row folder={f} group={group}
+                   isExpandable={group.id === "live"}
+                   isExpanded={!!expandedRows[f.id]}
+                   onToggle={() => onToggleRow(f.id)}
+                   artifacts={artifacts}
+                   blockers={blockers}
+                   onPatch={(patch) => onPatchFolder(f, patch)}
+                   onOpen={() => onOpenFolder && onOpenFolder(f.id)}
+                   onOpenVersionModal={(col, chain) => onOpenVersionModal(f, col, chain)}
+                   onOpenRequestModal={() => onOpenRequestModal(f)} />
+              {group.id === "live" && expandedRows[f.id] && (
+                <div style={{ display: "grid", gridTemplateColumns: `8px 1fr` }}>
+                  <div style={{ background: group.strip, opacity: 0.5 }} />
+                  <LiveSubitems folder={f}
+                                recommendations={recommendations}
+                                onChanged={() => onPatchFolder(f, {})}
+                                toast={toast} />
+                </div>
+              )}
+            </React.Fragment>
           ))}
 
-          {/* + Add campaign — only in planned (auto-flow for others) */}
+          {/* + Add (planned only) */}
           {group.id === "planned" && (
             <div onClick={onAddCampaign}
                  style={{
-                   display: "grid",
-                   gridTemplateColumns: `8px 1fr`,
-                   cursor: "pointer",
-                   borderTop: `1px dashed ${color.borderSubtle}`,
-                   background: color.surface,
-                   transition: transition.fast,
+                   display: "grid", gridTemplateColumns: `8px 1fr`,
+                   cursor: "pointer", borderTop: `1px dashed ${color.borderSubtle}`,
+                   background: color.surface, transition: transition.fast,
                  }}
                  onMouseEnter={e => e.currentTarget.style.background = color.surfaceMuted}
                  onMouseLeave={e => e.currentTarget.style.background = color.surface}>
               <div style={{ background: group.strip, opacity: 0.4 }} />
               <span style={{
-                padding: `${space(2)} ${space(3)}`,
-                color: color.fgSubtle, ...type.bodySmall,
-                fontWeight: 600, fontFamily,
+                padding: `${space(2)} ${space(3)}`, color: color.fgSubtle,
+                ...type.bodySmall, fontWeight: 600, fontFamily,
               }}>➕ הוסיפי קמפיין</span>
             </div>
           )}
 
-          {/* Auto-flow hint for live/completed */}
+          {/* Auto-flow hint */}
           {group.id !== "planned" && folders.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: `8px 1fr`,
-                          background: color.surface,
-                          borderTop: `1px dashed ${color.borderSubtle}` }}>
+                          background: color.surface, borderTop: `1px dashed ${color.borderSubtle}` }}>
               <div style={{ background: group.strip, opacity: 0.4 }} />
               <span style={{
-                padding: `${space(2)} ${space(3)}`,
-                color: color.fgSubtle, ...type.caption, fontFamily,
-                fontStyle: "italic",
+                padding: `${space(2)} ${space(3)}`, color: color.fgSubtle,
+                ...type.caption, fontFamily, fontStyle: "italic",
               }}>
-                ⚙ אוטומציה — קמפיינים נכנסים לכאן אוטומטית לפי שינוי סטטוס בלוח "מתוכננים".
+                ⚙ אוטומציה — קמפיינים נכנסים אוטומטית לפי שינוי סטטוס בקבוצת "מתוכננים".
               </span>
-            </div>
-          )}
-
-          {/* Status distribution mini-bar */}
-          {folders.length > 0 && (
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: `8px 1fr`,
-              background: color.surfaceMuted,
-              borderTop: `1px solid ${color.borderSubtle}`,
-            }}>
-              <div style={{ background: group.strip, opacity: 0.6 }} />
-              <div style={{
-                display: "flex", alignItems: "center", gap: space(3),
-                padding: `${space(2)} ${space(3)}`, flexWrap: "wrap",
-              }}>
-                <span style={{ ...type.caption, color: color.fgSubtle, fontFamily }}>
-                  התפלגות סטטוס:
-                </span>
-                <div style={{
-                  display: "flex", height: 16, borderRadius: 4, overflow: "hidden",
-                  width: 280, border: `1px solid ${color.borderSubtle}`,
-                }}>
-                  {group.statuses.map(s => {
-                    const cnt = statusCounts[s] || 0;
-                    if (!cnt) return null;
-                    const sd = STATUS_DEFS[s];
-                    const w = (cnt / folders.length) * 100;
-                    return (
-                      <div key={s} title={`${sd.label}: ${cnt}`}
-                           style={{
-                             background: sd.bg, width: `${w}%`, color: sd.fg,
-                             fontSize: 10, fontWeight: 700, fontFamily,
-                             display: "flex", alignItems: "center", justifyContent: "center",
-                           }}>{cnt > 1 ? cnt : ""}</div>
-                    );
-                  })}
-                </div>
-                <span style={{
-                  ...type.caption, color: color.fgSubtle, fontFamily,
-                  marginInlineStart: "auto",
-                }}>סה"כ {folders.length} בקטגוריה</span>
-              </div>
             </div>
           )}
         </>
@@ -1011,195 +1140,129 @@ function Group({ group, folders, collapsed, onToggle, artifacts, allocations,
   );
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// Row — one campaign with all 25+ columns inline-editable
-// ════════════════════════════════════════════════════════════════════════════
-function Row({ folder, group, artifactsByType, budgetIls, pendingRecs, openBlockers,
-                mediaPlanFiles, keywordFiles, briefFiles,
-                mediaPlanBusy, keywordBusy, briefBusy,
-                onPatch, onUploadMediaPlan, onUploadKeywords, onUploadBrief, onOpen }) {
-  const meta = folder.metadata || {};
-  const ACCEPT = ".xlsx,.xls,.csv,.pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.gif";
+// ═══════════════════════════════════════════════════════════════════════════
+// Row
+// ═══════════════════════════════════════════════════════════════════════════
 
-  // Auto registration close = go-live + 14 days, unless overridden
-  const autoRegClose = addDays(folder.planned_go_live_date, 14);
-  const regCloseValue = meta.registration_close_date || autoRegClose;
+function Row({ folder, group, isExpandable, isExpanded, onToggle,
+                artifacts, blockers, onPatch, onOpen,
+                onOpenVersionModal, onOpenRequestModal }) {
+  // Count blockers belonging to this folder + assigned to manager
+  const myBlockers = blockers.filter(b => {
+    const meta = b.metadata || {};
+    const matchesFolder = b.folder_id === folder.id || meta.folder_id === folder.id;
+    const ownedByMe = b.owner_role === "marketing_manager" || !b.owner_role;
+    return matchesFolder && ownedByMe;
+  }).length;
+
+  const methodLabel = (folder.methodology_switch_date && folder.methodology_switch_to)
+    ? `${fmtDate(folder.methodology_switch_date)} → ${folder.methodology_switch_to === "conversion" ? "Conv" : "Clicks"}`
+    : "—";
 
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: `8px 28px ${ROW_TEMPLATE}`,
+      gridTemplateColumns: `8px ${ROW_TEMPLATE}`,
       background: color.surface,
       borderTop: `1px solid ${color.borderSubtle}`,
     }}>
       <div style={{ background: group.strip, opacity: 0.85 }} />
+
+      {/* Expand chevron (only for live group) */}
       <Cell center>
-        <input type="checkbox" disabled
-               onClick={e => e.stopPropagation()}
-               style={{ width: 14, height: 14, cursor: "not-allowed", opacity: 0.5 }} />
+        {isExpandable ? (
+          <button onClick={e => { e.stopPropagation(); onToggle(); }}
+                  title={isExpanded ? "הסתר המלצות" : "הצג המלצות"}
+                  style={{
+                    background: "transparent", border: "none", cursor: "pointer",
+                    color: color.fgMuted, fontSize: 12, padding: 4,
+                    transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)",
+                    transition: "transform 120ms",
+                  }}>▾</button>
+        ) : null}
       </Cell>
 
-      {/* — General — */}
+      {/* Task name */}
       <Cell>
-        <InlineInput
-          value={folder.course_name}
-          placeholder="שם הקמפיין"
-          onSave={v => onPatch({ course_name: v })}
-        />
-      </Cell>
-      <Cell>
-        <InlineInput
-          value={folder.activity_label}
-          placeholder="+ פעילות"
-          onSave={v => onPatch({ activity_label: v })}
-        />
-      </Cell>
-      <Cell center>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%" }}>
-          <OwnerAvatar name={folder.created_by} />
-          <InlineInput
-            value={folder.created_by}
-            placeholder="+ בעלים"
-            onSave={v => onPatch({ created_by: v })}
-          />
-        </div>
-      </Cell>
-      <Cell center>
-        <PillPicker
-          value={folder.status}
-          defs={STATUS_DEFS}
-          allKeys={ALL_STATUSES}
-          onChange={s => onPatch({ status: s })}
-        />
-      </Cell>
-      <Cell center>
-        <PillPicker
-          value={meta.priority || "normal"}
-          defs={PRIORITY_DEFS}
-          allKeys={ALL_PRIORITIES}
-          onChange={p => onPatch({ metadata: { priority: p } })}
-        />
+        <InlineInput value={folder.course_name} placeholder="שם הקמפיין"
+                     onSave={v => onPatch({ course_name: v })} />
       </Cell>
 
-      {/* — Timing — */}
+      {/* Status */}
       <Cell center>
-        <InlineDate
-          value={folder.planned_go_live_date}
-          onSave={v => onPatch({ planned_go_live_date: v })}
-          placeholder="+ עלייה"
-        />
-      </Cell>
-      <Cell center>
-        <InlineDate
-          value={regCloseValue}
-          onSave={v => onPatch({ metadata: { registration_close_date: v } })}
-          placeholder={autoRegClose ? `אוטומטי: ${fmtDate(autoRegClose)}` : "+ סגירה"}
-        />
-      </Cell>
-      <Cell center>
-        <MethodologyCell folder={folder} />
+        <StatusPicker value={folder.status} onChange={s => onPatch({ status: s })} />
       </Cell>
 
-      {/* — Goals — */}
+      {/* Go-live date */}
       <Cell center>
-        <InlineInput
-          value={budgetIls}
-          inputType="number"
-          formatter={v => fmtMoney(v)}
-          onSave={v => onPatch({ metadata: { budget_ils: v == null ? null : Number(v) } })}
-        />
-      </Cell>
-      <Cell center>
-        <InlineInput
-          value={meta.target_leads}
-          inputType="number"
-          formatter={v => fmtNum(v)}
-          onSave={v => onPatch({ metadata: { target_leads: v == null ? null : Number(v) } })}
-        />
-      </Cell>
-      <Cell center>
-        <InlineInput
-          value={meta.target_cpl}
-          inputType="number"
-          formatter={v => fmtMoney(v)}
-          onSave={v => onPatch({ metadata: { target_cpl: v == null ? null : Number(v) } })}
-        />
+        <InlineDate value={folder.planned_go_live_date}
+                    onSave={v => onPatch({ planned_go_live_date: v })} />
       </Cell>
 
-      {/* — Documents — */}
+      {/* Methodology */}
       <Cell center>
-        <InlineFileUpload
-          files={mediaPlanFiles}
-          busy={mediaPlanBusy}
-          accept={ACCEPT}
-          onUpload={onUploadMediaPlan}
-        />
-      </Cell>
-      <Cell center>
-        <InlineFileUpload
-          files={keywordFiles}
-          busy={keywordBusy}
-          accept={ACCEPT}
-          onUpload={onUploadKeywords}
-        />
-      </Cell>
-      <Cell center>
-        <InlineFileUpload
-          files={briefFiles}
-          busy={briefBusy}
-          accept={ACCEPT}
-          onUpload={onUploadBrief}
-        />
+        <span style={{ ...type.caption, color: methodLabel === "—" ? "#cbd5e1" : color.fgDefault, fontFamily }}>
+          {methodLabel}
+        </span>
       </Cell>
 
-      {/* — Creative — */}
-      <Cell center><ArtifactStatusCell stats={artifactsByType.creative_concept   || null} /></Cell>
-      <Cell center><ArtifactStatusCell stats={artifactsByType.creative_rendered  || null} /></Cell>
-
-      {/* — Copy — */}
-      <Cell center><ArtifactStatusCell stats={artifactsByType.ad_copy_meta    || null} /></Cell>
-      <Cell center><ArtifactStatusCell stats={artifactsByType.ad_copy_google  || null} /></Cell>
-      <Cell center><ArtifactStatusCell stats={artifactsByType.ad_copy_tiktok  || null} /></Cell>
-      <Cell center><ArtifactStatusCell stats={artifactsByType.lead_form_copy  || null} /></Cell>
-
-      {/* — Operations — */}
-      <Cell center><ArtifactStatusCell stats={artifactsByType.make_scenario || null} /></Cell>
+      {/* Budget */}
       <Cell center>
-        <CountCell
-          count={pendingRecs}
-          color="warning"
-          title={`${pendingRecs} המלצות ממתינות`} />
-      </Cell>
-      <Cell center>
-        <CountCell
-          count={openBlockers}
-          color="danger"
-          title={`${openBlockers} חוסמים פתוחים`} />
+        <InlineInput value={folder.metadata?.budget_ils} inputType="number"
+                     formatter={v => fmtMoney(v)}
+                     onSave={v => onPatch({ metadata: { budget_ils: v == null ? null : Number(v) } })} />
       </Cell>
 
-      {/* — Reference — */}
-      <Cell center><FireberryCell courseId={folder.fireberry_course_id} /></Cell>
-      <Cell>
-        <InlineInput
-          value={meta.notes}
-          placeholder="+ הערה"
-          onSave={v => onPatch({ metadata: { notes: v } })}
-        />
+      {/* Artifact pills */}
+      {ARTIFACT_COLS.map(col => {
+        const chain = buildVersionChain(artifacts, folder.id, col.id);
+        return (
+          <Cell key={col.id} center>
+            <ArtifactPill chain={chain}
+                          onClick={() => onOpenVersionModal(col, chain)} />
+          </Cell>
+        );
+      })}
+
+      {/* Blockers count */}
+      <Cell center>
+        {myBlockers > 0 ? (
+          <span style={{
+            background: "#fee2e2", color: "#b91c1c",
+            padding: "2px 9px", borderRadius: 999,
+            fontSize: 11, fontWeight: 700, fontFamily,
+          }}>{myBlockers}</span>
+        ) : (
+          <span style={{ color: "#cbd5e1", fontSize: 12, fontFamily }}>—</span>
+        )}
+      </Cell>
+
+      {/* Request to account_manager (live only) */}
+      <Cell center>
+        {folder.status === "live" ? (
+          <button onClick={e => { e.stopPropagation(); onOpenRequestModal(); }}
+                  title="שליחת בקשה לתקציבאית — וידיאו / רימרקטינג / שינוי קריאייטיב..."
+                  style={{
+                    background: "#7c3aed", color: "#fff", border: "none",
+                    padding: "4px 10px", borderRadius: 4,
+                    fontSize: 11, fontWeight: 700, fontFamily, cursor: "pointer",
+                  }}>✉ בקשה</button>
+        ) : (
+          <span style={{ color: "#cbd5e1", fontSize: 12, fontFamily }}>—</span>
+        )}
       </Cell>
 
       {/* Open detail */}
       <Cell center>
-        <button
-          onClick={e => { e.stopPropagation(); onOpen && onOpen(); }}
-          title="פתחי תצוגת פירוט מלאה"
-          style={{
-            background: "transparent", border: "none", cursor: "pointer",
-            color: color.primary, fontSize: 22, fontWeight: 700,
-            padding: "2px 8px", borderRadius: 4, lineHeight: 1,
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = color.surfaceMuted}
-          onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-        >›</button>
+        <button onClick={e => { e.stopPropagation(); onOpen && onOpen(); }}
+                title="פתחי תצוגת פירוט מלאה"
+                style={{
+                  background: "transparent", border: "none", cursor: "pointer",
+                  color: color.primary, fontSize: 22, fontWeight: 700,
+                  padding: "2px 8px", borderRadius: 4, lineHeight: 1,
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = color.surfaceMuted}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>›</button>
       </Cell>
     </div>
   );

@@ -737,6 +737,17 @@ export function fileAccessUrl(objectPath) {
   return `${BASE}/api/campaigns/files/${objectPath}`;
 }
 
+/** All files for one folder, grouped by purpose (brief / media_plan / ...) */
+export async function listFolderFiles(folderId) {
+  return request("GET", `/api/campaigns/folders/${folderId}/files`);
+}
+
+/** Bulk: all files for ALL folders in bucket, grouped folder→purpose→files.
+ *  Used by FolderBoard so file counts appear immediately on first paint. */
+export async function listAllFoldersFiles() {
+  return request("GET", `/api/campaigns/folders-files-bulk`);
+}
+
 export async function getSchoolBudget() {
   return request("GET", "/api/campaigns/school-budget");
 }
@@ -773,4 +784,14 @@ export async function requestArtifactRevision(artifactId, body) {
 export async function forwardArtifact(artifactId, body) {
   // body: { target: 'launch'|'school_director'|'next_stage', note?, decided_by? }
   return request("POST", `/api/artifacts/${artifactId}/forward`, { decided_by: "marketing_manager", ...body });
+}
+
+/** Manager creates an artifact directly (e.g. she got keywords from external pro).
+ *  Goes through internal QA, ends up 'approved' (skips quality_gate since
+ *  manager IS the source-of-truth). Auto-versioned in same artifact_type chain.
+ *
+ *  body: { folder_id, artifact_type, title?, payload?, attached_file_path?, notes? }
+ */
+export async function createArtifactByManager(body) {
+  return request("POST", "/api/artifacts/create-by-manager", { created_by: "marketing_manager", ...body });
 }
