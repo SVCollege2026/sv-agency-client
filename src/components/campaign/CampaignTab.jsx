@@ -28,8 +28,12 @@ const SUB_TABS = [
   { id: "approvals", label: "תוצרים לאישור",    icon: "✋", desc: "כל מה שמחלקות הסוכנים הכינו ומחכה לאישור שלך — קופי, קריאייטיב, פריסות מדיה ותקציבים" },
   { id: "tasks",     label: "דורש פעולה",       icon: "✅", desc: "אישורים מהירים, תיקונים והחלטות שמחכות לך" },
   { id: "budget",    label: "תקציב בית-ספרי",   icon: "💰", desc: "תכנית התקציב הכוללת — שנתי + חודשי (אופציונלי)" },
-  { id: "transition",label: "Transition מ-Limann", icon: "🔄", desc: "מצב המעבר מסוכנות Limann — חיבורי make.com שצריכים reauth" },
   { id: "settings",  label: "הגדרות מערכת",     icon: "⚙",  desc: "ערכי מותג, התראות, חגים — מה שאת קובעת פעם בשנה" },
+  // NB: Sub-tabs LIST is the marketing-manager view only. Internal/admin
+  // tools (MAKE hub, Limann transition tracker) stay reachable via direct
+  // URL (?sub=make / ?sub=transition) but don't appear in her tab bar —
+  // she shouldn't think about make.com infra or agency-transition status
+  // as part of her daily marketing work.
 ];
 
 export default function CampaignTab() {
