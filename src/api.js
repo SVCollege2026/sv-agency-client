@@ -800,3 +800,20 @@ export async function createArtifactByManager(body) {
 export function artifactExcelUrl(artifactId) {
   return `${BASE}/api/artifacts/${artifactId}/export-excel`;
 }
+
+// ─── Limann transition tracker ───────────────────────────────────────────
+// Audit + tracker for migrating make.com infrastructure away from the
+// previous agency (LIMANN / Ilya). See PR #45 for the auditor agent.
+
+export async function runLimannAudit() {
+  return request("POST", "/api/optimization/limann-audit/run");
+}
+
+export async function getLimannAuditLatest() {
+  return request("GET", "/api/optimization/limann-audit/latest");
+}
+
+export async function resolveLimannItem(body) {
+  // body: { subject_table, subject_id, item_label, reason, decided_by? }
+  return request("POST", "/api/optimization/limann-audit/resolve", body);
+}
