@@ -740,7 +740,13 @@ function Group({ group, folders, collapsed, onToggle, artifacts, filesByFolder,
               <div style={{
                 padding: space(4), textAlign: "center",
                 color: color.fgSubtle, ...type.bodySmall, fontFamily,
-              }}>אין קמפיינים בקטגוריה זו עדיין</div>
+              }}>
+                {group.id === "planned"
+                  ? "אין קמפיינים בתכנון. הוסיפי חדש למטה."
+                  : group.id === "live"
+                    ? "אין קמפיינים פעילים כרגע. קמפיין יזרום לכאן ברגע שתעדכני אותו לסטטוס \"באוויר\"."
+                    : "אין קמפיינים שהסתיימו עדיין. קמפיין יזרום לכאן ברגע שתעדכני אותו ל\"בסגירה\" או \"סגור\"."}
+              </div>
             </div>
           )}
 
@@ -760,25 +766,44 @@ function Group({ group, folders, collapsed, onToggle, artifacts, filesByFolder,
                  onOpen={() => onOpenFolder && onOpenFolder(f.id)} />
           ))}
 
-          {/* + Add campaign row */}
-          <div onClick={onAddCampaign}
-               style={{
-                 display: "grid",
-                 gridTemplateColumns: `8px 1fr`,
-                 cursor: "pointer",
-                 borderTop: `1px dashed ${color.borderSubtle}`,
-                 background: color.surface,
-                 transition: transition.fast,
-               }}
-               onMouseEnter={e => e.currentTarget.style.background = color.surfaceMuted}
-               onMouseLeave={e => e.currentTarget.style.background = color.surface}>
-            <div style={{ background: group.strip, opacity: 0.4 }} />
-            <span style={{
-              padding: `${space(2)} ${space(3)}`,
-              color: color.fgSubtle, ...type.bodySmall,
-              fontWeight: 600, fontFamily,
-            }}>➕ הוסיפי קמפיין</span>
-          </div>
+          {/* + Add campaign row — RAK בקבוצת "מתוכננים".
+              קמפיינים ב"באוויר" / "הסתיימו" זורמים אוטומטית לפי שינוי סטטוס. */}
+          {group.id === "planned" && (
+            <div onClick={onAddCampaign}
+                 style={{
+                   display: "grid",
+                   gridTemplateColumns: `8px 1fr`,
+                   cursor: "pointer",
+                   borderTop: `1px dashed ${color.borderSubtle}`,
+                   background: color.surface,
+                   transition: transition.fast,
+                 }}
+                 onMouseEnter={e => e.currentTarget.style.background = color.surfaceMuted}
+                 onMouseLeave={e => e.currentTarget.style.background = color.surface}>
+              <div style={{ background: group.strip, opacity: 0.4 }} />
+              <span style={{
+                padding: `${space(2)} ${space(3)}`,
+                color: color.fgSubtle, ...type.bodySmall,
+                fontWeight: 600, fontFamily,
+              }}>➕ הוסיפי קמפיין</span>
+            </div>
+          )}
+
+          {/* Footer hint for live/completed groups — explains auto-flow */}
+          {group.id !== "planned" && folders.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: `8px 1fr`,
+                          background: color.surface,
+                          borderTop: `1px dashed ${color.borderSubtle}` }}>
+              <div style={{ background: group.strip, opacity: 0.4 }} />
+              <span style={{
+                padding: `${space(2)} ${space(3)}`,
+                color: color.fgSubtle, ...type.caption, fontFamily,
+                fontStyle: "italic",
+              }}>
+                ⚙ אוטומציה — קמפיינים נכנסים לכאן אוטומטית לפי שינוי סטטוס בלוח "מתוכננים".
+              </span>
+            </div>
+          )}
 
           {/* Footer: status distribution mini-bar */}
           {folders.length > 0 && (
@@ -908,22 +933,22 @@ function Row({ folder, group, artifactsByType,
         />
       </Cell>
 
-      {/* Media plan (file upload) */}
+      {/* Media plan (file upload — Excel/PDF/PPT/Word/image) */}
       <Cell center>
         <InlineFileUpload
           files={mediaPlanFiles}
           busy={mediaPlanBusy}
-          accept=".xlsx,.xls,.csv,.pdf,.docx"
+          accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp"
           onUpload={onUploadMediaPlan}
         />
       </Cell>
 
-      {/* Keyword research (file upload) */}
+      {/* Keyword research (file upload — same allowed types) */}
       <Cell center>
         <InlineFileUpload
           files={keywordFiles}
           busy={keywordBusy}
-          accept=".xlsx,.xls,.csv,.pdf,.docx"
+          accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp"
           onUpload={onUploadKeywords}
         />
       </Cell>
