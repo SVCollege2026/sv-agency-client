@@ -706,7 +706,7 @@ export default function CoursesCyclesPanel() {
                 <th style={S.th}>נרשמים</th>
                 <th style={S.th}>סכום עסקאות</th>
                 <th style={S.th}>הנחות</th>
-                <th style={S.th}>אחרי הנחה</th>
+                <th style={S.th}>עסקאות לאחר הנחה</th>
                 <th style={S.th}>נגבה בפועל</th>
               </tr>
             </thead>
@@ -802,7 +802,7 @@ export default function CoursesCyclesPanel() {
                 <th style={S.th}>סיום הרשמה</th>
                 <th style={S.th}>סטטוס רישום</th>
                 <th style={S.th}>נרשמים</th>
-                <th style={S.th}>אחרי הנחה</th>
+                <th style={S.th}>עסקאות לאחר הנחה</th>
                 <th style={S.th}>נגבה בפועל</th>
                 <th style={S.th}>סניף</th>
                 <th style={S.th}></th>
