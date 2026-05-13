@@ -3,25 +3,28 @@
  * Uses design tokens, toast notifications, skeleton loading, hover lift.
  */
 import React, { useState, useEffect } from "react";
-import { listArtifacts, approveArtifact, requestArtifactRevision, forwardArtifact, fileAccessUrl } from "../../api.js";
+import { listArtifacts, approveArtifact, requestArtifactRevision, forwardArtifact, fileAccessUrl, artifactExcelUrl } from "../../api.js";
 import { color, radius, shadow, space, type, transition, button as btn, input as inputStyle, emptyState, pill, fontFamily } from "./_tokens.js";
 import { useToast } from "./Toast.jsx";
 import { SkeletonCard } from "./Skeleton.jsx";
 import { ApprovalGuardBanner } from "./ApprovalGuard.jsx";
 
 const ARTIFACT_TYPES = {
-  media_plan:            { icon: "📊", label: "פריסת מדיה",         producer: "מחלקת מדיה" },
-  keyword_research:      { icon: "🔍", label: "מחקר ביטויים",        producer: "מחלקת מדיה" },
-  budget_recommendation: { icon: "💰", label: "המלצת תקציב",        producer: "מחלקת מדיה" },
-  market_research:       { icon: "📚", label: "מחקר תחום ומתחרים",  producer: "מחלקת מדיה" },
-  ad_copy_meta:          { icon: "📘", label: "קופי ל-Meta",         producer: "מחלקת קופי" },
-  ad_copy_google:        { icon: "🔎", label: "קופי ל-Google",       producer: "מחלקת קופי" },
-  ad_copy_tiktok:        { icon: "🎵", label: "קופי ל-TikTok",       producer: "מחלקת קופי" },
-  lead_form_copy:        { icon: "📝", label: "קופי לטופס Lead",    producer: "מחלקת קופי" },
-  creative_concept:      { icon: "🎨", label: "כיוון קריאייטיב",     producer: "מחלקת קריאייטיב" },
-  creative_rendered:     { icon: "🖼", label: "קריאייטיב מוכן",     producer: "מחלקת קריאייטיב" },
-  format_qa_report:      { icon: "📐", label: "בדיקת פורמטים",       producer: "מחלקת קריאייטיב" },
-  make_scenario:         { icon: "🔌", label: "תרחיש Make",          producer: "מחלקת MAKE" },
+  media_plan:                    { icon: "📊", label: "פריסת מדיה",            producer: "מחלקת מדיה" },
+  keyword_research:              { icon: "🔍", label: "מחקר ביטויים",           producer: "מחלקת מדיה" },
+  budget_recommendation:         { icon: "💰", label: "המלצת תקציב",           producer: "מחלקת מדיה" },
+  market_research:               { icon: "📚", label: "מחקר תחום ומתחרים",     producer: "מחלקת מדיה" },
+  // Daily auto-run on live Google campaigns: detect → review → propose
+  broad_keyword_waste_report:    { icon: "📉", label: "דוח גלם — broad waste", producer: "סוכן זיהוי" },
+  broad_keyword_waste_proposal:  { icon: "✂",  label: "הצעת הסרת ביטויים רחבים", producer: "סוקר פנימי + Claude" },
+  ad_copy_meta:                  { icon: "📘", label: "קופי ל-Meta",            producer: "מחלקת קופי" },
+  ad_copy_google:                { icon: "🔎", label: "קופי ל-Google",          producer: "מחלקת קופי" },
+  ad_copy_tiktok:                { icon: "🎵", label: "קופי ל-TikTok",          producer: "מחלקת קופי" },
+  lead_form_copy:                { icon: "📝", label: "קופי לטופס Lead",       producer: "מחלקת קופי" },
+  creative_concept:              { icon: "🎨", label: "כיוון קריאייטיב",        producer: "מחלקת קריאייטיב" },
+  creative_rendered:             { icon: "🖼", label: "קריאייטיב מוכן",        producer: "מחלקת קריאייטיב" },
+  format_qa_report:              { icon: "📐", label: "בדיקת פורמטים",          producer: "מחלקת קריאייטיב" },
+  make_scenario:                 { icon: "🔌", label: "תרחיש Make",             producer: "מחלקת MAKE" },
 };
 
 const STATUS_TONES = {
@@ -432,6 +435,95 @@ function Preview({ artifact, expanded }) {
             <ul style={{ margin: `${space(1)} 0`, paddingInlineStart: space(5) }}>{p.messaging_hooks.map((h, i) => <li key={i}>{h}</li>)}</ul>
           </div>
         )}
+      </div>
+    );
+  }
+
+  if (t === "broad_keyword_waste_proposal") {
+    const counts = p.counts || {};
+    const decisions = p.decisions || [];
+    const previewRows = expanded ? decisions : decisions.slice(0, 4);
+    const verdictBadge = (v) => {
+      const map = {
+        propose_remove: { bg: "#fee2e2", fg: "#b91c1c", label: "✗ להסיר" },
+        pause_only:     { bg: "#fef3c7", fg: "#a16207", label: "⏸ להשהות" },
+        keep:           { bg: "#dcfce7", fg: "#166534", label: "✓ להשאיר" },
+      };
+      const m = map[v] || { bg: "#f1f5f9", fg: "#475569", label: v || "—" };
+      return (
+        <span style={{
+          background: m.bg, color: m.fg, padding: "2px 8px",
+          borderRadius: radius.pill, fontSize: 11, fontWeight: 700,
+          fontFamily: "Heebo, sans-serif", whiteSpace: "nowrap",
+        }}>{m.label}</span>
+      );
+    };
+    return (
+      <div style={{ ...type.bodySmall, color: color.fgDefault }}>
+        <div style={{ marginBottom: space(2), padding: space(2), background: color.surfaceMuted,
+                       borderRadius: radius.md, display: "flex", gap: space(3), flexWrap: "wrap" }}>
+          <span><strong style={{ color: "#b91c1c" }}>{counts.propose_remove || 0}</strong> להסיר</span>
+          <span><strong style={{ color: "#a16207" }}>{counts.pause_only || 0}</strong> להשהות</span>
+          <span><strong style={{ color: "#166534" }}>{counts.keep || 0}</strong> להשאיר</span>
+        </div>
+        {p.claude_summary && (
+          <div style={{ ...type.small, color: color.fgMuted, marginBottom: space(2),
+                          fontStyle: "italic" }}>{p.claude_summary}</div>
+        )}
+        <div style={{ marginBottom: space(2) }}>
+          <strong>דוגמיות (broad match בלבד):</strong>
+          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: space(1.5),
+                          fontSize: 12, fontFamily: "Heebo, sans-serif" }}>
+            <thead>
+              <tr style={{ background: color.surfaceMuted }}>
+                <th style={{ textAlign: "right", padding: "4px 8px" }}>החלטה</th>
+                <th style={{ textAlign: "right", padding: "4px 8px" }}>ביטוי</th>
+                <th style={{ textAlign: "right", padding: "4px 8px" }}>הוצאה</th>
+                <th style={{ textAlign: "right", padding: "4px 8px" }}>המרות</th>
+              </tr>
+            </thead>
+            <tbody>
+              {previewRows.map((d, i) => (
+                <tr key={i} style={{ borderBottom: `1px solid ${color.borderSubtle}` }}>
+                  <td style={{ padding: "4px 8px" }}>{verdictBadge(d.verdict)}</td>
+                  <td style={{ padding: "4px 8px", fontWeight: 600 }}>{d.keyword_text || "—"}</td>
+                  <td style={{ padding: "4px 8px" }}>₪{(d.metrics?.spend || 0).toLocaleString("he-IL")}</td>
+                  <td style={{ padding: "4px 8px" }}>{d.metrics?.conversions || 0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!expanded && decisions.length > previewRows.length && (
+            <div style={{ ...type.small, color: color.fgSubtle, marginTop: space(1) }}>
+              ...עוד {decisions.length - previewRows.length} ביטויים. להצגה מלאה — Excel למטה.
+            </div>
+          )}
+        </div>
+        <a href={artifactExcelUrl(artifact.id)} target="_blank" rel="noreferrer"
+           style={{
+             display: "inline-flex", alignItems: "center", gap: space(1.5),
+             background: "#16a34a", color: "#fff", padding: `${space(1.5)} ${space(3)}`,
+             borderRadius: radius.md, textDecoration: "none",
+             fontSize: 13, fontWeight: 700, fontFamily: "Heebo, sans-serif",
+           }}>
+          📥 הורדת Excel מלא לבדיקה
+        </a>
+      </div>
+    );
+  }
+
+  if (t === "broad_keyword_waste_report") {
+    const suspects = p.suspects || [];
+    return (
+      <div style={{ ...type.bodySmall, color: color.fgMuted }}>
+        <div><strong>{suspects.length}</strong> מועמדים שזוהו (broad match בלבד, lookback {p.lookback_days || 30} ימים)</div>
+        {p.note && <div style={{ marginTop: space(1.5), fontStyle: "italic" }}>{p.note}</div>}
+        <div style={{ marginTop: space(2) }}>
+          <a href={artifactExcelUrl(artifact.id)} target="_blank" rel="noreferrer"
+             style={{ color: color.primary, fontSize: 12, textDecoration: "underline" }}>
+            📥 Excel גלם של הזיהוי הסטטיסטי
+          </a>
+        </div>
       </div>
     );
   }

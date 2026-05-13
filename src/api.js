@@ -795,3 +795,8 @@ export async function forwardArtifact(artifactId, body) {
 export async function createArtifactByManager(body) {
   return request("POST", "/api/artifacts/create-by-manager", { created_by: "marketing_manager", ...body });
 }
+
+/** Download URL for the Excel export of a tabular artifact (broad_keyword_waste_*). */
+export function artifactExcelUrl(artifactId) {
+  return `${BASE}/api/artifacts/${artifactId}/export-excel`;
+}
