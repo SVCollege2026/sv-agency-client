@@ -12,7 +12,6 @@ import NotificationBell from "./NotificationBell.jsx";
 import BlockersInbox from "./BlockersInbox.jsx";
 import ArtifactsApprovalPanel from "./ArtifactsApprovalPanel.jsx";
 import MakeHub from "./MakeHub.jsx";
-import TransitionTrackerPanel from "./TransitionTrackerPanel.jsx";
 import HelpCenter, { useHelpFirstVisit } from "./HelpCenter.jsx";
 import { ApprovalGuardBadge } from "./ApprovalGuard.jsx";
 import { color, radius, shadow, space, type, transition, fontFamily } from "./_tokens.js";
@@ -29,11 +28,6 @@ const SUB_TABS = [
   { id: "tasks",     label: "דורש פעולה",       icon: "✅", desc: "אישורים מהירים, תיקונים והחלטות שמחכות לך" },
   { id: "budget",    label: "תקציב בית-ספרי",   icon: "💰", desc: "תכנית התקציב הכוללת — שנתי + חודשי (אופציונלי)" },
   { id: "settings",  label: "הגדרות מערכת",     icon: "⚙",  desc: "ערכי מותג, התראות, חגים — מה שאת קובעת פעם בשנה" },
-  // NB: Sub-tabs LIST is the marketing-manager view only. Internal/admin
-  // tools (MAKE hub, Limann transition tracker) stay reachable via direct
-  // URL (?sub=make / ?sub=transition) but don't appear in her tab bar —
-  // she shouldn't think about make.com infra or agency-transition status
-  // as part of her daily marketing work.
 ];
 
 export default function CampaignTab() {
@@ -145,12 +139,11 @@ export default function CampaignTab() {
         />
       )}
 
-      {sub === "approvals"  && <ArtifactsApprovalPanel />}
-      {sub === "tasks"      && <BlockersInbox />}
-      {sub === "budget"     && <SchoolBudgetPanel />}
-      {sub === "transition" && <TransitionTrackerPanel />}
-      {sub === "make"       && <MakeHub />}
-      {sub === "settings"   && <SettingsPanel />}
+      {sub === "approvals" && <ArtifactsApprovalPanel />}
+      {sub === "tasks"     && <BlockersInbox />}
+      {sub === "budget"    && <SchoolBudgetPanel />}
+      {sub === "make"      && <MakeHub />}
+      {sub === "settings"  && <SettingsPanel />}
     </div>
   );
 }
