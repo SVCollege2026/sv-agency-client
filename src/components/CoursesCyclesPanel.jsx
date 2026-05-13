@@ -802,7 +802,7 @@ export default function CoursesCyclesPanel() {
                 <th style={S.th}>סיום הרשמה</th>
                 <th style={S.th}>סטטוס רישום</th>
                 <th style={S.th}>נרשמים</th>
-                <th style={S.th}>סכום עסקאות</th>
+                <th style={S.th}>אחרי הנחה</th>
                 <th style={S.th}>נגבה בפועל</th>
                 <th style={S.th}>סניף</th>
                 <th style={S.th}></th>
@@ -834,7 +834,7 @@ export default function CoursesCyclesPanel() {
                       <td style={S.tdSecondary}>{fmtDate(reg.endDate)}</td>
                       <td style={S.td}><StatusBadge status={reg.status} /></td>
                       <td style={S.tdSecondary}>{fmtNum(c.total_enrollees)}</td>
-                      <td style={{ ...S.td, color: T.cDeals }}>{fmtMoney(c.total_deals_amount)}</td>
+                      <td style={{ ...S.td, color: T.cDeals }}>{fmtMoney(c.total_after_discounts)}</td>
                       <td style={{ ...S.td, color: T.cCollected }}>{fmtMoney(c.total_collected)}</td>
                       <td style={S.tdSecondary}>{c.branch || "—"}</td>
                       <td style={S.td}>
@@ -847,10 +847,10 @@ export default function CoursesCyclesPanel() {
               {/* ── Total row ── */}
               {filteredCycles.length > 0 && (() => {
                 const sum = filteredCycles.reduce((s, c) => ({
-                  total_enrollees:    s.total_enrollees    + Number(c.total_enrollees    || 0),
-                  total_deals_amount: s.total_deals_amount + Number(c.total_deals_amount || 0),
-                  total_collected:    s.total_collected    + Number(c.total_collected    || 0),
-                }), { total_enrollees: 0, total_deals_amount: 0, total_collected: 0 });
+                  total_enrollees:       s.total_enrollees       + Number(c.total_enrollees       || 0),
+                  total_after_discounts: s.total_after_discounts + Number(c.total_after_discounts || 0),
+                  total_collected:       s.total_collected       + Number(c.total_collected       || 0),
+                }), { total_enrollees: 0, total_after_discounts: 0, total_collected: 0 });
                 const tdTotal = { ...S.td, fontWeight: 700, background: "#f1f5f9", borderTop: `2px solid ${T.navy}` };
                 return (
                   <tr>
@@ -859,7 +859,7 @@ export default function CoursesCyclesPanel() {
                     <td style={tdTotal}></td>
                     <td style={tdTotal}></td>
                     <td style={tdTotal}>{fmtNum(sum.total_enrollees)}</td>
-                    <td style={{ ...tdTotal, color: T.cDeals }}>{fmtMoney(sum.total_deals_amount)}</td>
+                    <td style={{ ...tdTotal, color: T.cDeals }}>{fmtMoney(sum.total_after_discounts)}</td>
                     <td style={{ ...tdTotal, color: T.cCollected }}>{fmtMoney(sum.total_collected)}</td>
                     <td style={tdTotal}></td>
                     <td style={tdTotal}></td>
