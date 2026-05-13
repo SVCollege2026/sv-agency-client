@@ -59,6 +59,21 @@ export const color = {
   accentVibrantBg:"#e0e7ff",
 };
 
+// ─── Monday-style status palette — single source of truth for board pills ───
+// Used by FolderBoard StatusDropdown, ApprovalDropdown, group strips,
+// RecommendationsBadge. Hex values match the manager's reference Monday board.
+export const monday = {
+  // Status tile colors — pills + group strips
+  orange:  "#fdab3d",    // working / pending
+  green:   "#00c875",    // done / approved / live
+  red:     "#df2f4a",    // stuck / rejected / closed
+  grey:    "#c4c4c4",    // not started / draft
+  purple:  "#a25ddc",    // notes / revision required
+  blue:    "#579bfc",    // planned / recommendations
+  white:   "#ffffff",
+  ink:     "#1e293b",    // dark text on light tiles
+};
+
 // ─── Spacing scale — strict 4pt grid ─────────────────────────────────────────
 const _spaceStep = 4;
 export const space = (n) => `${n * _spaceStep}px`;        // space(1) = 4px, space(4) = 16px

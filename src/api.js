@@ -801,6 +801,35 @@ export function artifactExcelUrl(artifactId) {
   return `${BASE}/api/artifacts/${artifactId}/export-excel`;
 }
 
+// ─── Campaign Management — Manager-initiated requests ───────────────────────
+
+/** Manager sends a change request mid-campaign (add video, reallocate budget, etc.)
+ *  intent is one of the action types from ActionMenu (B.1/B.2 in spec). */
+export async function submitChangeRequest(folderId, intent, action, payload = {}) {
+  return request("POST", "/api/workflow/requests", {
+    request_type: "change_request",
+    folder_id: folderId,
+    brief_payload: { intent: "change", action, ...payload },
+    requested_by: "marketing_manager",
+  });
+}
+
+/** Manager sends a question to the account manager agent (תקציבאית). */
+export async function submitManagerQuestion(message, folderId = null, mentions = []) {
+  return request("POST", "/api/workflow/requests", {
+    request_type: "manager_question",
+    folder_id: folderId,
+    brief_payload: { intent: "question", message, mentions },
+    requested_by: "marketing_manager",
+  });
+}
+
+/** List all workflow items for a specific folder (for ActivityIndicator). */
+export async function listWorkflowItemsByFolder(folderId, { limit = 50 } = {}) {
+  const p = new URLSearchParams({ folder_id: folderId, limit: String(limit) });
+  return request("GET", `/api/workflow/items?${p.toString()}`).catch(() => []);
+}
+
 // ─── Limann transition tracker ───────────────────────────────────────────
 // Audit + tracker for migrating make.com infrastructure away from the
 // previous agency (LIMANN / Ilya). See PR #45 for the auditor agent.
