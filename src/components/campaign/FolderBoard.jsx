@@ -126,6 +126,7 @@ function budgetForPlatform(artifacts, folderId, platform) {
   const plan = currentArtifactOfType(artifacts, folderId, "media_plan");
   const rec  = currentArtifactOfType(artifacts, folderId, "budget_recommendation");
   const breakdown1 = ((plan?.payload || {}).platform_breakdown) || {};
+  if (breakdown1[platform]?.budget_ils) return Number(breakdown1[platform].budget_ils);
   if (breakdown1[platform]?.budget) return Number(breakdown1[platform].budget);
   const budgets = ((plan?.payload || {}).budgets) || {};
   if (budgets[platform]) return Number(budgets[platform]);
