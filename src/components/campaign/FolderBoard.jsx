@@ -230,13 +230,19 @@ export default function FolderBoard({ refreshKey = 0 }) {
         listRecommendations({ limit: 300 }).catch(() => []),
         listWorkflowBlockers({ onlyOpen: true }).catch(() => []),
       ]);
-      setFolders(Array.isArray(f) ? f : []);
+      const folders = Array.isArray(f) ? f : [];
+      setFolders(folders);
       setArtifacts(Array.isArray(a) ? a : []);
       setAllocations(Array.isArray(b) ? b : []);
       setRecs(Array.isArray(r) ? r : []);
       setBlockers(Array.isArray(bl) ? bl : []);
-      // workflow items — not critical, degrade gracefully on error
       listWorkflowItems({ limit: 300 }).then(wf => setWorkflowItems(Array.isArray(wf) ? wf : [])).catch(() => {});
+      // Pre-fetch briefs for all folders so brief-derived columns populate immediately
+      folders.forEach(folder => {
+        listFolderBriefs(folder.id)
+          .then(list => setBriefsByFolder(prev => ({ ...prev, [folder.id]: Array.isArray(list) ? list : [] })))
+          .catch(() => {});
+      });
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -305,11 +311,6 @@ export default function FolderBoard({ refreshKey = 0 }) {
   return (
     <div style={{ direction: "rtl", fontFamily, width: "100%" }}>
 
-      {/* Morning brief — auto-shown, no click required */}
-      {dailyBrief && (
-        <DailyBriefBanner brief={dailyBrief} open={briefOpen} onToggle={() => setBriefOpen(o => !o)} />
-      )}
-
       {/* Toolbar */}
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -372,6 +373,11 @@ export default function FolderBoard({ refreshKey = 0 }) {
           border: `1px solid ${color.borderDefault}`, boxShadow: shadow.sm,
           width: "100%",
         }}>
+          {/* School-wide daily brief — inside the board, above groups */}
+          {dailyBrief && (
+            <BoardBriefRow brief={dailyBrief} open={briefOpen} onToggle={() => setBriefOpen(o => !o)} />
+          )}
+
           {groupedFolders.map(group => (
             <Group key={group.id}
                    group={group}
@@ -1160,100 +1166,95 @@ function StatusPicker({ value, onChange }) {
   );
 }
 
-// ─── Daily brief banner ───────────────────────────────────────────────────────
-const STATUS_BRIEF = {
-  green:           { bg: "#f0fdf4", border: "#86efac", dot: "#16a34a", label: "ביצועים תקינים" },
-  yellow:          { bg: "#fefce8", border: "#fde047", dot: "#ca8a04", label: "דורש תשומת לב" },
-  red:             { bg: "#fff1f2", border: "#fda4af", dot: "#dc2626", label: "דורש טיפול דחוף" },
-  unknown:         { bg: "#f8fafc", border: "#e2e8f0", dot: "#94a3b8", label: "אין נתונים" },
-  no_data:         { bg: "#f8fafc", border: "#e2e8f0", dot: "#94a3b8", label: "אין נתונים" },
+// ─── Board brief row — inside the board card, above groups ───────────────────
+const BRIEF_STATUS_COLOR = {
+  green:   { dot: monday.green,  text: "ביצועים תקינים",  bg: "#f6fef9" },
+  yellow:  { dot: monday.orange, text: "דורש תשומת לב",   bg: "#fffbf0" },
+  red:     { dot: monday.red,    text: "דורש טיפול דחוף", bg: "#fff5f5" },
+  unknown: { dot: monday.grey,   text: "אין נתונים",       bg: color.surfaceMuted },
+  no_data: { dot: monday.grey,   text: "אין נתונים",       bg: color.surfaceMuted },
 };
 
-function DailyBriefBanner({ brief, open, onToggle }) {
-  const s = STATUS_BRIEF[brief.overall_status] || STATUS_BRIEF.unknown;
+function BoardBriefRow({ brief, open, onToggle }) {
+  const s = BRIEF_STATUS_COLOR[brief.overall_status] || BRIEF_STATUS_COLOR.unknown;
   const runDate = brief.run_date
-    ? new Date(brief.run_date).toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" })
+    ? new Date(brief.run_date).toLocaleDateString("he-IL", { day: "numeric", month: "short" })
     : "";
 
   return (
-    <div style={{
-      background: s.bg, border: `1px solid ${s.border}`,
-      borderRadius: radius.md, marginBottom: space(3),
-      overflow: "hidden",
-    }}>
-      {/* Header row — always visible */}
+    <div style={{ borderBottom: `1px solid ${color.borderDefault}` }}>
+      {/* Summary strip — same height/padding as group headers */}
       <div
         onClick={onToggle}
         style={{
           display: "flex", alignItems: "center", gap: space(2),
-          padding: `${space(2.5)} ${space(4)}`, cursor: "pointer",
-          userSelect: "none",
+          padding: `${space(2)} ${space(3)}`,
+          background: s.bg, cursor: "pointer", userSelect: "none",
+          borderInlineStart: `4px solid ${s.dot}`,
         }}
+        onMouseEnter={e => e.currentTarget.style.filter = "brightness(0.97)"}
+        onMouseLeave={e => e.currentTarget.style.filter = ""}
       >
         <span style={{
-          width: 10, height: 10, borderRadius: "50%",
+          width: 8, height: 8, borderRadius: "50%",
           background: s.dot, flexShrink: 0, display: "inline-block",
         }} />
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", fontFamily }}>
-          🌅 תדריך בוקר — {runDate}
+        <span style={{ fontSize: 13, fontWeight: 700, color: color.fgDefault, fontFamily }}>
+          תדריך בוקר {runDate}
         </span>
         <span style={{
-          fontSize: 12, background: s.border, color: "#1e293b",
-          borderRadius: 99, padding: "2px 10px", fontFamily, fontWeight: 600,
-        }}>{s.label}</span>
+          fontSize: 12, color: color.fgMuted, fontFamily, fontWeight: 500,
+        }}>{s.text}</span>
+
+        {/* Metric pills — always visible at a glance */}
+        {(brief.assessments || []).slice(0, 4).map((a, i) => {
+          const c = { beating: monday.green, on_target: "#579bfc", underperforming: monday.orange, critical: monday.red }[a.status] || monday.grey;
+          return (
+            <span key={i} style={{
+              fontSize: 11, fontWeight: 700, fontFamily,
+              background: "#fff", border: `1px solid ${color.borderDefault}`,
+              borderRadius: radius.pill, padding: "2px 8px",
+              color: c,
+            }}>
+              {a.platform} {a.metric.replace("_ils","").replace("_pct","")} {a.actual != null ? (Number(a.actual).toFixed(0)) : "—"}
+            </span>
+          );
+        })}
+
         {brief.pending_recs_count > 0 && (
           <span style={{
-            fontSize: 12, background: "#dbeafe", color: "#1d4ed8",
-            borderRadius: 99, padding: "2px 10px", fontFamily, fontWeight: 600,
-          }}>💡 {brief.pending_recs_count} המלצות פתוחות</span>
+            fontSize: 11, fontWeight: 700, fontFamily,
+            background: "#dbeafe", color: "#1d4ed8",
+            borderRadius: radius.pill, padding: "2px 8px",
+          }}>💡 {brief.pending_recs_count}</span>
         )}
-        <span style={{ marginInlineStart: "auto", fontSize: 13, color: "#64748b", transition: "transform 120ms", display: "inline-block", transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}>▾</span>
+
+        <span style={{
+          marginInlineStart: "auto", fontSize: 12, color: color.fgSubtle,
+          transform: open ? "rotate(0deg)" : "rotate(-90deg)",
+          transition: "transform 120ms", display: "inline-block",
+        }}>▾</span>
       </div>
 
-      {/* Expanded content */}
-      {open && (
-        <div style={{ borderTop: `1px solid ${s.border}`, padding: `${space(3)} ${space(4)}` }}>
-          {/* Priority actions */}
+      {/* Expanded: priority actions + full brief text */}
+      {open && brief.brief_he && (
+        <div style={{
+          padding: `${space(3)} ${space(4)}`,
+          background: s.bg, borderTop: `1px solid ${color.borderSubtle}`,
+        }}>
           {brief.priority_actions?.length > 0 && (
-            <div style={{ marginBottom: space(3) }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: space(1.5), fontFamily, textTransform: "uppercase", letterSpacing: 0.5 }}>פעולות עדיפות</div>
-              <ul style={{ margin: 0, paddingInlineStart: 20 }}>
-                {brief.priority_actions.map((a, i) => (
-                  <li key={i} style={{ fontSize: 13, color: "#1e293b", fontFamily, marginBottom: 4 }}>{a}</li>
-                ))}
-              </ul>
-            </div>
+            <ul style={{ margin: `0 0 ${space(2)}`, paddingInlineStart: 18 }}>
+              {brief.priority_actions.map((a, i) => (
+                <li key={i} style={{ fontSize: 13, color: color.fgDefault, fontFamily, marginBottom: 3 }}>{a}</li>
+              ))}
+            </ul>
           )}
-          {/* Metric assessments */}
-          {brief.assessments?.length > 0 && (
-            <div style={{ marginBottom: space(3) }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: space(1.5), fontFamily, textTransform: "uppercase", letterSpacing: 0.5 }}>ביצועי פלטפורמות</div>
-              <div style={{ display: "flex", gap: space(2), flexWrap: "wrap" }}>
-                {brief.assessments.map((a, i) => {
-                  const statusColor = { beating: "#15803d", on_target: "#1d4ed8", underperforming: "#d97706", critical: "#dc2626" }[a.status] || "#64748b";
-                  return (
-                    <div key={i} style={{
-                      background: "#fff", border: "1px solid #e2e8f0", borderRadius: radius.sm,
-                      padding: `${space(1.5)} ${space(2.5)}`, fontSize: 12, fontFamily,
-                    }}>
-                      <span style={{ fontWeight: 700, color: "#1e293b" }}>{a.platform} · {a.metric}</span>
-                      <span style={{ color: statusColor, fontWeight: 700, marginInlineStart: 8 }}>{a.actual?.toFixed ? a.actual.toFixed(1) : a.actual}</span>
-                      <span style={{ color: "#94a3b8", marginInlineStart: 6 }}>/ יעד {a.sv_avg?.toFixed ? a.sv_avg.toFixed(1) : a.sv_avg}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {/* Full brief text */}
-          {brief.brief_he && (
-            <div style={{
-              background: "#fff", border: "1px solid #e2e8f0", borderRadius: radius.sm,
-              padding: space(3), fontSize: 13, lineHeight: 1.7, color: "#1e293b",
-              fontFamily, whiteSpace: "pre-wrap",
-              maxHeight: 280, overflowY: "auto",
-            }}>{brief.brief_he}</div>
-          )}
+          <div style={{
+            fontSize: 13, lineHeight: 1.7, color: color.fgDefault, fontFamily,
+            whiteSpace: "pre-wrap", maxHeight: 240, overflowY: "auto",
+            background: color.surface, borderRadius: radius.sm,
+            padding: space(3), border: `1px solid ${color.borderSubtle}`,
+          }}>{brief.brief_he}</div>
         </div>
       )}
     </div>

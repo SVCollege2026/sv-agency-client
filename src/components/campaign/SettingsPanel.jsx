@@ -55,12 +55,12 @@ function SettingRow({ label, value, hint, format = fmtNum, type = "text", onSave
     <div style={{
       display: "grid", gridTemplateColumns: "1fr auto auto",
       alignItems: "center", gap: space(3),
-      padding: `${space(2.5)} ${space(4)}`,
+      padding: `${space(2)} ${space(4)}`,
       borderBottom: `1px solid ${color.borderSubtle}`,
     }}>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: color.fgDefault, fontFamily }}>{label}</div>
-        {hint && <div style={{ fontSize: 12, color: color.fgSubtle, marginTop: 2, fontFamily }}>{hint}</div>}
+        <div style={{ fontSize: 13, fontWeight: 500, color: color.fgDefault, fontFamily }}>{label}</div>
+        {hint && <div style={{ fontSize: 11, color: color.fgSubtle, marginTop: 1, fontFamily }}>{hint}</div>}
       </div>
 
       {editing ? (
@@ -81,7 +81,7 @@ function SettingRow({ label, value, hint, format = fmtNum, type = "text", onSave
           }}
         />
       ) : (
-        <span style={{ fontSize: 14, fontWeight: 700, color: value != null && value !== "" ? color.fgDefault : color.fgSubtle, fontFamily }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: value != null && value !== "" ? color.fgDefault : color.fgSubtle, fontFamily }}>
           {displayed}
         </span>
       )}
@@ -89,16 +89,16 @@ function SettingRow({ label, value, hint, format = fmtNum, type = "text", onSave
       <button
         onClick={editing ? commit : startEdit}
         style={{
-          background: editing ? color.primary : color.surfaceMuted,
-          border: `1px solid ${editing ? color.primary : color.borderDefault}`,
+          background: "transparent",
+          border: `1px solid ${editing ? color.primary : "transparent"}`,
           borderRadius: radius.sm, padding: `${space(1)} ${space(2)}`,
-          fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily,
-          color: editing ? "#fff" : color.fgMuted,
+          fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily,
+          color: editing ? color.primary : color.fgSubtle,
           transition: transition.fast,
           whiteSpace: "nowrap",
         }}
-        onMouseEnter={e => { if (!editing) e.currentTarget.style.background = "#e5e7eb"; }}
-        onMouseLeave={e => { if (!editing) e.currentTarget.style.background = color.surfaceMuted; }}
+        onMouseEnter={e => { if (!editing) e.currentTarget.style.color = color.fgDefault; }}
+        onMouseLeave={e => { if (!editing) e.currentTarget.style.color = color.fgSubtle; }}
       >
         {editing ? "שמירה" : "✎ עריכה"}
       </button>
@@ -109,11 +109,9 @@ function SettingRow({ label, value, hint, format = fmtNum, type = "text", onSave
 function SectionHeader({ title }) {
   return (
     <div style={{
-      padding: `${space(3)} ${space(4)} ${space(1.5)}`,
-      fontSize: 11, fontWeight: 700, color: color.fgSubtle,
-      textTransform: "uppercase", letterSpacing: 0.7, fontFamily,
-      borderBottom: `2px solid ${color.primary}`,
-      marginBottom: 0,
+      padding: `${space(4)} ${space(4)} ${space(1)}`,
+      fontSize: 11, fontWeight: 600, color: color.fgSubtle,
+      textTransform: "uppercase", letterSpacing: 0.5, fontFamily,
     }}>{title}</div>
   );
 }
