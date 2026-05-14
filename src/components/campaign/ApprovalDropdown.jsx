@@ -24,10 +24,10 @@ const FOLLOWUP_ACTIONS = [
 
 const PILL_STATES = {
   missing:     { bg: "transparent", fg: "#9ca3af", text: "—" },
-  pending:     { bg: "#fdab3d", fg: "#fff",        text: "⏳ ממתין" },
-  approved:    { bg: "#00c875", fg: "#fff",        text: "✓ אושר" },
-  has_notes:   { bg: "#a25ddc", fg: "#fff",        text: "💬 הערות" },
-  rejected:    { bg: "#df2f4a", fg: "#fff",        text: "✗ נדחה" },
+  pending:     { bg: "#fdab3d", fg: "#fff",        text: "לאישורך" },
+  approved:    { bg: "#00c875", fg: "#fff",        text: "אושר" },
+  has_notes:   { bg: "#a25ddc", fg: "#fff",        text: "דורש תיקון" },
+  rejected:    { bg: "#df2f4a", fg: "#fff",        text: "נדחה" },
   new_version: { bg: "#fdab3d", fg: "#fff",        text: null },
 };
 

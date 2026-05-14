@@ -8,7 +8,7 @@ import { uploadCampaignFile, fileAccessUrl } from "../../api.js";
 export default function FileUpload({
   folderId = null,
   purpose = "brief",
-  accept = ".pdf,.docx,.doc,.png,.jpg,.jpeg,.webp,.txt,.md",
+  accept = ".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.csv,.png,.jpg,.jpeg,.webp,.txt,.md",
   value = null,         // { path, name, mime, size, access_url }
   onUploaded = () => {},
   label = "העלאת קובץ",

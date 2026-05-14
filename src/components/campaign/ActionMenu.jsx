@@ -254,6 +254,7 @@ export default function ActionMenu({ folder, prefilledChannel, onRefresh }) {
           background: color.surface, border: `1px solid ${color.borderDefault}`,
           borderRadius: radius.md, boxShadow: shadow.xl,
           zIndex: 9999, width: 280, padding: space(2),
+          maxHeight: "80vh", overflowY: "auto",
         }} onClick={e => e.stopPropagation()}>
           {groups.map(g => (
             <React.Fragment key={g}>

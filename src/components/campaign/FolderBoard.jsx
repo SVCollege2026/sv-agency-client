@@ -51,7 +51,6 @@ const STATUS_DEFS = {
   in_progress:     { label: "בעבודה",      bg: monday.orange, fg: monday.white },
   ready_to_launch: { label: "מוכן לעלייה", bg: monday.purple, fg: monday.white },
   live:            { label: "באוויר",      bg: monday.green,  fg: monday.white },
-  closing:         { label: "בסגירה",      bg: monday.orange, fg: monday.white },
   closed:          { label: "סגור",        bg: monday.red,    fg: monday.white },
 };
 const ALL_STATUSES = Object.keys(STATUS_DEFS);
@@ -60,7 +59,7 @@ const ALL_STATUSES = Object.keys(STATUS_DEFS);
 const GROUPS = [
   { id: "planned",   label: "קמפיינים מתוכננים לעלייה", statuses: ["draft", "in_progress", "ready_to_launch"], strip: monday.blue },
   { id: "live",      label: "קמפיינים באוויר",          statuses: ["live"],                                    strip: monday.green },
-  { id: "completed", label: "קמפיינים שהסתיימו",        statuses: ["closing", "closed"],                       strip: monday.red },
+  { id: "completed", label: "קמפיינים שהסתיימו",        statuses: ["closed"],                                  strip: monday.red },
 ];
 
 // ─── Platform display map ────────────────────────────────────────────────────
@@ -162,32 +161,37 @@ function briefField(briefs, key) {
 
 // ─── Column defaults ──────────────────────────────────────────────────────────
 const TOP_COL_DEFS = [
-  { id: "chev",        label: "",              defaultW: 32 },
-  { id: "name",        label: "שם הקמפיין",    defaultW: 220 },
-  { id: "status",      label: "סטטוס",         defaultW: 140 },
-  { id: "due",         label: "תאריך עלייה",   defaultW: 120 },
-  { id: "budget",      label: "תקציב כולל",    defaultW: 110 },
-  { id: "audience",    label: "קהל יעד",        defaultW: 160 },
-  { id: "media",       label: "מדיות חשובות",  defaultW: 150 },
-  { id: "field_notes", label: "מה לספר",        defaultW: 170 },
-  { id: "what_works",  label: "מה עובד/לא",    defaultW: 150 },
-  { id: "media_plan",        label: "פריסת מדיה",    defaultW: 130 },
-  { id: "media_plan_status", label: "אישור פריסה",  defaultW: 130 },
-  { id: "recs",        label: "💡 המלצות",      defaultW: 120 },
-  { id: "activity",    label: "מה קורה עכשיו", defaultW: 150 },
-  { id: "action",      label: "",              defaultW: 80 },
+  { id: "chev",              label: "",               defaultW: 32 },
+  { id: "name",              label: "שם הקמפיין",     defaultW: 220 },
+  { id: "status",            label: "סטטוס",          defaultW: 140 },
+  { id: "due",               label: "תאריך עלייה",    defaultW: 120 },
+  { id: "budget",            label: "תקציב",          defaultW: 110 },
+  { id: "media_plan",        label: "פריסת מדיה",     defaultW: 120 },
+  { id: "media_plan_status", label: "אישור פריסה",    defaultW: 130 },
+  { id: "audience",          label: "קהל יעד",         defaultW: 160 },
+  { id: "media",             label: "ערוצי מדיה",     defaultW: 140 },
+  { id: "field_notes",       label: "מה הערך ללומד",  defaultW: 180 },
+  { id: "what_works",        label: "השראה ודוגמאות", defaultW: 160 },
+  { id: "competitors",       label: "מתחרים",          defaultW: 140 },
+  { id: "landing_url",       label: "דף נחיתה",        defaultW: 140 },
+  { id: "recs",              label: "המלצות",          defaultW: 110 },
+  { id: "activity",          label: "מה קורה עכשיו",  defaultW: 150 },
+  { id: "action",            label: "",               defaultW: 80 },
 ];
 
 const SUB_COL_DEFS = [
-  { id: "spc",      label: "",              defaultW: 32 },
-  { id: "channel",  label: "ערוץ",          defaultW: 160 },
-  { id: "budget",   label: "תקציב מוקצה",  defaultW: 120 },
-  { id: "kw",       label: "מחקר ביטויי",  defaultW: 140 },
-  { id: "copy",     label: "קופי",          defaultW: 140 },
-  { id: "creative", label: "קריאייטיב",    defaultW: 140 },
-  { id: "ads",      label: "מודעות",        defaultW: 90 },
-  { id: "recs",     label: "💡",            defaultW: 90 },
-  { id: "action",   label: "",              defaultW: 80 },
+  { id: "spc",           label: "",               defaultW: 32 },
+  { id: "channel",       label: "ערוץ",           defaultW: 150 },
+  { id: "budget",        label: "תקציב",          defaultW: 110 },
+  { id: "kw",            label: "מחקר ביטויי",   defaultW: 130 },
+  { id: "kw_status",     label: "סטטוס מחקר",    defaultW: 120 },
+  { id: "copy",          label: "קופי",           defaultW: 110 },
+  { id: "copy_status",   label: "סטטוס קופי",    defaultW: 120 },
+  { id: "creative",      label: "קריאייטיב",     defaultW: 110 },
+  { id: "cre_status",    label: "סטטוס קריאייטיב", defaultW: 130 },
+  { id: "ads",           label: "מודעות",         defaultW: 80 },
+  { id: "recs",          label: "המלצות",         defaultW: 90 },
+  { id: "action",        label: "",               defaultW: 80 },
 ];
 
 const DEFAULT_TOP_WIDTHS = Object.fromEntries(TOP_COL_DEFS.map(c => [c.id, c.defaultW]));
@@ -317,7 +321,7 @@ export default function FolderBoard({ refreshKey = 0 }) {
         marginBottom: space(3), flexWrap: "wrap", gap: space(2),
       }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: space(3) }}>
-          <h3 style={{ ...type.h2, margin: 0, fontSize: 20 }}>📋 לוח קמפיינים</h3>
+          <h3 style={{ ...type.h2, margin: 0, fontSize: 20 }}>לוח קמפיינים</h3>
           <span style={{ ...type.bodySmall, color: color.fgSubtle }}>
             {q ? `${filtered.length} / ${folders.length}` : `${folders.length} קמפיינים`}
           </span>
@@ -496,7 +500,7 @@ function Group({
       {!collapsed && (
         <div style={{ overflowX: "auto" }}>
           {/* Column headers with drag-resize */}
-          <div style={{ display: "grid", gridTemplateColumns: templateCols, background: "#f8fafc", borderBottom: `1px solid ${color.borderSubtle}`, minWidth: "max-content" }}>
+          <div style={{ display: "grid", gridTemplateColumns: templateCols, background: "#f8fafc", borderBottom: `1px solid ${color.borderSubtle}`, minWidth: "max-content", position: "sticky", top: 0, zIndex: 2 }}>
             {visibleCols.map(col => (
               <ColHeader key={col.id} col={col} width={colWidths[col.id] || col.defaultW} onResize={onResizeCol} />
             ))}
@@ -633,10 +637,12 @@ function Row({
 
   // Metadata fields with brief fallback
   const meta = folder.metadata || {};
-  const audience    = meta.audience    ?? briefField(briefs, "audience");
+  const audience    = meta.audience      ?? briefField(briefs, "audience");
   const impMedia    = meta.important_media ?? briefField(briefs, "important_media");
-  const fieldNotes  = meta.field_notes  ?? briefField(briefs, "message") ?? briefField(briefs, "syllabi_text");
-  const whatWorks   = meta.what_works   ?? briefField(briefs, "notes");
+  const fieldNotes  = meta.field_notes   ?? briefField(briefs, "message") ?? briefField(briefs, "syllabi_text");
+  const whatWorks   = meta.what_works    ?? briefField(briefs, "ad_examples_text");
+  const competitors = meta.competitors   ?? briefField(briefs, "competitors");
+  const landingUrl  = meta.landing_url   ?? briefField(briefs, "landing_url");
 
   // Artifacts
   const mediaPlanArtifact = currentArtifactOfType(artifacts, folder.id, "media_plan");
@@ -685,23 +691,42 @@ function Row({
         return <LongTextCell value={audience} placeholder="—" fieldLabel="קהל יעד"
                              onSave={v => onPatch({ metadata: { audience: v } })} />;
       case "media":
-        return <LongTextCell value={impMedia} placeholder="—" fieldLabel="מדיות חשובות"
+        return <LongTextCell value={impMedia} placeholder="—" fieldLabel="ערוצי מדיה"
                              onSave={v => onPatch({ metadata: { important_media: v } })} />;
       case "field_notes":
-        return <LongTextCell value={fieldNotes} placeholder="—" fieldLabel="מה לספר על התחום"
+        return <LongTextCell value={fieldNotes} placeholder="—" fieldLabel="מה הערך ללומד"
                              onSave={v => onPatch({ metadata: { field_notes: v } })} />;
       case "what_works":
-        return <LongTextCell value={whatWorks} placeholder="—" fieldLabel="מה עובד / לא עובד"
+        return <LongTextCell value={whatWorks} placeholder="—" fieldLabel="השראה ודוגמאות"
                              onSave={v => onPatch({ metadata: { what_works: v } })} />;
+      case "competitors":
+        return <LongTextCell value={competitors} placeholder="—" fieldLabel="מתחרים"
+                             onSave={v => onPatch({ metadata: { competitors: v } })} />;
+      case "landing_url":
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 4, width: "100%" }}>
+            <InlineText
+              value={landingUrl} placeholder="—"
+              fontSize={12} fontWeight={400}
+              onSave={v => onPatch({ metadata: { landing_url: v } })}
+            />
+            {landingUrl && (
+              <a href={landingUrl} target="_blank" rel="noreferrer"
+                 style={{ fontSize: 11, color: "#0969da", whiteSpace: "nowrap", fontFamily }}
+                 onClick={e => e.stopPropagation()}>פתח</a>
+            )}
+          </div>
+        );
       case "media_plan":
         if (!mediaPlanArtifact) return <Dash />;
         return (
           <button
             onClick={() => onOpenPayload(mediaPlanArtifact)}
-            style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 6px",
+            style={{ background: "none", border: `1px solid #0969da`, borderRadius: 4,
+                     cursor: "pointer", padding: "3px 8px",
                      fontSize: 12, color: "#0969da", fontFamily, display: "flex", alignItems: "center", gap: 4 }}>
-            <span>📊</span>
-            <span>v{mediaPlanArtifact.version_number || 1}</span>
+            <span>פריסה</span>
+            <span style={{ fontWeight: 700 }}>v{mediaPlanArtifact.version_number || 1}</span>
           </button>
         );
       case "media_plan_status":
@@ -754,6 +779,7 @@ function Row({
       borderInlineStart: `4px solid ${group.strip}`,
       transition: transition.fast,
       minHeight: 56,
+      minWidth: "max-content",
     }}
     onMouseEnter={e => e.currentTarget.style.background = "#fafbfc"}
     onMouseLeave={e => e.currentTarget.style.background = color.surface}>
@@ -780,7 +806,7 @@ function SubitemsBlock({ folder, artifacts, allocations, recommendations, group,
   const allocChannels = [...new Set(folderAllocs.map(a => (a.platform || "").toLowerCase()).filter(Boolean))];
 
   const SubHeaders = () => (
-    <div style={{ display: "grid", gridTemplateColumns: SUB_TEMPLATE, background: "#eef2f7", borderBottom: `1px solid ${color.borderSubtle}` }}>
+    <div style={{ display: "grid", gridTemplateColumns: SUB_TEMPLATE, background: "#eef2f7", borderBottom: `1px solid ${color.borderSubtle}`, minWidth: "max-content" }}>
       {SUB_COL_DEFS.map(h => (
         <div key={h.id} style={{
           padding: `${space(1.5)} ${space(2.5)}`,
@@ -869,15 +895,27 @@ function SubitemsBlock({ folder, artifacts, allocations, recommendations, group,
   );
 }
 
+function ArtifactLink({ artifact, onOpenPayload }) {
+  if (!artifact) return <Dash />;
+  return (
+    <button onClick={() => onOpenPayload(artifact)}
+      style={{ background: "none", border: `1px solid #d1d5db`, borderRadius: 4,
+               cursor: "pointer", padding: "2px 7px",
+               fontSize: 11, color: "#374151", fontFamily, whiteSpace: "nowrap" }}>
+      v{artifact.version_number || 1}
+    </button>
+  );
+}
+
 function SubitemRow({ folder, channel, planArtifact, allocationBudget, artifacts, recommendations, onOpenPayload, onRefresh }) {
   const display = platformDisplayFor(channel);
   const kwArtifact  = platformUsesKeywords(channel)
     ? (currentArtifactOfType(artifacts, folder.id, "keyword_research", channel)
         || currentArtifactOfType(artifacts, folder.id, "keyword_research"))
     : null;
-  const copyArtifact     = currentArtifactOfType(artifacts, folder.id, `ad_copy_${channel}`);
+  const copyArtifact     = currentArtifactOfType(artifacts, folder.id, `ad_copy_${channel}`)
+                        || currentArtifactOfType(artifacts, folder.id, "ad_copy");
   const creativeArtifact = currentArtifactOfType(artifacts, folder.id, "creative_rendered", channel);
-  // Prefer budget from approved plan; fall back to allocation amount
   const budget = budgetForPlatform(artifacts, folder.id, channel) ?? allocationBudget;
   const adsCount = artifacts.filter(a =>
     a.folder_id === folder.id
@@ -887,44 +925,61 @@ function SubitemRow({ folder, channel, planArtifact, allocationBudget, artifacts
   ).length;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: SUB_TEMPLATE, background: color.surface, borderTop: `1px solid ${color.borderSubtle}`, minHeight: 44 }}>
+    <div style={{ display: "grid", gridTemplateColumns: SUB_TEMPLATE, background: color.surface, borderTop: `1px solid ${color.borderSubtle}`, minHeight: 44, minWidth: "max-content" }}>
       <Cell center compact />
+      {/* ערוץ */}
       <Cell compact>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: color.fgDefault, fontFamily }}>
-          <span style={{ fontSize: 16 }}>{display.icon}</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: color.fgDefault, fontFamily }}>
+          <span style={{ fontSize: 15 }}>{display.icon}</span>
           {display.label}
         </span>
       </Cell>
+      {/* תקציב */}
       <Cell center compact>
         <span style={{ fontSize: 13, fontWeight: 600, color: budget ? color.fgDefault : color.fgSubtle, fontFamily }}>
           {budget ? fmtMoney(budget) : "—"}
         </span>
       </Cell>
+      {/* מחקר ביטויי — תוכן */}
+      <Cell center compact>
+        {platformUsesKeywords(channel)
+          ? <ArtifactLink artifact={kwArtifact} onOpenPayload={onOpenPayload} />
+          : <Dash />}
+      </Cell>
+      {/* סטטוס מחקר */}
       <Cell center compact>
         {platformUsesKeywords(channel)
           ? <ApprovalDropdown artifact={kwArtifact} folder={folder} onApproved={onRefresh} onRevised={onRefresh}
                               onOpenPayload={() => kwArtifact && onOpenPayload(kwArtifact)} />
           : <Dash />}
       </Cell>
+      {/* קופי — תוכן */}
+      <Cell center compact>
+        <ArtifactLink artifact={copyArtifact} onOpenPayload={onOpenPayload} />
+      </Cell>
+      {/* סטטוס קופי */}
       <Cell center compact>
         <ApprovalDropdown artifact={copyArtifact} folder={folder} onApproved={onRefresh} onRevised={onRefresh}
                           onOpenPayload={() => copyArtifact && onOpenPayload(copyArtifact)} />
       </Cell>
+      {/* קריאייטיב — תוכן */}
+      <Cell center compact>
+        <ArtifactLink artifact={creativeArtifact} onOpenPayload={onOpenPayload} />
+      </Cell>
+      {/* סטטוס קריאייטיב */}
       <Cell center compact>
         <ApprovalDropdown artifact={creativeArtifact} folder={folder} onApproved={onRefresh} onRevised={onRefresh}
                           onOpenPayload={() => creativeArtifact && onOpenPayload(creativeArtifact)} />
       </Cell>
+      {/* מודעות */}
       <Cell center compact>
         {adsCount > 0 ? <span style={{ fontSize: 13, fontWeight: 700, color: color.fgDefault, fontFamily }}>{adsCount}</span> : <Dash />}
       </Cell>
+      {/* המלצות */}
       <Cell center compact>
-        <RecommendationsBadge
-          recommendations={recommendations}
-          folder={folder}
-          platform={channel}
-          onRefresh={onRefresh}
-        />
+        <RecommendationsBadge recommendations={recommendations} folder={folder} platform={channel} onRefresh={onRefresh} />
       </Cell>
+      {/* + פעולה */}
       <Cell center compact>
         <ActionMenu folder={folder} prefilledChannel={channel} onRefresh={onRefresh} />
       </Cell>
