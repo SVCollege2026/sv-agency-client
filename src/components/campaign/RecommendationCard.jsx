@@ -29,7 +29,7 @@ function timeAgo(iso) {
   return "לפני מעט";
 }
 
-export default function RecommendationCard({ rec, onDecided }) {
+export default function RecommendationCard({ rec, folderName, onDecided }) {
   const toast = useToast();
   const [busy, setBusy]       = useState(false);
   const [showReject, setShowReject]   = useState(false);
@@ -77,6 +77,13 @@ export default function RecommendationCard({ rec, onDecided }) {
       }}>
         <span style={{ fontSize: 16 }}>{icon}</span>
         <span style={{ fontSize: 12, fontWeight: 700, color: color.fgMuted, fontFamily }}>{dept.replace(/_/g, " ")}</span>
+        {folderName && (
+          <span style={{
+            background: "#e0e7ff", color: "#3730a3",
+            borderRadius: 999, padding: "2px 8px",
+            fontSize: 11, fontWeight: 600, fontFamily,
+          }}>{folderName}</span>
+        )}
         {conf && <span style={{ fontSize: 11, color: color.fgSubtle, fontFamily, marginRight: "auto" }}>confidence: {conf}</span>}
         <span style={{ fontSize: 11, color: color.fgSubtle, fontFamily }}>{timeAgo(created)}</span>
       </div>

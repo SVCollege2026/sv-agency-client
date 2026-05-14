@@ -14,8 +14,11 @@ const TABS = [
   { id: "all",        label: "🕐 הסטוריה" },
 ];
 
-export default function RecommendationsDrawer({ recommendations, folder, platform, onClose, onRefresh }) {
+export default function RecommendationsDrawer({ recommendations, folders = [], folder, platform, onClose, onRefresh }) {
   const [tab, setTab] = useState("pending");
+
+  // Build folder lookup for global mode
+  const folderMap = Object.fromEntries((folders || []).map(f => [f.id, f.course_name || f.id]));
 
   const filtered = (() => {
     switch (tab) {
@@ -28,11 +31,12 @@ export default function RecommendationsDrawer({ recommendations, folder, platfor
     }
   })();
 
+  const isGlobal = !folder;
   const title = folder
     ? `המלצות — ${folder.course_name || folder.id}`
-    : "כל ההמלצות";
+    : "💡 כל ההמלצות";
 
-  const subtitle = platform ? `ערוץ: ${platform}` : null;
+  const subtitle = platform ? `ערוץ: ${platform}` : isGlobal ? `${filtered.length} ממתינות לאישורך` : null;
 
   return (
     <>
@@ -95,7 +99,12 @@ export default function RecommendationsDrawer({ recommendations, folder, platfor
             </div>
           ) : (
             filtered.map(rec => (
-              <RecommendationCard key={rec.id} rec={rec} onDecided={onRefresh} />
+              <RecommendationCard
+                key={rec.id}
+                rec={rec}
+                folderName={isGlobal ? (folderMap[rec.folder_id] || null) : null}
+                onDecided={onRefresh}
+              />
             ))
           )}
         </div>

@@ -23,7 +23,7 @@ import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from
 import {
   listCampaignFolders, createCampaignFolder, updateCampaignFolder,
   listArtifacts, listBudgetAllocations,
-  listRecommendations, listWorkflowBlockers,
+  listRecommendations, listWorkflowBlockers, listWorkflowItems,
   listFolderBriefs,
   approveArtifact, requestArtifactRevision,
   submitChangeRequest,
@@ -210,7 +210,8 @@ export default function FolderBoard({ refreshKey = 0 }) {
   const [expandedRows, setExpandedRows] = useState({});
   const [addingTo, setAddingTo]       = useState(null);
   const [addingName, setAddingName]   = useState("");
-  const [payloadModal, setPayloadModal] = useState(null); // artifact to show
+  const [payloadModal, setPayloadModal] = useState(null);
+  const [globalRecsOpen, setGlobalRecsOpen] = useState(false);
 
   const { prefs, setWidth, toggleHidden } = useColumnPrefs({ widths: DEFAULT_TOP_WIDTHS, hidden: DEFAULT_HIDDEN });
 
@@ -229,8 +230,8 @@ export default function FolderBoard({ refreshKey = 0 }) {
       setAllocations(Array.isArray(b) ? b : []);
       setRecs(Array.isArray(r) ? r : []);
       setBlockers(Array.isArray(bl) ? bl : []);
-      // workflow items — not critical, ignore errors
-      setWorkflowItems([]);
+      // workflow items — not critical, degrade gracefully on error
+      listWorkflowItems({ limit: 300 }).then(wf => setWorkflowItems(Array.isArray(wf) ? wf : [])).catch(() => {});
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -315,12 +316,17 @@ export default function FolderBoard({ refreshKey = 0 }) {
             onToggle={toggleHidden}
           />
           {totalPending > 0 && (
-            <span style={{
+            <button onClick={() => setGlobalRecsOpen(true)} style={{
               background: "#dbeafe", color: "#1d4ed8",
               borderRadius: 999, padding: "5px 14px",
               fontSize: 13, fontWeight: 700, fontFamily,
+              border: "none", cursor: "pointer",
               display: "inline-flex", alignItems: "center", gap: 4,
-            }}>💡 {totalPending} המלצות</span>
+              transition: transition.fast,
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "#bfdbfe"}
+            onMouseLeave={e => e.currentTarget.style.background = "#dbeafe"}
+            >💡 {totalPending} המלצות</button>
           )}
           <button onClick={() => { setAddingTo("planned"); setAddingName(""); }} style={{
             ...button.primary, fontSize: 13, padding: "8px 16px",
@@ -380,6 +386,16 @@ export default function FolderBoard({ refreshKey = 0 }) {
       {/* Artifact payload modal */}
       {payloadModal && (
         <ArtifactPayloadModal artifact={payloadModal} onClose={() => setPayloadModal(null)} />
+      )}
+
+      {/* Global recommendations drawer — all campaigns */}
+      {globalRecsOpen && (
+        <RecommendationsDrawer
+          recommendations={recommendations}
+          folders={folders}
+          onClose={() => setGlobalRecsOpen(false)}
+          onRefresh={refresh}
+        />
       )}
 
       {/* Floating account-manager chat */}
@@ -647,6 +663,7 @@ function Row({
         return (
           <ApprovalDropdown
             artifact={mediaPlanArtifact}
+            folder={folder}
             onApproved={onRefresh}
             onRevised={onRefresh}
             onOpenPayload={() => mediaPlanArtifact && onOpenPayload(mediaPlanArtifact)}
@@ -656,6 +673,7 @@ function Row({
         return (
           <ApprovalDropdown
             artifact={budgetRecArtifact}
+            folder={folder}
             onApproved={onRefresh}
             onRevised={onRefresh}
             onOpenPayload={() => budgetRecArtifact && onOpenPayload(budgetRecArtifact)}
@@ -725,6 +743,7 @@ function SubitemsBlock({ folder, artifacts, recommendations, group, onOpenPayloa
           {draftPlan && (
             <ApprovalDropdown
               artifact={draftPlan}
+              folder={folder}
               onApproved={onRefresh}
               onRevised={onRefresh}
               onOpenPayload={() => onOpenPayload(draftPlan)}
@@ -795,16 +814,16 @@ function SubitemRow({ folder, channel, planArtifact, artifacts, recommendations,
       </Cell>
       <Cell center compact>
         {platformUsesKeywords(channel)
-          ? <ApprovalDropdown artifact={kwArtifact} onApproved={onRefresh} onRevised={onRefresh}
+          ? <ApprovalDropdown artifact={kwArtifact} folder={folder} onApproved={onRefresh} onRevised={onRefresh}
                               onOpenPayload={() => kwArtifact && onOpenPayload(kwArtifact)} />
           : <Dash />}
       </Cell>
       <Cell center compact>
-        <ApprovalDropdown artifact={copyArtifact} onApproved={onRefresh} onRevised={onRefresh}
+        <ApprovalDropdown artifact={copyArtifact} folder={folder} onApproved={onRefresh} onRevised={onRefresh}
                           onOpenPayload={() => copyArtifact && onOpenPayload(copyArtifact)} />
       </Cell>
       <Cell center compact>
-        <ApprovalDropdown artifact={creativeArtifact} onApproved={onRefresh} onRevised={onRefresh}
+        <ApprovalDropdown artifact={creativeArtifact} folder={folder} onApproved={onRefresh} onRevised={onRefresh}
                           onOpenPayload={() => creativeArtifact && onOpenPayload(creativeArtifact)} />
       </Cell>
       <Cell center compact>

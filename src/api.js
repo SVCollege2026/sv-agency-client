@@ -830,6 +830,12 @@ export async function listWorkflowItemsByFolder(folderId, { limit = 50 } = {}) {
   return request("GET", `/api/workflow/items?${p.toString()}`).catch(() => []);
 }
 
+/** List all workflow items across all folders (for board-level activity display). */
+export async function listWorkflowItems({ limit = 300 } = {}) {
+  const p = new URLSearchParams({ limit: String(limit) });
+  return request("GET", `/api/workflow/items?${p.toString()}`).catch(() => []);
+}
+
 // ─── Limann transition tracker ───────────────────────────────────────────
 // Audit + tracker for migrating make.com infrastructure away from the
 // previous agency (LIMANN / Ilya). See PR #45 for the auditor agent.
