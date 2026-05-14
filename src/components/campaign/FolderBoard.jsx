@@ -170,8 +170,9 @@ const TOP_COL_DEFS = [
   { id: "media",       label: "מדיות חשובות",  defaultW: 150 },
   { id: "field_notes", label: "מה לספר",        defaultW: 170 },
   { id: "what_works",  label: "מה עובד/לא",    defaultW: 150 },
-  { id: "media_plan",  label: "פריסת מדיה",    defaultW: 130 },
-  { id: "budget_rec",  label: "תקציב מומלץ",   defaultW: 130 },
+  { id: "media_plan",        label: "פריסת מדיה",    defaultW: 130 },
+  { id: "media_plan_status", label: "אישור פריסה",  defaultW: 130 },
+  { id: "budget_rec",        label: "תקציב מומלץ",  defaultW: 130 },
   { id: "recs",        label: "💡 המלצות",      defaultW: 120 },
   { id: "activity",    label: "מה קורה עכשיו", defaultW: 150 },
   { id: "action",      label: "",              defaultW: 80 },
@@ -514,6 +515,7 @@ function Group({
                 <SubitemsBlock
                   folder={f}
                   artifacts={artifacts}
+                  allocations={allocations}
                   recommendations={recommendations}
                   group={group}
                   onOpenPayload={onOpenPayload}
@@ -674,6 +676,17 @@ function Row({
         return <LongTextCell value={whatWorks} placeholder="—" fieldLabel="מה עובד / לא עובד"
                              onSave={v => onPatch({ metadata: { what_works: v } })} />;
       case "media_plan":
+        if (!mediaPlanArtifact) return <Dash />;
+        return (
+          <button
+            onClick={() => onOpenPayload(mediaPlanArtifact)}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 6px",
+                     fontSize: 12, color: "#0969da", fontFamily, display: "flex", alignItems: "center", gap: 4 }}>
+            <span>📊</span>
+            <span>v{mediaPlanArtifact.version_number || 1}</span>
+          </button>
+        );
+      case "media_plan_status":
         return (
           <ApprovalDropdown
             artifact={mediaPlanArtifact}
@@ -740,11 +753,29 @@ function Row({
 // ═══════════════════════════════════════════════════════════════════════════
 const SUB_TEMPLATE = SUB_COL_DEFS.map(c => `${c.defaultW}px`).join(" ");
 
-function SubitemsBlock({ folder, artifacts, recommendations, group, onOpenPayload, onRefresh }) {
+function SubitemsBlock({ folder, artifacts, allocations, recommendations, group, onOpenPayload, onRefresh }) {
   const approvedPlan = approvedMediaPlanFor(artifacts, folder.id);
   const channels     = channelsFromApprovedPlan(approvedPlan);
 
-  if (!approvedPlan) {
+  // Channels from budget_allocations (used when no approved plan yet)
+  const folderAllocs = (allocations || []).filter(a => a.folder_id === folder.id && a.status === "active");
+  const allocChannels = [...new Set(folderAllocs.map(a => (a.platform || "").toLowerCase()).filter(Boolean))];
+
+  const SubHeaders = () => (
+    <div style={{ display: "grid", gridTemplateColumns: SUB_TEMPLATE, background: "#eef2f7", borderBottom: `1px solid ${color.borderSubtle}` }}>
+      {SUB_COL_DEFS.map(h => (
+        <div key={h.id} style={{
+          padding: `${space(1.5)} ${space(2.5)}`,
+          fontSize: 11, fontWeight: 700, color: color.fgMuted, letterSpacing: 0.3,
+          textAlign: h.id === "channel" ? "right" : "center",
+          borderInlineEnd: `1px solid ${color.borderSubtle}`, fontFamily,
+        }}>{h.label}</div>
+      ))}
+    </div>
+  );
+
+  // No plan and no allocations → block with message
+  if (!approvedPlan && allocChannels.length === 0) {
     const draftPlan = currentArtifactOfType(artifacts, folder.id, "media_plan");
     return (
       <div style={{ background: "#f8fafc", borderInlineStart: `4px solid ${group.strip}`, borderTop: `1px dashed ${color.borderSubtle}`, paddingInlineStart: 32 }}>
@@ -752,40 +783,64 @@ function SubitemsBlock({ folder, artifacts, recommendations, group, onOpenPayloa
           <span style={{ fontSize: 18 }}>📊</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, color: color.fgDefault, marginBottom: 2 }}>פריסת מדיה לא אושרה עדיין</div>
-            <div style={{ fontSize: 12, color: color.fgSubtle }}>ערוצי המדיה יקבעו לפי הפריסה שתאשרי. עד אז אין subitems.</div>
+            <div style={{ fontSize: 12, color: color.fgSubtle }}>ערוצי המדיה יקבעו לפי הפריסה שתאשרי.</div>
           </div>
           {draftPlan && (
-            <ApprovalDropdown
-              artifact={draftPlan}
-              folder={folder}
-              onApproved={onRefresh}
-              onRevised={onRefresh}
-              onOpenPayload={() => onOpenPayload(draftPlan)}
-            />
+            <ApprovalDropdown artifact={draftPlan} folder={folder}
+              onApproved={onRefresh} onRevised={onRefresh}
+              onOpenPayload={() => onOpenPayload(draftPlan)} />
           )}
         </div>
       </div>
     );
   }
 
+  // No approved plan but have allocations → show platform rows from allocations
+  if (!approvedPlan && allocChannels.length > 0) {
+    const draftPlan = currentArtifactOfType(artifacts, folder.id, "media_plan");
+    return (
+      <div style={{ background: "#f8fafc", borderInlineStart: `4px solid ${group.strip}`, borderTop: `1px dashed ${color.borderSubtle}`, paddingInlineStart: 32 }}>
+        <div style={{ padding: `${space(2)} ${space(4)}`, display: "flex", alignItems: "center", gap: space(3),
+                      fontSize: 12, color: "#856404", background: "#fff9e6",
+                      borderBottom: `1px solid #ffe082`, fontFamily }}>
+          <span>⚠️</span>
+          <span style={{ flex: 1 }}>פריסת מדיה טרם אושרה — מוצג תקציב מוערך מהייבוא</span>
+          {draftPlan && (
+            <ApprovalDropdown artifact={draftPlan} folder={folder}
+              onApproved={onRefresh} onRevised={onRefresh}
+              onOpenPayload={() => onOpenPayload(draftPlan)} />
+          )}
+        </div>
+        <SubHeaders />
+        {allocChannels.map(channel => {
+          const alloc = folderAllocs.find(a => (a.platform || "").toLowerCase() === channel);
+          return (
+            <SubitemRow key={channel}
+              folder={folder}
+              channel={channel}
+              planArtifact={null}
+              allocationBudget={alloc ? Number(alloc.amount_ils) : null}
+              artifacts={artifacts}
+              recommendations={recommendations}
+              onOpenPayload={onOpenPayload}
+              onRefresh={onRefresh}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Approved plan → full subitems
   return (
     <div style={{ background: "#f8fafc", borderInlineStart: `4px solid ${group.strip}`, borderTop: `1px dashed ${color.borderSubtle}`, paddingInlineStart: 32 }}>
-      {/* Sub-headers */}
-      <div style={{ display: "grid", gridTemplateColumns: SUB_TEMPLATE, background: "#eef2f7", borderBottom: `1px solid ${color.borderSubtle}` }}>
-        {SUB_COL_DEFS.map(h => (
-          <div key={h.id} style={{
-            padding: `${space(1.5)} ${space(2.5)}`,
-            fontSize: 11, fontWeight: 700, color: color.fgMuted, letterSpacing: 0.3,
-            textAlign: h.id === "channel" ? "right" : "center",
-            borderInlineEnd: `1px solid ${color.borderSubtle}`, fontFamily,
-          }}>{h.label}</div>
-        ))}
-      </div>
+      <SubHeaders />
       {channels.map(channel => (
         <SubitemRow key={channel}
           folder={folder}
           channel={channel}
           planArtifact={approvedPlan}
+          allocationBudget={null}
           artifacts={artifacts}
           recommendations={recommendations}
           onOpenPayload={onOpenPayload}
@@ -796,7 +851,7 @@ function SubitemsBlock({ folder, artifacts, recommendations, group, onOpenPayloa
   );
 }
 
-function SubitemRow({ folder, channel, planArtifact, artifacts, recommendations, onOpenPayload, onRefresh }) {
+function SubitemRow({ folder, channel, planArtifact, allocationBudget, artifacts, recommendations, onOpenPayload, onRefresh }) {
   const display = platformDisplayFor(channel);
   const kwArtifact  = platformUsesKeywords(channel)
     ? (currentArtifactOfType(artifacts, folder.id, "keyword_research", channel)
@@ -804,7 +859,8 @@ function SubitemRow({ folder, channel, planArtifact, artifacts, recommendations,
     : null;
   const copyArtifact     = currentArtifactOfType(artifacts, folder.id, `ad_copy_${channel}`);
   const creativeArtifact = currentArtifactOfType(artifacts, folder.id, "creative_rendered", channel);
-  const budget           = budgetForPlatform(artifacts, folder.id, channel);
+  // Prefer budget from approved plan; fall back to allocation amount
+  const budget = budgetForPlatform(artifacts, folder.id, channel) ?? allocationBudget;
   const adsCount = artifacts.filter(a =>
     a.folder_id === folder.id
     && a.artifact_type === "creative_rendered"
