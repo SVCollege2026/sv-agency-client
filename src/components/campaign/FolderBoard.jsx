@@ -27,6 +27,8 @@ import {
   listFolderBriefs, getMediaDailyBrief,
   approveArtifact, requestArtifactRevision,
   submitChangeRequest,
+  getSchoolActualSpend,
+  getFolderActualSpend,
 } from "../../api.js";
 import ImportLiveCampaignModal from "./ImportLiveCampaignModal.jsx";
 import {
@@ -182,7 +184,9 @@ const TOP_COL_DEFS = [
 const SUB_COL_DEFS = [
   { id: "spc",           label: "",               defaultW: 32 },
   { id: "channel",       label: "ערוץ",           defaultW: 150 },
-  { id: "budget",        label: "תקציב",          defaultW: 110 },
+  { id: "budget",        label: "מתוכנן",         defaultW: 110 },
+  { id: "spent",         label: "מנוצל",          defaultW: 110 },
+  { id: "util_pct",      label: "% ניצול",        defaultW: 80 },
   { id: "kw",            label: "מחקר ביטויי",   defaultW: 130 },
   { id: "kw_status",     label: "סטטוס מחקר",    defaultW: 120 },
   { id: "copy",          label: "קופי",           defaultW: 110 },
@@ -798,6 +802,13 @@ function Row({
 const SUB_TEMPLATE = SUB_COL_DEFS.map(c => `${c.defaultW}px`).join(" ");
 
 function SubitemsBlock({ folder, artifacts, allocations, recommendations, group, onOpenPayload, onRefresh }) {
+  const [spendByPlatform, setSpendByPlatform] = useState(null);
+  useEffect(() => {
+    getFolderActualSpend(folder.id)
+      .then(s => setSpendByPlatform((s?.by_platform) || {}))
+      .catch(() => {});
+  }, [folder.id]);
+
   const approvedPlan = approvedMediaPlanFor(artifacts, folder.id);
   const channels     = channelsFromApprovedPlan(approvedPlan);
 
@@ -866,6 +877,7 @@ function SubitemsBlock({ folder, artifacts, allocations, recommendations, group,
               allocationBudget={alloc ? Number(alloc.amount_ils) : null}
               artifacts={artifacts}
               recommendations={recommendations}
+              spendByPlatform={spendByPlatform}
               onOpenPayload={onOpenPayload}
               onRefresh={onRefresh}
             />
@@ -887,6 +899,7 @@ function SubitemsBlock({ folder, artifacts, allocations, recommendations, group,
           allocationBudget={null}
           artifacts={artifacts}
           recommendations={recommendations}
+          spendByPlatform={spendByPlatform}
           onOpenPayload={onOpenPayload}
           onRefresh={onRefresh}
         />
@@ -907,7 +920,7 @@ function ArtifactLink({ artifact, onOpenPayload }) {
   );
 }
 
-function SubitemRow({ folder, channel, planArtifact, allocationBudget, artifacts, recommendations, onOpenPayload, onRefresh }) {
+function SubitemRow({ folder, channel, planArtifact, allocationBudget, artifacts, recommendations, spendByPlatform, onOpenPayload, onRefresh }) {
   const display = platformDisplayFor(channel);
   const kwArtifact  = platformUsesKeywords(channel)
     ? (currentArtifactOfType(artifacts, folder.id, "keyword_research", channel)
@@ -917,6 +930,8 @@ function SubitemRow({ folder, channel, planArtifact, allocationBudget, artifacts
                         || currentArtifactOfType(artifacts, folder.id, "ad_copy");
   const creativeArtifact = currentArtifactOfType(artifacts, folder.id, "creative_rendered", channel);
   const budget = budgetForPlatform(artifacts, folder.id, channel) ?? allocationBudget;
+  const spentRaw = (spendByPlatform || {})[channel.toLowerCase()]?.spend ?? null;
+  const utilPct  = (budget && spentRaw != null) ? Math.round(spentRaw / budget * 100) : null;
   const adsCount = artifacts.filter(a =>
     a.folder_id === folder.id
     && a.artifact_type === "creative_rendered"
@@ -934,11 +949,27 @@ function SubitemRow({ folder, channel, planArtifact, allocationBudget, artifacts
           {display.label}
         </span>
       </Cell>
-      {/* תקציב */}
+      {/* מתוכנן */}
       <Cell center compact>
         <span style={{ fontSize: 13, fontWeight: 600, color: budget ? color.fgDefault : color.fgSubtle, fontFamily }}>
           {budget ? fmtMoney(budget) : "—"}
         </span>
+      </Cell>
+      {/* מנוצל */}
+      <Cell center compact>
+        <span style={{ fontSize: 13, fontWeight: 600, fontFamily,
+          color: spentRaw == null ? color.fgSubtle : color.fgDefault }}>
+          {spentRaw != null ? fmtMoney(spentRaw) : (spendByPlatform == null ? "…" : "—")}
+        </span>
+      </Cell>
+      {/* % ניצול */}
+      <Cell center compact>
+        {utilPct != null ? (
+          <span style={{
+            fontSize: 12, fontWeight: 700, fontFamily,
+            color: utilPct > 110 ? "#dc2626" : utilPct >= 80 ? "#16a34a" : "#d97706",
+          }}>{utilPct}%</span>
+        ) : <Dash />}
       </Cell>
       {/* מחקר ביטויי — תוכן */}
       <Cell center compact>
