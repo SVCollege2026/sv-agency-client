@@ -219,27 +219,11 @@ export default function SettingsPanel() {
       {/* ── מערכת ─────────────────────────────────────────────────────────── */}
       <SectionHeader title="⚙ הגדרות מערכת" />
       <SettingRow
-        label="שעת תחילת עבודה"
-        value={wh.start}
-        format={v => v || "—"}
-        type="time"
-        hint="הפלטפורמות יתחילו לפעול מהשעה הזו"
-        onSave={v => saveWorkingHours("start", v)}
-      />
-      <SettingRow
-        label="שעת סיום עבודה"
-        value={wh.end}
-        format={v => v || "—"}
-        type="time"
-        hint="הפלטפורמות יפסיקו לפעול בשעה זו"
-        onSave={v => saveWorkingHours("end", v)}
-      />
-      <SettingRow
-        label="ימים מינימום לפני המלצת סגירה"
+        label="מינימום ימי דאטה לפני המלצה"
         value={p.min_days_for_recommendation}
         format={v => v == null ? "—" : `${v} ימים`}
         type="number"
-        hint="כמה ימי דאטה נדרשים לפני שהמערכת ממליצה לסגור ערוץ"
+        hint="כמה ימי דאטה נדרשים לפני שהמערכת מייצרת המלצה על ערוץ"
         onSave={v => savePayload("min_days_for_recommendation", v)}
       />
 
