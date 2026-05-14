@@ -244,72 +244,72 @@ export default function SettingsPanel() {
       />
 
       {/* ── ספים — Meta ──────────────────────────────────────────────────── */}
-      <SectionHeader title="📊 ספי ביצועים — Meta (ממוצע SV)" />
+      <SectionHeader title="📊 ספי ביצועים — Meta" />
       <SettingRow
-        label="CPL ממוצע SV (₪)"
+        label="CPL — סף עליון (₪)"
         value={metaT.cpl_ils?.sv_avg}
         format={fmtMoney}
         type="number"
-        hint="ממוצע נוכחי — הגבול העליון שאסור לחצות; המערכת שואפת לשיפור מתמיד"
+        hint="ממוצע SV ללא AI — אסור לחצות. יעד (Great): מתחת ל-₪85"
         onSave={v => saveThreshold("meta", "cpl_ils", "sv_avg", v)}
       />
       <SettingRow
-        label="CTR ממוצע SV (%)"
+        label="CTR — סף תחתון (%)"
         value={metaT.ctr_pct?.sv_avg}
         format={fmtPct}
         type="number"
-        hint="ממוצע נוכחי — יעד (Great): 1.5%+"
+        hint="ממוצע SV — אסור לרדת מתחתיו. יעד (Great): מעל 1.5%"
         onSave={v => saveThreshold("meta", "ctr_pct", "sv_avg", v)}
       />
       <SettingRow
-        label="CPC ממוצע SV (₪)"
+        label="CPC — סף עליון (₪)"
         value={metaT.cpc_ils?.sv_avg}
         format={fmtMoney}
         type="number"
-        hint="ממוצע נוכחי — עלות לקליק"
+        hint="ממוצע SV — אסור לחצות"
         onSave={v => saveThreshold("meta", "cpc_ils", "sv_avg", v)}
       />
       <SettingRow
-        label="CPM ממוצע SV (₪)"
+        label="CPM — סף עליון (₪)"
         value={metaT.cpm_ils?.sv_avg}
         format={fmtMoney}
         type="number"
-        hint="ממוצע נוכחי — יעד (Great): מתחת ל-₪50"
+        hint="ממוצע SV — אסור לחצות. יעד (Great): מתחת ל-₪50"
         onSave={v => saveThreshold("meta", "cpm_ils", "sv_avg", v)}
       />
 
       {/* ── ספים — Google ────────────────────────────────────────────────── */}
-      <SectionHeader title="📊 ספי ביצועים — Google (ממוצע SV)" />
+      <SectionHeader title="📊 ספי ביצועים — Google" />
       <SettingRow
-        label="CPL ממוצע SV (₪)"
+        label="CPL — סף עליון (₪)"
         value={googleT.cpl_ils?.sv_avg}
         format={fmtMoney}
         type="number"
-        hint="ממוצע נוכחי — הגבול העליון שאסור לחצות; המערכת שואפת לשיפור מתמיד"
+        hint="ממוצע SV — אסור לחצות. יעד (Great): מתחת ל-₪100"
         onSave={v => saveThreshold("google", "cpl_ils", "sv_avg", v)}
       />
       <SettingRow
-        label="CTR ממוצע SV (%)"
+        label="CTR — סף תחתון (%)"
         value={googleT.ctr_pct?.sv_avg}
         format={fmtPct}
         type="number"
-        hint="ממוצע נוכחי — יעד (Great): 5%+"
+        hint="ממוצע SV — אסור לרדת מתחתיו. יעד (Great): מעל 5%"
         onSave={v => saveThreshold("google", "ctr_pct", "sv_avg", v)}
       />
       <SettingRow
-        label="CPC ממוצע SV (₪)"
+        label="CPC — סף עליון (₪)"
         value={googleT.cpc_ils?.sv_avg}
         format={fmtMoney}
         type="number"
-        hint="ממוצע נוכחי — עלות לקליק"
+        hint="ממוצע SV — אסור לחצות. יעד (Great): מתחת ל-₪3"
         onSave={v => saveThreshold("google", "cpc_ils", "sv_avg", v)}
       />
       <SettingRow
-        label="CPM ממוצע SV (₪)"
+        label="CPM — סף עליון (₪)"
         value={googleT.cpm_ils?.sv_avg}
         format={fmtMoney}
         type="number"
-        hint="ממוצע נוכחי — עלות ל-1,000 חשיפות"
+        hint="ממוצע SV — אסור לחצות"
         onSave={v => saveThreshold("google", "cpm_ils", "sv_avg", v)}
       />
 
