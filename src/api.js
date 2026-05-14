@@ -489,6 +489,10 @@ export async function updateCampaignFolder(folderId, body) {
   return request("PATCH", `/api/campaigns/folders/${folderId}`, body);
 }
 
+export async function deleteCampaignFolder(folderId) {
+  return request("DELETE", `/api/campaigns/folders/${folderId}`);
+}
+
 export async function importLiveCampaign(body) {
   // body: { course_name, platforms: [{platform, monthly_budget_ils}],
   //         go_live_date?, period_start?, period_end?, notes?, imported_by? }
@@ -857,4 +861,10 @@ export async function getLimannAuditLatest() {
 export async function resolveLimannItem(body) {
   // body: { subject_table, subject_id, item_label, reason, decided_by? }
   return request("POST", "/api/optimization/limann-audit/resolve", body);
+}
+
+// ─── Media department — daily brief ──────────────────────────────────────────
+
+export async function getMediaDailyBrief() {
+  return request("GET", "/api/media/daily-brief");
 }

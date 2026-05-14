@@ -24,7 +24,7 @@ import {
   listCampaignFolders, createCampaignFolder, updateCampaignFolder,
   listArtifacts, listBudgetAllocations,
   listRecommendations, listWorkflowBlockers, listWorkflowItems,
-  listFolderBriefs,
+  listFolderBriefs, getMediaDailyBrief,
   approveArtifact, requestArtifactRevision,
   submitChangeRequest,
 } from "../../api.js";
@@ -173,7 +173,6 @@ const TOP_COL_DEFS = [
   { id: "what_works",  label: "מה עובד/לא",    defaultW: 150 },
   { id: "media_plan",        label: "פריסת מדיה",    defaultW: 130 },
   { id: "media_plan_status", label: "אישור פריסה",  defaultW: 130 },
-  { id: "budget_rec",        label: "תקציב מומלץ",  defaultW: 130 },
   { id: "recs",        label: "💡 המלצות",      defaultW: 120 },
   { id: "activity",    label: "מה קורה עכשיו", defaultW: 150 },
   { id: "action",      label: "",              defaultW: 80 },
@@ -216,6 +215,8 @@ export default function FolderBoard({ refreshKey = 0 }) {
   const [payloadModal, setPayloadModal] = useState(null);
   const [globalRecsOpen, setGlobalRecsOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [dailyBrief, setDailyBrief] = useState(null);
+  const [briefOpen, setBriefOpen] = useState(false);
 
   const { prefs, setWidth, toggleHidden } = useColumnPrefs({ widths: DEFAULT_TOP_WIDTHS, hidden: DEFAULT_HIDDEN });
 
@@ -241,6 +242,10 @@ export default function FolderBoard({ refreshKey = 0 }) {
   }
 
   useEffect(() => { refresh(); /* eslint-disable-next-line */ }, [refreshKey]);
+
+  useEffect(() => {
+    getMediaDailyBrief().then(b => setDailyBrief(b)).catch(() => {});
+  }, []);
 
   async function ensureBriefs(folderId) {
     if (briefsByFolder[folderId]) return;
@@ -299,6 +304,12 @@ export default function FolderBoard({ refreshKey = 0 }) {
 
   return (
     <div style={{ direction: "rtl", fontFamily, width: "100%" }}>
+
+      {/* Morning brief — auto-shown, no click required */}
+      {dailyBrief && (
+        <DailyBriefBanner brief={dailyBrief} open={briefOpen} onToggle={() => setBriefOpen(o => !o)} />
+      )}
+
       {/* Toolbar */}
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -359,7 +370,7 @@ export default function FolderBoard({ refreshKey = 0 }) {
         <div style={{
           background: color.surface, borderRadius: radius.lg,
           border: `1px solid ${color.borderDefault}`, boxShadow: shadow.sm,
-          overflow: "auto", width: "100%",
+          width: "100%",
         }}>
           {groupedFolders.map(group => (
             <Group key={group.id}
@@ -477,9 +488,9 @@ function Group({
       </div>
 
       {!collapsed && (
-        <>
+        <div style={{ overflowX: "auto" }}>
           {/* Column headers with drag-resize */}
-          <div style={{ display: "grid", gridTemplateColumns: templateCols, background: "#f8fafc", borderBottom: `1px solid ${color.borderSubtle}` }}>
+          <div style={{ display: "grid", gridTemplateColumns: templateCols, background: "#f8fafc", borderBottom: `1px solid ${color.borderSubtle}`, minWidth: "max-content" }}>
             {visibleCols.map(col => (
               <ColHeader key={col.id} col={col} width={colWidths[col.id] || col.defaultW} onResize={onResizeCol} />
             ))}
@@ -537,7 +548,7 @@ function Group({
               colCount={visibleCols.length}
             />
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -1146,6 +1157,106 @@ function StatusPicker({ value, onChange }) {
         </div>
       )}
     </>
+  );
+}
+
+// ─── Daily brief banner ───────────────────────────────────────────────────────
+const STATUS_BRIEF = {
+  green:           { bg: "#f0fdf4", border: "#86efac", dot: "#16a34a", label: "ביצועים תקינים" },
+  yellow:          { bg: "#fefce8", border: "#fde047", dot: "#ca8a04", label: "דורש תשומת לב" },
+  red:             { bg: "#fff1f2", border: "#fda4af", dot: "#dc2626", label: "דורש טיפול דחוף" },
+  unknown:         { bg: "#f8fafc", border: "#e2e8f0", dot: "#94a3b8", label: "אין נתונים" },
+  no_data:         { bg: "#f8fafc", border: "#e2e8f0", dot: "#94a3b8", label: "אין נתונים" },
+};
+
+function DailyBriefBanner({ brief, open, onToggle }) {
+  const s = STATUS_BRIEF[brief.overall_status] || STATUS_BRIEF.unknown;
+  const runDate = brief.run_date
+    ? new Date(brief.run_date).toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" })
+    : "";
+
+  return (
+    <div style={{
+      background: s.bg, border: `1px solid ${s.border}`,
+      borderRadius: radius.md, marginBottom: space(3),
+      overflow: "hidden",
+    }}>
+      {/* Header row — always visible */}
+      <div
+        onClick={onToggle}
+        style={{
+          display: "flex", alignItems: "center", gap: space(2),
+          padding: `${space(2.5)} ${space(4)}`, cursor: "pointer",
+          userSelect: "none",
+        }}
+      >
+        <span style={{
+          width: 10, height: 10, borderRadius: "50%",
+          background: s.dot, flexShrink: 0, display: "inline-block",
+        }} />
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", fontFamily }}>
+          🌅 תדריך בוקר — {runDate}
+        </span>
+        <span style={{
+          fontSize: 12, background: s.border, color: "#1e293b",
+          borderRadius: 99, padding: "2px 10px", fontFamily, fontWeight: 600,
+        }}>{s.label}</span>
+        {brief.pending_recs_count > 0 && (
+          <span style={{
+            fontSize: 12, background: "#dbeafe", color: "#1d4ed8",
+            borderRadius: 99, padding: "2px 10px", fontFamily, fontWeight: 600,
+          }}>💡 {brief.pending_recs_count} המלצות פתוחות</span>
+        )}
+        <span style={{ marginInlineStart: "auto", fontSize: 13, color: "#64748b", transition: "transform 120ms", display: "inline-block", transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}>▾</span>
+      </div>
+
+      {/* Expanded content */}
+      {open && (
+        <div style={{ borderTop: `1px solid ${s.border}`, padding: `${space(3)} ${space(4)}` }}>
+          {/* Priority actions */}
+          {brief.priority_actions?.length > 0 && (
+            <div style={{ marginBottom: space(3) }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: space(1.5), fontFamily, textTransform: "uppercase", letterSpacing: 0.5 }}>פעולות עדיפות</div>
+              <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+                {brief.priority_actions.map((a, i) => (
+                  <li key={i} style={{ fontSize: 13, color: "#1e293b", fontFamily, marginBottom: 4 }}>{a}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {/* Metric assessments */}
+          {brief.assessments?.length > 0 && (
+            <div style={{ marginBottom: space(3) }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: space(1.5), fontFamily, textTransform: "uppercase", letterSpacing: 0.5 }}>ביצועי פלטפורמות</div>
+              <div style={{ display: "flex", gap: space(2), flexWrap: "wrap" }}>
+                {brief.assessments.map((a, i) => {
+                  const statusColor = { beating: "#15803d", on_target: "#1d4ed8", underperforming: "#d97706", critical: "#dc2626" }[a.status] || "#64748b";
+                  return (
+                    <div key={i} style={{
+                      background: "#fff", border: "1px solid #e2e8f0", borderRadius: radius.sm,
+                      padding: `${space(1.5)} ${space(2.5)}`, fontSize: 12, fontFamily,
+                    }}>
+                      <span style={{ fontWeight: 700, color: "#1e293b" }}>{a.platform} · {a.metric}</span>
+                      <span style={{ color: statusColor, fontWeight: 700, marginInlineStart: 8 }}>{a.actual?.toFixed ? a.actual.toFixed(1) : a.actual}</span>
+                      <span style={{ color: "#94a3b8", marginInlineStart: 6 }}>/ יעד {a.sv_avg?.toFixed ? a.sv_avg.toFixed(1) : a.sv_avg}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {/* Full brief text */}
+          {brief.brief_he && (
+            <div style={{
+              background: "#fff", border: "1px solid #e2e8f0", borderRadius: radius.sm,
+              padding: space(3), fontSize: 13, lineHeight: 1.7, color: "#1e293b",
+              fontFamily, whiteSpace: "pre-wrap",
+              maxHeight: 280, overflowY: "auto",
+            }}>{brief.brief_he}</div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

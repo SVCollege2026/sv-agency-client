@@ -6,7 +6,7 @@
  */
 import React, { useState, useRef, useEffect } from "react";
 import { color, radius, shadow, space, fontFamily, transition } from "./_tokens.js";
-import { submitChangeRequest, scheduleMethodologySwitch, closeCampaign } from "../../api.js";
+import { submitChangeRequest, scheduleMethodologySwitch, closeCampaign, deleteCampaignFolder } from "../../api.js";
 import { useToast } from "./Toast.jsx";
 import ActionMiniForm from "./ActionMiniForm.jsx";
 
@@ -127,6 +127,17 @@ function buildActions(prefilledChannel) {
       isClose: true,
       danger: true,
     },
+    {
+      group: "פעולות מערכת",
+      id: "delete_row", icon: "🗑", label: "מחיקת שורה",
+      desc: "מחיקה מוחלטת מהמערכת.",
+      fields: [
+        { key: "name_confirm", label: "הקלידי את שם הקמפיין לאישור", type: "text", required: true, placeholder: "שם הקמפיין" },
+      ],
+      canSubmit: (v) => !!v.name_confirm?.trim(),
+      isDelete: true,
+      danger: true,
+    },
   ];
 
   // If prefilledChannel (subitem), filter to channel-relevant actions only + prefill
@@ -184,6 +195,14 @@ export default function ActionMenu({ folder, prefilledChannel, onRefresh }) {
           requested_by: "marketing_manager",
         });
         toast.success("🔄 שינוי Methodology תוזמן");
+      } else if (activeAction.isDelete) {
+        if ((vals.name_confirm || "").trim() !== (folder.course_name || "").trim()) {
+          toast.error("שם הקמפיין אינו תואם — בדקי שוב");
+          setBusy(false);
+          return;
+        }
+        await deleteCampaignFolder(folder.id);
+        toast.success("🗑 השורה נמחקה");
       } else if (activeAction.isClose) {
         if ((vals.name_confirm || "").trim() !== (folder.course_name || "").trim()) {
           toast.error("שם הקמפיין אינו תואם — בדקי שוב");
