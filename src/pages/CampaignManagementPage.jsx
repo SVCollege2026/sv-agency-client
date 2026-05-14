@@ -1459,7 +1459,7 @@ export default function CampaignManagementPage() {
         </button>
       </div>
 
-      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "28px 20px" }}>
+      <div style={{ maxWidth: mode === "marketing" ? undefined : 1400, margin: "0 auto", padding: "28px 20px" }}>
         {/* ── Header ── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
           <div>
