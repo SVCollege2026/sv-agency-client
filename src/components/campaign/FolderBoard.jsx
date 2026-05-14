@@ -28,6 +28,7 @@ import {
   approveArtifact, requestArtifactRevision,
   submitChangeRequest,
 } from "../../api.js";
+import ImportLiveCampaignModal from "./ImportLiveCampaignModal.jsx";
 import {
   color, radius, shadow, space, type, transition, button,
   input as inputStyle, fontFamily, monday,
@@ -212,6 +213,7 @@ export default function FolderBoard({ refreshKey = 0 }) {
   const [addingName, setAddingName]   = useState("");
   const [payloadModal, setPayloadModal] = useState(null);
   const [globalRecsOpen, setGlobalRecsOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   const { prefs, setWidth, toggleHidden } = useColumnPrefs({ widths: DEFAULT_TOP_WIDTHS, hidden: DEFAULT_HIDDEN });
 
@@ -328,6 +330,10 @@ export default function FolderBoard({ refreshKey = 0 }) {
             onMouseLeave={e => e.currentTarget.style.background = "#dbeafe"}
             >💡 {totalPending} המלצות</button>
           )}
+          <button onClick={() => setImportModalOpen(true)} style={{
+            ...button.ghost, fontSize: 13, padding: "8px 16px",
+            border: `1.5px solid ${color.borderDefault}`,
+          }}>✈ ייבוא קמפיין פעיל</button>
           <button onClick={() => { setAddingTo("planned"); setAddingName(""); }} style={{
             ...button.primary, fontSize: 13, padding: "8px 16px",
           }}>➕ קמפיין חדש</button>
@@ -395,6 +401,14 @@ export default function FolderBoard({ refreshKey = 0 }) {
           folders={folders}
           onClose={() => setGlobalRecsOpen(false)}
           onRefresh={refresh}
+        />
+      )}
+
+      {/* Import live campaign modal */}
+      {importModalOpen && (
+        <ImportLiveCampaignModal
+          onClose={() => setImportModalOpen(false)}
+          onSuccess={() => { setImportModalOpen(false); refresh(); }}
         />
       )}
 
