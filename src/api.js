@@ -489,6 +489,12 @@ export async function updateCampaignFolder(folderId, body) {
   return request("PATCH", `/api/campaigns/folders/${folderId}`, body);
 }
 
+export async function importLiveCampaign(body) {
+  // body: { course_name, platforms: [{platform, monthly_budget_ils}],
+  //         go_live_date?, period_start?, period_end?, notes?, imported_by? }
+  return request("POST", "/api/campaigns/import-live", body);
+}
+
 export async function listFolderBriefs(folderId, { includeVersions = false } = {}) {
   const qs = includeVersions ? "?include_versions=true" : "";
   return request("GET", `/api/campaigns/briefs/${folderId}${qs}`);
