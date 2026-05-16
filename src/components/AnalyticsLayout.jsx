@@ -1,11 +1,6 @@
 /**
  * AnalyticsLayout.jsx — shell של מחלקת אנליזה
  * Secondary nav: Dashboard · ניתוח מנהלים · דוחות שמורים
- *
- * הוסרו: ניתוח שלב 0 (AnalysisPage), ניתוח נקודתי (QuickTablePage), יעדים
- * (GoalsPage). הם משאריות הארכיטקטורה הישנה (לפני Stage 0 baseline) ולא
- * מחוברים למקורות הנתונים הנוכחיים. בעתיד תיבנה כאן יכולת "שאלות לניתוח"
- * חדשה שתתבסס על baseline_facts (ראו README).
  */
 import React from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
