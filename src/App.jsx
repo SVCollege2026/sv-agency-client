@@ -49,8 +49,6 @@ export default function App() {
         <Route path="/reports"             element={<Navigate to="/analytics/reports"   replace />} />
         <Route path="/analysis"            element={<Navigate to="/analytics/dashboard" replace />} />
         <Route path="/goals"               element={<Navigate to="/analytics/dashboard" replace />} />
-        <Route path="/analytics/analysis"    element={<Navigate to="/analytics/dashboard" replace />} />
-        <Route path="/analytics/quick-table" element={<Navigate to="/analytics/dashboard" replace />} />
         <Route path="/analytics/goals"       element={<Navigate to="/analytics/dashboard" replace />} />
 
       </Route>

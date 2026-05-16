@@ -62,43 +62,6 @@ export async function deleteQuestion(id) {
   return request("DELETE", `/api/questions/${id}`);
 }
 
-// ─── Analysis ─────────────────────────────────────────────────────────────────
-
-export async function runAnalysis({ questions = null, base_run_id = null, instructions = null } = {}) {
-  return request("POST", "/api/analysis/run", { questions, base_run_id, instructions });
-}
-
-export async function getAnalysisStatus(runId) {
-  return request("GET", `/api/analysis/status/${runId}`);
-}
-
-export async function getRunResults(runId) {
-  // status/{runId} returns both status + results_summary for completed runs
-  return request("GET", `/api/analysis/status/${runId}`);
-}
-
-export async function getRunSynthesis(runId) {
-  // Fetches the synthesis/key_findings stored in analysis_runs.results_summary
-  return request("GET", `/api/analysis/status/${runId}`).then(r => r?.results_summary ?? null);
-}
-
-export async function getAnalysisResults() {
-  return request("GET", "/api/analysis/results");
-}
-
-export async function listRuns() {
-  return request("GET", "/api/analysis/runs");
-}
-
-export async function quickTable(question_text, instructions = null) {
-  // Single ad-hoc calculation — no debate, no synthesis. Returns a table layout.
-  return request("POST", "/api/analysis/quick-table", { question_text, instructions });
-}
-
-export async function cancelRun(runId) {
-  return request("POST", `/api/analysis/cancel/${runId}`);
-}
-
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export async function getDashboardStage0() {
