@@ -730,19 +730,6 @@ export async function updateSchoolBudget(body) {
   return request("PUT", "/api/campaigns/school-budget", body);
 }
 
-export async function getSchoolActualSpend({ start = "2026-01-01", end = null } = {}) {
-  const p = new URLSearchParams({ start });
-  if (end) p.set("end", end);
-  return request("GET", `/api/campaigns/actual-spend?${p.toString()}`);
-}
-
-export async function getFolderActualSpend(folderId, { start = "2026-01-01", end = null, platform = null } = {}) {
-  const p = new URLSearchParams({ start });
-  if (end)      p.set("end", end);
-  if (platform) p.set("platform", platform);
-  return request("GET", `/api/campaigns/folders/${folderId}/actual-spend?${p.toString()}`);
-}
-
 // ─── Campaign Management — Artifacts (תוצרים לאישור) ─────────────────────────
 
 export async function listArtifacts({ folderId = null, status = null, artifactType = null, pendingForApproval = false, limit = 100 } = {}) {
