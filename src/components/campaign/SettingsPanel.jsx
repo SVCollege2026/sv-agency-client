@@ -7,7 +7,6 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   getSchoolBudget, updateSchoolBudget,
   getGeneralSettings, updateGeneralSettings,
-  getSchoolActualSpend,
 } from "../../api.js";
 import { color, radius, space, fontFamily, transition } from "./_tokens.js";
 import { useToast } from "./Toast.jsx";
@@ -117,109 +116,13 @@ function SectionHeader({ title }) {
   );
 }
 
-const STATUS_UTIL = {
-  on_pace:    { color: "#16a34a", label: "בקצב" },
-  over_pace:  { color: "#dc2626", label: "מעבר לקצב" },
-  under_pace: { color: "#d97706", label: "מתחת לקצב" },
-  unknown:    { color: "#6b7280", label: "אין נתונים" },
-};
-
-function BudgetUtilBlock({ actualSpend }) {
-  const b = actualSpend?.budget;
-  const isLoading = actualSpend === null;
-
-  const statusDef = STATUS_UTIL[b?.status] || STATUS_UTIL.unknown;
-  const byPlat = actualSpend?.by_platform || {};
-
-  return (
-    <div style={{
-      margin: `0 ${space(4)} ${space(2)}`,
-      background: "#f8fafc",
-      border: `1px solid #e2e8f0`,
-      borderRadius: 8,
-      padding: `${space(3)} ${space(4)}`,
-    }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: space(2), fontFamily }}>
-        ניצול תקציב YTD
-      </div>
-
-      {isLoading ? (
-        <div style={{ fontSize: 13, color: "#94a3b8", fontFamily }}>טוען...</div>
-      ) : (
-        <>
-          {/* Progress bar */}
-          <div style={{ position: "relative", height: 8, background: "#e2e8f0", borderRadius: 99, marginBottom: space(2) }}>
-            {/* Year elapsed marker */}
-            {b?.year_elapsed_pct != null && (
-              <div style={{
-                position: "absolute", top: -3, bottom: -3,
-                left: `${Math.min(b.year_elapsed_pct, 100)}%`,
-                width: 2, background: "#94a3b8", borderRadius: 1,
-              }} title={`שנה עברה: ${b.year_elapsed_pct}%`} />
-            )}
-            {/* Spend fill */}
-            <div style={{
-              height: "100%", borderRadius: 99,
-              background: statusDef.color,
-              width: `${Math.min(b?.utilized_pct || 0, 100)}%`,
-              transition: "width 0.5s ease",
-            }} />
-          </div>
-
-          <div style={{ display: "flex", gap: space(4), flexWrap: "wrap", alignItems: "flex-start" }}>
-            <div>
-              <div style={{ fontSize: 12, color: "#64748b", fontFamily }}>מנוצל בפועל</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#1e293b", fontFamily }}>
-                {actualSpend?.total_spend != null ? `₪${Number(actualSpend.total_spend).toLocaleString("he-IL")}` : "—"}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: "#64748b", fontFamily }}>% מהתקציב השנתי</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: statusDef.color, fontFamily }}>
-                {b?.utilized_pct != null ? `${b.utilized_pct}%` : "—"}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: "#64748b", fontFamily }}>% שנה עברה</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#475569", fontFamily }}>
-                {b?.year_elapsed_pct != null ? `${b.year_elapsed_pct}%` : "—"}
-              </div>
-            </div>
-            <div style={{ marginInlineStart: "auto", textAlign: "center" }}>
-              <div style={{
-                display: "inline-block", padding: "4px 12px", borderRadius: 99,
-                background: `${statusDef.color}18`,
-                color: statusDef.color, fontWeight: 700, fontSize: 13, fontFamily,
-              }}>{statusDef.label}</div>
-            </div>
-          </div>
-
-          {/* Per-platform breakdown */}
-          {Object.keys(byPlat).length > 0 && (
-            <div style={{ display: "flex", gap: space(3), marginTop: space(2), flexWrap: "wrap" }}>
-              {Object.entries(byPlat).map(([plat, data]) => (
-                <div key={plat} style={{ fontSize: 12, color: "#475569", fontFamily }}>
-                  <span style={{ fontWeight: 600 }}>{plat.charAt(0).toUpperCase() + plat.slice(1)}</span>
-                  {": "}
-                  <span>₪{Number(data.spend || 0).toLocaleString("he-IL")}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
 // ─── main component ───────────────────────────────────────────────────────────
 
 export default function SettingsPanel() {
   const toast    = useToast();
-  const [budget,      setBudget]      = useState(null);
-  const [settings,    setSettings]    = useState(null);
-  const [actualSpend, setActualSpend] = useState(null);
-  const [loading,     setLoading]     = useState(true);
+  const [budget,   setBudget]   = useState(null);
+  const [settings, setSettings] = useState(null);
+  const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
     Promise.all([
@@ -229,7 +132,6 @@ export default function SettingsPanel() {
       setBudget(b);
       setSettings(s);
     }).finally(() => setLoading(false));
-    getSchoolActualSpend().then(s => setActualSpend(s)).catch(() => {});
   }, []);
 
   async function saveBudget(field, value) {
@@ -313,9 +215,6 @@ export default function SettingsPanel() {
         type="text"
         onSave={v => saveBudget("notes", v)}
       />
-
-      {/* ── ניצול תקציב YTD ─────────────────────────────────────────────── */}
-      <BudgetUtilBlock actualSpend={actualSpend} />
 
       {/* ── מערכת ─────────────────────────────────────────────────────────── */}
       <SectionHeader title="⚙ הגדרות מערכת" />
