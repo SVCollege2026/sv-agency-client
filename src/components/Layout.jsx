@@ -8,6 +8,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import svcollegeLogo from "../assets/svcollege-logo.png";
 import UserAvatar from "./UserAvatar.jsx";
 import CommandPalette from "./CommandPalette.jsx";
+import EmmaChat from "./EmmaChat.jsx";
 
 export default function Layout() {
   const navigate = useNavigate();
@@ -73,6 +74,9 @@ export default function Layout() {
 
       {/* Global Cmd+K palette */}
       <CommandPalette />
+
+      {/* אמה — העוזרת התפעולית, זמינה בכל מסך */}
+      <EmmaChat />
     </div>
   );
 }
