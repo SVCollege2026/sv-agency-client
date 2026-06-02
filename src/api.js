@@ -31,6 +31,16 @@ async function request(method, path, body = null, isFormData = false) {
   return res.json();
 }
 
+// ─── Emma — צ'ט תפעולי (מפעילה יכולות קיימות לפי בקשה חופשית) ──────────────────
+
+export async function askEmma(message, history = null) {
+  return request("POST", "/api/emma/ask", { message, history });
+}
+
+export async function executeEmmaAction(action, params = null) {
+  return request("POST", "/api/emma/execute", { action, params });
+}
+
 // ─── Questions ────────────────────────────────────────────────────────────────
 
 export async function uploadQuestionsFile(file, { runId = null, mode = "replace" } = {}) {

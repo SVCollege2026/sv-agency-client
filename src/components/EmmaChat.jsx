@@ -1,0 +1,231 @@
+/**
+ * EmmaChat — floating "✨ אמה" drawer, available on every screen.
+ * אמה: העוזרת התפעולית. בקשה בשפה חופשית → מפעילה יכולת קיימת → תשובה.
+ * סינכרוני: POST /api/emma/ask מחזיר reply + actions ישירות.
+ */
+import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { color, radius, shadow, space, fontFamily, transition } from "./campaign/_tokens.js";
+import { askEmma, executeEmmaAction } from "../api.js";
+
+const STORAGE_KEY = "sv:chat:emma";
+
+// תוויות ידידותיות לכלים שאמה מפעילה (מוצג כצ'יפ מתחת לתשובה)
+const TOOL_LABELS = {
+  investigate_media: "חקירת ביצועי מדיה",
+  system_health:     "בדיקת בריאות מערכת",
+  make_health:       "בדיקת בריאות Make",
+};
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
+  catch { return []; }
+}
+function saveHistory(msgs) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(msgs.slice(-50))); }
+  catch {}
+}
+
+export default function EmmaChat() {
+  const [open, setOpen]   = useState(false);
+  const [msgs, setMsgs]   = useState(loadHistory);
+  const [input, setInput] = useState("");
+  const [busy, setBusy]   = useState(false);
+  const bottomRef = useRef(null);
+  const inputRef  = useRef(null);
+
+  useEffect(() => { saveHistory(msgs); }, [msgs]);
+  useLayoutEffect(() => { if (open) bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, open]);
+  useLayoutEffect(() => { if (open && inputRef.current) inputRef.current.focus(); }, [open]);
+
+  async function send() {
+    const text = input.trim();
+    if (!text || busy) return;
+    setInput("");
+
+    const userMsg = { role: "manager", text, ts: new Date().toISOString() };
+    setMsgs(prev => [...prev, userMsg]);
+
+    // היסטוריה לפורמט Anthropic (user/assistant) — בלי ההודעה הנוכחית
+    const history = msgs.map(m => ({
+      role: m.role === "manager" ? "user" : "assistant",
+      content: m.text,
+    }));
+
+    setBusy(true);
+    try {
+      const resp = await askEmma(text, history);
+      const replyText = resp?.reply || "לא הצלחתי להחזיר תשובה.";
+      const actions = Array.isArray(resp?.actions) ? resp.actions : [];
+      const pending = Array.isArray(resp?.pending_actions)
+        ? resp.pending_actions.map(p => ({ ...p, status: "pending" }))
+        : [];
+      setMsgs(prev => [...prev, {
+        role: "agent", text: replyText, actions, pending,
+        ts: new Date().toISOString(), error: resp?.ok === false,
+      }]);
+    } catch (e) {
+      setMsgs(prev => [...prev, { role: "agent", text: `שגיאה: ${e.message}. נסי שנית.`, ts: new Date().toISOString(), error: true }]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function clearHistory() {
+    setMsgs([]);
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
+  // אישור והפעלה של פעולה שאמה הציעה (HITL): שולח ל-/api/emma/execute
+  async function approveAction(msgIdx, actIdx) {
+    const act = msgs[msgIdx]?.pending?.[actIdx];
+    if (!act || act.status !== "pending") return;
+    const setStatus = (status, resultText) => setMsgs(prev => prev.map((m, i) => {
+      if (i !== msgIdx) return m;
+      const pending = (m.pending || []).map((p, j) => j === actIdx ? { ...p, status, resultText } : p);
+      return { ...m, pending };
+    }));
+    setStatus("running");
+    try {
+      const res = await executeEmmaAction(act.action, act.params);
+      const ok = res?.ok !== false && !res?.error;
+      setStatus(ok ? "done" : "error", ok ? "בוצע ✓" : `נכשל: ${res?.error || "שגיאה"}`);
+    } catch (e) {
+      setStatus("error", `נכשל: ${e.message}`);
+    }
+  }
+
+  return (
+    <>
+      {/* Floating button — bottom RIGHT (תקציבאית יושבת בצד שמאל) */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          position: "fixed", bottom: 24, right: 24,
+          background: color.primary, color: "#fff",
+          border: "none", borderRadius: radius.pill,
+          padding: `${space(2.5)} ${space(4)}`,
+          fontSize: 14, fontWeight: 700, cursor: "pointer",
+          boxShadow: shadow.lg, fontFamily, zIndex: 9990,
+          display: "flex", alignItems: "center", gap: space(1.5),
+          transition: transition.fast,
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = color.primaryHover}
+        onMouseLeave={e => e.currentTarget.style.background = color.primary}
+      >
+        ✨ אמה
+      </button>
+
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 9991, background: "rgba(0,0,0,0.05)" }} />
+          <div style={{
+            position: "fixed", bottom: 80, right: 24,
+            width: "min(360px, calc(100vw - 32px))",
+            height: "min(540px, calc(100dvh - 110px))",
+            maxWidth: "calc(100vw - 32px)",
+            background: color.surface, borderRadius: radius.lg,
+            boxShadow: shadow.xl, zIndex: 9992,
+            display: "flex", flexDirection: "column",
+            border: `1px solid ${color.borderDefault}`,
+            direction: "rtl",
+          }}>
+            {/* Header */}
+            <div style={{ padding: `${space(3)} ${space(4)}`, borderBottom: `1px solid ${color.borderDefault}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: color.fgDefault, fontFamily }}>✨ אמה</div>
+                <div style={{ fontSize: 11, color: color.fgSubtle, fontFamily }}>העוזרת התפעולית — מפעילה את המשרד</div>
+              </div>
+              <div style={{ display: "flex", gap: space(1) }}>
+                <button onClick={clearHistory} title="נקי שיחה" style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 14, color: color.fgSubtle, padding: 4 }}>🗑</button>
+                <button onClick={() => setOpen(false)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 18, color: color.fgMuted, padding: 4 }}>×</button>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div style={{ flex: 1, overflow: "auto", padding: space(3), display: "flex", flexDirection: "column", gap: space(2) }}>
+              {msgs.length === 0 && (
+                <div style={{ color: color.fgSubtle, fontSize: 13, fontFamily, textAlign: "center", marginTop: space(6), lineHeight: 1.7 }}>
+                  בקשי ממני בשפה חופשית.<br />
+                  למשל: "מה קרה ל-CPL בגוגל החודש?" · "ה-Make תקין?" · "המערכת רצה?"
+                </div>
+              )}
+              {msgs.map((m, i) => (
+                <div key={i} style={{ alignSelf: m.role === "manager" ? "flex-end" : "flex-start", maxWidth: "88%" }}>
+                  <div style={{
+                    background: m.role === "manager" ? color.primary : (m.error ? "#fee2e2" : "#f1f5f9"),
+                    color: m.role === "manager" ? "#fff" : (m.error ? "#b91c1c" : color.fgDefault),
+                    borderRadius: m.role === "manager" ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
+                    padding: `${space(2)} ${space(3)}`,
+                    fontSize: 13, fontFamily, lineHeight: 1.6, whiteSpace: "pre-wrap",
+                  }}>{m.text}</div>
+                  {Array.isArray(m.actions) && m.actions.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                      {m.actions.map((a, j) => (
+                        <span key={j} style={{
+                          fontSize: 10, fontFamily,
+                          background: a.status === "error" ? "#fef2f2" : "#ecfdf5",
+                          color: a.status === "error" ? "#b91c1c" : "#047857",
+                          border: `1px solid ${a.status === "error" ? "#fecaca" : "#a7f3d0"}`,
+                          borderRadius: 999, padding: "1px 8px",
+                        }}>
+                          🔧 {TOOL_LABELS[a.tool] || a.tool}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {Array.isArray(m.pending) && m.pending.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>
+                      {m.pending.map((p, j) => (
+                        <div key={j} style={{ border: `1px solid #fde68a`, borderRadius: 10, padding: space(2), background: "#fffbeb", fontFamily }}>
+                          <div style={{ fontSize: 12, color: color.fgDefault, lineHeight: 1.5, marginBottom: 6 }}>⚡ {p.summary}</div>
+                          {p.status === "pending" && (
+                            <button onClick={() => approveAction(i, j)} style={{
+                              padding: `${space(1.5)} ${space(3)}`, background: "#16a34a", color: "#fff",
+                              border: "none", borderRadius: radius.button, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily,
+                            }}>✓ אישור והפעלה</button>
+                          )}
+                          {p.status === "running" && <div style={{ fontSize: 12, color: color.fgSubtle }}>⏳ מפעילה...</div>}
+                          {p.status === "done"    && <div style={{ fontSize: 12, color: "#047857", fontWeight: 700 }}>{p.resultText || "בוצע ✓"}</div>}
+                          {p.status === "error"   && <div style={{ fontSize: 12, color: "#b91c1c", fontWeight: 700 }}>{p.resultText || "נכשל"}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 10, color: color.fgSubtle, fontFamily, marginTop: 2, textAlign: m.role === "manager" ? "left" : "right" }}>
+                    {new Date(m.ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                </div>
+              ))}
+              {busy && (
+                <div style={{ alignSelf: "flex-start", background: "#f1f5f9", borderRadius: "12px 12px 12px 2px", padding: `${space(2)} ${space(3)}`, fontSize: 13, color: color.fgSubtle, fontFamily }}>
+                  ⏳ אמה עובדת...
+                </div>
+              )}
+              <div ref={bottomRef} />
+            </div>
+
+            {/* Input */}
+            <div style={{ padding: space(3), borderTop: `1px solid ${color.borderDefault}`, display: "flex", gap: space(2) }}>
+              <input
+                ref={inputRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                placeholder="בקשי מאמה..."
+                disabled={busy}
+                style={{ flex: 1, padding: `${space(2)} ${space(3)}`, border: `1px solid ${color.borderDefault}`, borderRadius: radius.input, fontSize: 13, fontFamily, direction: "rtl", outline: "none", background: "#fff" }}
+              />
+              <button onClick={send} disabled={busy || !input.trim()} style={{
+                padding: `${space(2)} ${space(3)}`,
+                background: busy || !input.trim() ? "#e5e7eb" : color.primary,
+                color: busy || !input.trim() ? color.fgSubtle : "#fff",
+                border: "none", borderRadius: radius.button,
+                fontSize: 13, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer", fontFamily,
+              }}>שלחי</button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
