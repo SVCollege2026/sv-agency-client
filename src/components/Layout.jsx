@@ -6,7 +6,6 @@
 import React from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import svcollegeLogo from "../assets/svcollege-logo.png";
-import UserAvatar from "./UserAvatar.jsx";
 import CommandPalette from "./CommandPalette.jsx";
 import EmmaChat from "./EmmaChat.jsx";
 
@@ -63,7 +62,6 @@ export default function Layout() {
               פורטל ניהול מחלקות
             </p>
           </div>
-          <UserAvatar />
         </div>
       </header>
 
