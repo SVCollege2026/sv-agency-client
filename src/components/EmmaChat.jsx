@@ -5,7 +5,7 @@
  */
 import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { color, radius, shadow, space, fontFamily, transition } from "./campaign/_tokens.js";
-import { askEmma, executeEmmaAction } from "../api.js";
+import { askEmma, executeEmmaAction, uploadCampaignFile } from "../api.js";
 
 const STORAGE_KEY = "sv:chat:emma";
 
@@ -32,6 +32,7 @@ export default function EmmaChat() {
   const [busy, setBusy]   = useState(false);
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
+  const fileRef   = useRef(null);
 
   useEffect(() => { saveHistory(msgs); }, [msgs]);
   useLayoutEffect(() => { if (open) bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, open]);
@@ -73,6 +74,26 @@ export default function EmmaChat() {
   function clearHistory() {
     setMsgs([]);
     localStorage.removeItem(STORAGE_KEY);
+  }
+
+  // צירוף מסמך: מעלה ל-Storage דרך /api/campaigns/upload, ומכניס קישור לתיבת ההודעה
+  // כדי שתוסיפי הוראה ("תעבירי למדיה") — אמה תזהה את הקישור ותצרף אותו (attach_document).
+  async function attachFile(e) {
+    const file = e.target.files?.[0];
+    if (e.target) e.target.value = "";
+    if (!file || busy) return;
+    setBusy(true);
+    try {
+      const up = await uploadCampaignFile(file, { purpose: "attachment" });
+      const url = up?.public_url || up?.path || "";
+      const ref = `[מסמך מצורף: ${up?.name || file.name}${url ? " — " + url : ""}]`;
+      setInput(prev => (prev ? prev + " " : "") + ref + " ");
+      inputRef.current?.focus();
+    } catch (err) {
+      setMsgs(prev => [...prev, { role: "agent", text: `העלאת המסמך נכשלה: ${err.message}`, ts: new Date().toISOString(), error: true }]);
+    } finally {
+      setBusy(false);
+    }
   }
 
   // אישור והפעלה של פעולה שאמה הציעה (HITL): שולח ל-/api/emma/execute
@@ -205,7 +226,13 @@ export default function EmmaChat() {
             </div>
 
             {/* Input */}
-            <div style={{ padding: space(3), borderTop: `1px solid ${color.borderDefault}`, display: "flex", gap: space(2) }}>
+            <div style={{ padding: space(3), borderTop: `1px solid ${color.borderDefault}`, display: "flex", gap: space(2), alignItems: "center" }}>
+              <input ref={fileRef} type="file" onChange={attachFile} style={{ display: "none" }}
+                     accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.gif,.svg" />
+              <button onClick={() => fileRef.current?.click()} disabled={busy} title="צרף מסמך"
+                style={{ padding: `${space(2)} ${space(2)}`, background: "transparent",
+                         border: `1px solid ${color.borderDefault}`, borderRadius: radius.button,
+                         fontSize: 16, cursor: busy ? "not-allowed" : "pointer", lineHeight: 1 }}>📎</button>
               <input
                 ref={inputRef}
                 value={input}
