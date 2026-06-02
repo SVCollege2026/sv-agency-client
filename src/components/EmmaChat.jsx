@@ -120,7 +120,9 @@ export default function EmmaChat() {
           <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 9991, background: "rgba(0,0,0,0.05)" }} />
           <div style={{
             position: "fixed", bottom: 80, right: 24,
-            width: 360, height: 540,
+            width: "min(360px, calc(100vw - 32px))",
+            height: "min(540px, calc(100dvh - 110px))",
+            maxWidth: "calc(100vw - 32px)",
             background: color.surface, borderRadius: radius.lg,
             boxShadow: shadow.xl, zIndex: 9992,
             display: "flex", flexDirection: "column",

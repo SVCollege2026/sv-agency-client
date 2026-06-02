@@ -105,7 +105,9 @@ export default function AccountManagerChat() {
           }} />
           <div style={{
             position: "fixed", bottom: 80, left: 24,
-            width: 340, height: 500,
+            width: "min(340px, calc(100vw - 32px))",
+            height: "min(500px, calc(100dvh - 110px))",
+            maxWidth: "calc(100vw - 32px)",
             background: color.surface, borderRadius: radius.lg,
             boxShadow: shadow.xl, zIndex: 9992,
             display: "flex", flexDirection: "column",
