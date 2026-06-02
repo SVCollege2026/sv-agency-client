@@ -157,7 +157,8 @@ export default function EmmaChat() {
                 <div style={{ fontSize: 11, color: color.fgSubtle, fontFamily }}>העוזרת התפעולית — מפעילה את המשרד</div>
               </div>
               <div style={{ display: "flex", gap: space(1) }}>
-                <button onClick={clearHistory} title="נקי שיחה" style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 14, color: color.fgSubtle, padding: 4 }}>🗑</button>
+                <button onClick={clearHistory} title="שיחה חדשה — מנקה רק את התצוגה; המשימות שהעברת נשמרות במערכת"
+                  style={{ background: "transparent", border: `1px solid ${color.borderDefault}`, borderRadius: radius.button, cursor: "pointer", fontSize: 11, fontWeight: 700, color: color.fgMuted, padding: "3px 8px", fontFamily }}>✏️ שיחה חדשה</button>
                 <button onClick={() => setOpen(false)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 18, color: color.fgMuted, padding: 4 }}>×</button>
               </div>
             </div>
