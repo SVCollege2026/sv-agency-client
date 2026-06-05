@@ -11,14 +11,19 @@ const STORAGE_KEY = "sv:chat:emma";
 
 // ערוצי-הצ'ט: אמה (מנהלת-לקוח) · מדיה (מומחה-פלטפורמה + QA) · רישום (מנציח אישורים)
 const CHANNELS = [
-  { id: "emma",   label: "✨ אמה",   placeholder: "בקשי מאמה, או כתבי 'מאושר...'",            tone: "#7c3aed" },
-  { id: "media",  label: "📊 מדיה",  placeholder: "שאלי את מומחה-המדיה (מטא/גוגל/אסטרטגיה)...", tone: "#0ea5e9" },
-  { id: "record", label: "✅ רישום", placeholder: "כתבי 'מאושר לעשות X' — וזה יירשם במערכת.",   tone: "#16a34a" },
+  { id: "emma",     label: "✨ אמה",   placeholder: "בקשי מאמה, או כתבי 'מאושר...'",       tone: "#7c3aed", specialist: null },
+  { id: "strategy", label: "📈 אסטרטג", placeholder: "התלבטי עם האסטרטג על מהלכים/פריסה...",  tone: "#0ea5e9", specialist: "strategy" },
+  { id: "meta",     label: "ⓜ מטא",   placeholder: "שאלי את מנהל מטא (תקציב/CPL/קהלים)...",  tone: "#1877f2", specialist: "meta" },
+  { id: "google",   label: "🔍 גוגל",  placeholder: "שאלי את מנהל גוגל (CPC/ביטויים)...",     tone: "#ea4335", specialist: "google" },
+  { id: "record",   label: "✅ רישום", placeholder: "כתבי 'מאושר לעשות X' — וזה יירשם.",      tone: "#16a34a", specialist: null },
 ];
 const SOURCE_META = {
-  emma:   { label: "אמה",          bg: "#f1f5f9", fg: "#0f172a" },
-  media:  { label: "מומחה-המדיה",  bg: "#e0f2fe", fg: "#075985" },
-  record: { label: "רישום",        bg: "#dcfce7", fg: "#166534" },
+  emma:     { label: "אמה",         bg: "#f1f5f9", fg: "#0f172a" },
+  media:    { label: "מומחה-המדיה", bg: "#e0f2fe", fg: "#075985" },
+  strategy: { label: "אסטרטג",      bg: "#e0f2fe", fg: "#075985" },
+  meta:     { label: "מנהל מטא",    bg: "#e7f0ff", fg: "#1849a9" },
+  google:   { label: "מנהל גוגל",   bg: "#fde8e6", fg: "#b42318" },
+  record:   { label: "רישום",       bg: "#dcfce7", fg: "#166534" },
 };
 
 // תוויות ידידותיות לכלים שאמה מפעילה (מוצג כצ'יפ מתחת לתשובה)
@@ -69,11 +74,12 @@ export default function EmmaChat() {
 
     setBusy(true);
     try {
-      if (ch === "media") {
-        const resp = await askMedia(text, history);
+      const chan = CHANNELS.find(c => c.id === ch);
+      if (chan && chan.specialist) {
+        const resp = await askMedia(text, history, chan.specialist);
         setMsgs(prev => [...prev, {
-          role: "agent", source: "media", specialist: resp?.specialist,
-          text: resp?.reply || "מומחה-המדיה לא החזיר תשובה.",
+          role: "agent", source: resp?.specialist || ch, specialist: resp?.specialist,
+          text: resp?.reply || "המומחה לא החזיר תשובה.",
           qa_passed: resp?.qa_passed, qa_notes: resp?.qa_notes,
           ts: new Date().toISOString(), error: resp?.ok === false,
         }]);
@@ -218,7 +224,7 @@ export default function EmmaChat() {
                     padding: `${space(2)} ${space(3)}`,
                     fontSize: 13, fontFamily, lineHeight: 1.6, whiteSpace: "pre-wrap",
                   }}>{m.text}</div>
-                  {m.source === "media" && (m.qa_passed === true || m.qa_passed === false) && (
+                  {["media","strategy","meta","google"].includes(m.source) && (m.qa_passed === true || m.qa_passed === false) && (
                     <div style={{ marginTop: 4, fontSize: 10, fontFamily, display: "inline-block",
                                   borderRadius: 999, padding: "1px 8px",
                                   background: m.qa_passed ? "#ecfdf5" : "#fff7ed",

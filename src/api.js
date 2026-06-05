@@ -41,9 +41,9 @@ export async function executeEmmaAction(action, params = null) {
   return request("POST", "/api/emma/execute", { action, params });
 }
 
-// ערוץ-מדיה ישיר: מומחה-הפלטפורמה (הבעלים) + ה-QA שלו, גלוי
-export async function askMedia(message, history = null) {
-  return request("POST", "/api/emma/media", { message, history });
+// ערוץ-מדיה ישיר: מומחה (אסטרטג/מטא/גוגל) + ה-QA שלו, גלוי. specialist = בחירה מפורשת
+export async function askMedia(message, history = null, specialist = null) {
+  return request("POST", "/api/emma/media", { message, history, specialist });
 }
 
 // גורם-רישום: "מאושר לעשות X" → נרשם ל-decision_log (מאומת)
