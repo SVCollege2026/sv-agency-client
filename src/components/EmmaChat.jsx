@@ -5,9 +5,21 @@
  */
 import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { color, radius, shadow, space, fontFamily, transition } from "./campaign/_tokens.js";
-import { askEmma, executeEmmaAction, uploadCampaignFile } from "../api.js";
+import { askEmma, askMedia, recordApproval, executeEmmaAction, uploadCampaignFile } from "../api.js";
 
 const STORAGE_KEY = "sv:chat:emma";
+
+// ערוצי-הצ'ט: אמה (מנהלת-לקוח) · מדיה (מומחה-פלטפורמה + QA) · רישום (מנציח אישורים)
+const CHANNELS = [
+  { id: "emma",   label: "✨ אמה",   placeholder: "בקשי מאמה, או כתבי 'מאושר...'",            tone: "#7c3aed" },
+  { id: "media",  label: "📊 מדיה",  placeholder: "שאלי את מומחה-המדיה (מטא/גוגל/אסטרטגיה)...", tone: "#0ea5e9" },
+  { id: "record", label: "✅ רישום", placeholder: "כתבי 'מאושר לעשות X' — וזה יירשם במערכת.",   tone: "#16a34a" },
+];
+const SOURCE_META = {
+  emma:   { label: "אמה",          bg: "#f1f5f9", fg: "#0f172a" },
+  media:  { label: "מומחה-המדיה",  bg: "#e0f2fe", fg: "#075985" },
+  record: { label: "רישום",        bg: "#dcfce7", fg: "#166534" },
+};
 
 // תוויות ידידותיות לכלים שאמה מפעילה (מוצג כצ'יפ מתחת לתשובה)
 const TOOL_LABELS = {
@@ -30,6 +42,7 @@ export default function EmmaChat() {
   const [msgs, setMsgs]   = useState(loadHistory);
   const [input, setInput] = useState("");
   const [busy, setBusy]   = useState(false);
+  const [channel, setChannel] = useState("emma"); // emma | media | record
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
   const fileRef   = useRef(null);
@@ -41,9 +54,11 @@ export default function EmmaChat() {
   async function send() {
     const text = input.trim();
     if (!text || busy) return;
+    const ch = channel;
     setInput("");
+    if (inputRef.current) inputRef.current.style.height = "auto";
 
-    const userMsg = { role: "manager", text, ts: new Date().toISOString() };
+    const userMsg = { role: "manager", text, channel: ch, ts: new Date().toISOString() };
     setMsgs(prev => [...prev, userMsg]);
 
     // היסטוריה לפורמט Anthropic (user/assistant) — בלי ההודעה הנוכחית
@@ -54,16 +69,30 @@ export default function EmmaChat() {
 
     setBusy(true);
     try {
-      const resp = await askEmma(text, history);
-      const replyText = resp?.reply || "לא הצלחתי להחזיר תשובה.";
-      const actions = Array.isArray(resp?.actions) ? resp.actions : [];
-      const pending = Array.isArray(resp?.pending_actions)
-        ? resp.pending_actions.map(p => ({ ...p, status: "pending" }))
-        : [];
-      setMsgs(prev => [...prev, {
-        role: "agent", text: replyText, actions, pending,
-        ts: new Date().toISOString(), error: resp?.ok === false,
-      }]);
+      if (ch === "media") {
+        const resp = await askMedia(text, history);
+        setMsgs(prev => [...prev, {
+          role: "agent", source: "media", specialist: resp?.specialist,
+          text: resp?.reply || "מומחה-המדיה לא החזיר תשובה.",
+          qa_passed: resp?.qa_passed, qa_notes: resp?.qa_notes,
+          ts: new Date().toISOString(), error: resp?.ok === false,
+        }]);
+      } else if (ch === "record") {
+        const resp = await recordApproval(text);
+        setMsgs(prev => [...prev, {
+          role: "agent", source: "record", text: resp?.reply || "לא נרשם.",
+          ts: new Date().toISOString(), error: resp?.ok === false,
+        }]);
+      } else {
+        const resp = await askEmma(text, history);
+        const actions = Array.isArray(resp?.actions) ? resp.actions : [];
+        const pending = Array.isArray(resp?.pending_actions)
+          ? resp.pending_actions.map(p => ({ ...p, status: "pending" })) : [];
+        setMsgs(prev => [...prev, {
+          role: "agent", source: "emma", text: resp?.reply || "לא הצלחתי להחזיר תשובה.",
+          actions, pending, ts: new Date().toISOString(), error: resp?.ok === false,
+        }]);
+      }
     } catch (e) {
       setMsgs(prev => [...prev, { role: "agent", text: `שגיאה: ${e.message}. נסי שנית.`, ts: new Date().toISOString(), error: true }]);
     } finally {
@@ -166,13 +195,22 @@ export default function EmmaChat() {
             {/* Messages */}
             <div style={{ flex: 1, overflow: "auto", padding: space(3), display: "flex", flexDirection: "column", gap: space(2) }}>
               {msgs.length === 0 && (
-                <div style={{ color: color.fgSubtle, fontSize: 13, fontFamily, textAlign: "center", marginTop: space(6), lineHeight: 1.7 }}>
-                  בקשי ממני בשפה חופשית.<br />
-                  למשל: "מה קרה ל-CPL בגוגל החודש?" · "ה-Make תקין?" · "המערכת רצה?"
+                <div style={{ color: color.fgSubtle, fontSize: 12.5, fontFamily, textAlign: "right", marginTop: space(5), lineHeight: 1.8, padding: `0 ${space(1)}` }}>
+                  בחרי למטה אל מי לפנות:<br />
+                  <b>✨ אמה</b> — מנהלת-הלקוח: בקשות, אישורים, שאלות.<br />
+                  <b>📊 מדיה</b> — מומחה-הפלטפורמה + ה-QA שלו, ישירות.<br />
+                  <b>✅ רישום</b> — "מאושר לעשות X" → נרשם במערכת.
                 </div>
               )}
               {msgs.map((m, i) => (
                 <div key={i} style={{ alignSelf: m.role === "manager" ? "flex-end" : "flex-start", maxWidth: "88%" }}>
+                  {m.role !== "manager" && m.source && SOURCE_META[m.source] && (
+                    <div style={{ fontSize: 10, fontWeight: 700, fontFamily, color: SOURCE_META[m.source].fg,
+                                  background: SOURCE_META[m.source].bg, borderRadius: 999, padding: "1px 8px",
+                                  display: "inline-block", marginBottom: 3 }}>
+                      {SOURCE_META[m.source].label}{m.specialist ? ` · ${m.specialist}` : ""}
+                    </div>
+                  )}
                   <div style={{
                     background: m.role === "manager" ? color.primary : (m.error ? "#fee2e2" : "#f1f5f9"),
                     color: m.role === "manager" ? "#fff" : (m.error ? "#b91c1c" : color.fgDefault),
@@ -180,6 +218,15 @@ export default function EmmaChat() {
                     padding: `${space(2)} ${space(3)}`,
                     fontSize: 13, fontFamily, lineHeight: 1.6, whiteSpace: "pre-wrap",
                   }}>{m.text}</div>
+                  {m.source === "media" && (m.qa_passed === true || m.qa_passed === false) && (
+                    <div style={{ marginTop: 4, fontSize: 10, fontFamily, display: "inline-block",
+                                  borderRadius: 999, padding: "1px 8px",
+                                  background: m.qa_passed ? "#ecfdf5" : "#fff7ed",
+                                  color: m.qa_passed ? "#047857" : "#9a3412",
+                                  border: `1px solid ${m.qa_passed ? "#a7f3d0" : "#fed7aa"}` }}>
+                      {m.qa_passed ? "✓ עבר את ה-QA של המומחה" : "⚠ ה-QA סימן הערה"}{m.qa_notes ? ` — ${m.qa_notes}` : ""}
+                    </div>
+                  )}
                   {Array.isArray(m.actions) && m.actions.length > 0 && (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
                       {m.actions.map((a, j) => (
@@ -226,25 +273,43 @@ export default function EmmaChat() {
               <div ref={bottomRef} />
             </div>
 
-            {/* Input */}
-            <div style={{ padding: space(3), borderTop: `1px solid ${color.borderDefault}`, display: "flex", gap: space(2), alignItems: "center" }}>
+            {/* Recipient selector — אל מי את פונה: אמה / מדיה / רישום */}
+            <div style={{ padding: `${space(2)} ${space(3)} 0`, display: "flex", gap: space(1) }}>
+              {CHANNELS.map(c => (
+                <button key={c.id} onClick={() => { setChannel(c.id); inputRef.current?.focus(); }}
+                  style={{
+                    flex: 1, padding: `${space(1.5)} 0`, fontSize: 11, fontWeight: 700, fontFamily,
+                    cursor: "pointer", borderRadius: radius.button, transition: transition.fast,
+                    border: `1px solid ${channel === c.id ? c.tone : color.borderDefault}`,
+                    background: channel === c.id ? c.tone : "transparent",
+                    color: channel === c.id ? "#fff" : color.fgMuted,
+                  }}>{c.label}</button>
+              ))}
+            </div>
+
+            {/* Input — תיבת-כתיבה שגדלה עם הטקסט */}
+            <div style={{ padding: space(3), display: "flex", gap: space(2), alignItems: "flex-end" }}>
               <input ref={fileRef} type="file" onChange={attachFile} style={{ display: "none" }}
                      accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.gif,.svg" />
               <button onClick={() => fileRef.current?.click()} disabled={busy} title="צרף מסמך"
                 style={{ padding: `${space(2)} ${space(2)}`, background: "transparent",
-                         border: `1px solid ${color.borderDefault}`, borderRadius: radius.button,
+                         border: `1px solid ${color.borderDefault}`, borderRadius: radius.button, alignSelf: "flex-end",
                          fontSize: 16, cursor: busy ? "not-allowed" : "pointer", lineHeight: 1 }}>📎</button>
-              <input
+              <textarea
                 ref={inputRef}
                 value={input}
+                rows={1}
                 onChange={e => setInput(e.target.value)}
+                onInput={e => { e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px"; }}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-                placeholder="בקשי מאמה..."
+                placeholder={(CHANNELS.find(c => c.id === channel) || CHANNELS[0]).placeholder}
                 disabled={busy}
-                style={{ flex: 1, padding: `${space(2)} ${space(3)}`, border: `1px solid ${color.borderDefault}`, borderRadius: radius.input, fontSize: 13, fontFamily, direction: "rtl", outline: "none", background: "#fff" }}
+                style={{ flex: 1, padding: `${space(2)} ${space(3)}`, border: `1px solid ${color.borderDefault}`,
+                         borderRadius: radius.input, fontSize: 13, fontFamily, direction: "rtl", outline: "none",
+                         background: "#fff", resize: "none", overflowY: "auto", maxHeight: 160, lineHeight: 1.5 }}
               />
               <button onClick={send} disabled={busy || !input.trim()} style={{
-                padding: `${space(2)} ${space(3)}`,
+                padding: `${space(2)} ${space(3)}`, alignSelf: "flex-end",
                 background: busy || !input.trim() ? "#e5e7eb" : color.primary,
                 color: busy || !input.trim() ? color.fgSubtle : "#fff",
                 border: "none", borderRadius: radius.button,
