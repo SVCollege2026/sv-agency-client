@@ -37,9 +37,11 @@ import {
   runInvestigation,
   getMediaStage0Latest,
   generateMediaStage0,
+  getEmergencyStopActive,
 } from "../api.js";
 import CoursesCyclesPanel from "../components/CoursesCyclesPanel.jsx";
 import CampaignTab from "../components/campaign/CampaignTab.jsx";
+import EmergencyStopButton from "../components/campaign/EmergencyStopButton.jsx";
 
 // ─── Utils ───────────────────────────────────────────────────────────────────
 
@@ -158,6 +160,8 @@ function fmtChannelSplit(v) {
 const DETAIL_COLUMNS = [
   { key: "platform",        label: "פלטפורמה",   default: true  },
   { key: "campaign_name",   label: "קמפיין",     default: true  },
+  // עצירת-חירום (EMERGENCY-STOP-HAND-3): כפתור אדום ליד כל קמפיין מטא. הלחיצה = האישור.
+  { key: "emergency_stop",  label: "עצירת חירום", default: true  },
   { key: "spend",           label: "הוצאה",      default: true,  fmt: fmtMoney },
   { key: "leads_count",     label: "לידים",       default: true,  fmt: (v) => fmtNum(v) },
   { key: "new_leads_count", label: "חדשים",      default: true,  fmt: (v) => fmtNum(v) },
@@ -1193,6 +1197,17 @@ export default function CampaignManagementPage() {
   const [runs, setRuns]                   = useState([]);
   const [showRuns, setShowRuns]           = useState(false);
 
+  // עצירות-חירום פעילות (EMERGENCY-STOP-HAND-3): map של "target_type:target_id" → רשומת stop.
+  // נטען פעם אחת ומתרענן אחרי כל לחיצת עצירה/החזרה — קובע "נעצר ע"י מנהלת השיווק" בטבלה.
+  const [emergencyStops, setEmergencyStops] = useState({});
+  const loadEmergencyStops = React.useCallback(() => {
+    getEmergencyStopActive()
+      .then((r) => setEmergencyStops(Object.fromEntries(
+        (r.stops || []).map((s) => [`${s.target_type}:${s.target_id}`, s]))))
+      .catch(() => setEmergencyStops({})); // אין דאטה ≠ "נעצר" — ברירת-מחדל: לא מציגים עצור
+  }, []);
+  useEffect(loadEmergencyStops, [loadEmergencyStops]);
+
   const [visibleCols, setVisibleCols] = useState(
     () => Object.fromEntries(ALL_COLUMNS.map((c) => [c.key, c.default]))
   );
@@ -1765,7 +1780,19 @@ export default function CampaignManagementPage() {
                     }}>
                       {visibleColList.map((c) => (
                         <td key={c.key} style={tdStyle}>
-                          {c.fmt ? c.fmt(r[c.key]) : (r[c.key] ?? "—")}
+                          {c.key === "emergency_stop" ? (
+                            // עצירת-חירום: רק שורות-קמפיין אמיתיות (לא סיכום); הכפתור עצמו
+                            // מציג את עצמו רק למטא — היד-הכותבת תומכת רק בה.
+                            r.is_summary ? "" : (
+                              <EmergencyStopButton
+                                platform={r.platform}
+                                campaignId={r.campaign_id}
+                                campaignName={r.campaign_name}
+                                stopInfo={emergencyStops[`campaign:${r.campaign_id}`] || null}
+                                onChanged={loadEmergencyStops}
+                              />
+                            )
+                          ) : (c.fmt ? c.fmt(r[c.key]) : (r[c.key] ?? "—"))}
                         </td>
                       ))}
                     </tr>
