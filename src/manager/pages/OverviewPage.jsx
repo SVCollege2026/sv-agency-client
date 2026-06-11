@@ -145,6 +145,11 @@ export default function OverviewPage() {
     const approvalCards = filteredPending.map((i) => ({
       kind: i.kind, id: i.id, tag_he: "דורש אישור", title: i.title,
       course: i.course, version: i.version, since: i.updated_at,
+      // תגית-תיקייה: כל פריט מציג את שיוכו בכל הופעה. תקציב/המלצות בלי
+      // קורס שייכים לתיקיית "פריסות מדיה ותקציב".
+      folder_tag: i.course
+        || (["budget_allocation", "recommendation"].includes(i.kind)
+            ? "פריסות מדיה ותקציב" : "פעילות בית-ספרית"),
     }));
     waiting = [
       ...blockerCards.filter((b) => b.urgent),
@@ -207,8 +212,9 @@ export default function OverviewPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {waiting.slice(0, 6).map((w) => (
                 <PriorityCard key={`${w.kind}-${w.id}`} tag={w.tag_he}
+                  folder={w.folder_tag || w.course}
                   title={w.title}
-                  meta={[w.course, w.version != null ? `V${w.version}` : null,
+                  meta={[w.version != null ? `V${w.version}` : null,
                          timeAgoHe(w.since)].filter(Boolean).join(" · ")}
                   onClick={() => openItem(w)} />
               ))}

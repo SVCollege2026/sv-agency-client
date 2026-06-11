@@ -55,6 +55,15 @@ export function getFolders() {
   return request("GET", "/api/campaigns/folders");
 }
 
+export function createFolder({ courseName, plannedGoLiveDate = null, metadata = {} }) {
+  return request("POST", "/api/campaigns/folders", {
+    course_name: courseName,
+    planned_go_live_date: plannedGoLiveDate,
+    created_by: "marketing_manager",
+    metadata,
+  });
+}
+
 export function getFolder(folderId, includeVersions = false) {
   return request("GET", `/api/campaigns/folders/${folderId}?include_versions=${includeVersions}`);
 }

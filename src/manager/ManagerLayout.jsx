@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./components/Sidebar.jsx";
 import NewRequestModal from "./components/NewRequestModal.jsx";
+import NewCourseModal from "./components/NewCourseModal.jsx";
 import { getApprovalsInbox, getFolders } from "./api.js";
 import { filterInboxItems, testFolderIdSet } from "./lib.js";
 import "./tokens.css";
@@ -73,12 +74,14 @@ export default function ManagerLayout() {
         </div>
       </div>
 
-      {requestModal && (
+      {requestModal && (requestModal.newCourse ? (
+        <NewCourseModal onClose={() => setRequestModal(null)}
+                        onCreated={loadFolders} />
+      ) : (
         <NewRequestModal folders={folders}
                          initialFolderId={requestModal.folderId || null}
-                         newCourse={!!requestModal.newCourse}
                          onClose={() => setRequestModal(null)} />
-      )}
+      ))}
     </div>
   );
 }

@@ -11,8 +11,7 @@ import { groupFoldersByCourse } from "../lib.js";
 
 const PRIORITY = [["normal", "רגילה"], ["high", "דחופה"], ["low", "נמוכה"]];
 
-export default function NewRequestModal({ folders = [], initialFolderId = null,
-                                          newCourse = false, onClose }) {
+export default function NewRequestModal({ folders = [], initialFolderId = null, onClose }) {
   const [text, setText] = useState("");
   const [folderId, setFolderId] = useState(initialFolderId || "");
   const [priority, setPriority] = useState("normal");
@@ -46,7 +45,7 @@ export default function NewRequestModal({ folders = [], initialFolderId = null,
       }
       await submitRequest({
         folderId: folderId || null,
-        requestType: newCourse ? "new_course" : (folderId ? "course_activity" : "school_level"),
+        requestType: folderId ? "course_activity" : "school_level",
         briefPayload: {
           free_text: text.trim(),
           priority,
@@ -67,11 +66,11 @@ export default function NewRequestModal({ folders = [], initialFolderId = null,
   return (
     <div className="mi-modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="mi-modal" role="dialog" aria-modal="true" ref={dialogRef}
-           aria-label={newCourse ? "פתיחת קורס חדש" : "בקשה חדשה"}
+           aria-label="בקשה חדשה"
            style={{ maxInlineSize: 520 }}>
         <div style={{ display: "flex", alignItems: "center", marginBlockEnd: 12 }}>
           <h2 className="mi-h2" style={{ fontSize: 18, flex: 1 }}>
-            {newCourse ? "פתיחת קורס חדש" : "בקשה חדשה"}
+            בקשה חדשה
           </h2>
           <button className="mi-btn mi-btn-ghost" aria-label="סגירה" onClick={onClose}>✕</button>
         </div>
@@ -91,13 +90,11 @@ export default function NewRequestModal({ folders = [], initialFolderId = null,
         ) : (
         <>
           <label className="mi-field-label" htmlFor="nr-text">
-            {newCourse ? "איזה קורס לפתוח, ומה חשוב שנדע?" : "מה תרצי שהמשרד יבדוק או יבצע?"}
+            מה תרצי שהמשרד יבדוק או יבצע?
           </label>
           <textarea id="nr-text" className="mi-textarea" value={text}
                     onChange={(e) => setText(e.target.value)}
-                    placeholder={newCourse
-                      ? "לדוגמה: פתיחת קורס חדש בנושא דאטה. מחזור ראשון בספטמבר."
-                      : "לדוגמה: יש לנו רעיון לסרטון קצר עם בוגרת. אני רוצה לבדוק אותו לקמפיין יולי."} />
+                    placeholder="לדוגמה: יש לנו רעיון לסרטון קצר עם בוגרת. אני רוצה לבדוק אותו לקמפיין יולי." />
 
           <div style={{ display: "flex", gap: 8, marginBlockStart: 12, flexWrap: "wrap" }}>
             <button type="button" className="mi-btn mi-btn-secondary"
@@ -128,19 +125,17 @@ export default function NewRequestModal({ folders = [], initialFolderId = null,
             </div>
           </div>
 
-          {!newCourse && (
-            <div style={{ marginBlockStart: 12 }}>
-              <label className="mi-field-label" htmlFor="nr-folder">שיוך (לא חובה)</label>
-              <select id="nr-folder" className="mi-field" value={folderId}
-                      onChange={(e) => setFolderId(e.target.value)}>
-                <option value="">פעילות בית-ספרית (כללי)</option>
-                {/* קורס ⇒ תיקיית-העבודה העדכנית שלו (projection) */}
-                {groupFoldersByCourse(folders).map((c) => (
-                  <option key={c.key} value={c.latest.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div style={{ marginBlockStart: 12 }}>
+            <label className="mi-field-label" htmlFor="nr-folder">שיוך (לא חובה)</label>
+            <select id="nr-folder" className="mi-field" value={folderId}
+                    onChange={(e) => setFolderId(e.target.value)}>
+              <option value="">פעילות בית-ספרית (כללי)</option>
+              {/* קורס ⇒ תיקיית-העבודה העדכנית שלו (projection) */}
+              {groupFoldersByCourse(folders).map((c) => (
+                <option key={c.key} value={c.latest.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
 
           {error && (
             <p className="mi-meta" role="alert"
