@@ -851,3 +851,22 @@ export async function resolveLimannItem(body) {
 export async function getMediaDailyBrief() {
   return request("GET", "/api/media/daily-brief");
 }
+
+// ─── Emergency stop — עצירת-חירום לקמפיין מהממשק (EMERGENCY-STOP-HAND-3) ─────
+// לחיצת מנהלת-השיווק = האישור. צד השרת אוכף: מפעיל אנושי בלבד (סוכנים נחסמים),
+// מתג EMERGENCY_STOP_ENABLED, read-back מיידי, ותיעוד מי-לחץ-ומתי ב-decision_log.
+
+export async function emergencyStopPause(body) {
+  // body: { target_type, target_id, target_name, operator, reason? }
+  return request("POST", "/api/media/emergency-stop/pause", body);
+}
+
+export async function emergencyStopResume(body) {
+  // body: { target_type, target_id, target_name, operator, reason? }
+  return request("POST", "/api/media/emergency-stop/resume", body);
+}
+
+export async function getEmergencyStopActive() {
+  // { stops: [{target_type, target_id, target_name, stopped_at, stopped_by, ...}], truncated }
+  return request("GET", "/api/media/emergency-stop/active");
+}
