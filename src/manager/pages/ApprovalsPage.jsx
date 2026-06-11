@@ -4,12 +4,14 @@
  * מאחדת: תוצרים (artifacts) + הקצאות-תקציב + המלצות-מדיה.
  */
 import React, { useCallback, useEffect, useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import {
   getApprovalsInbox, approveArtifact, requestArtifactRevision,
   decideAllocation, decideRecommendation,
 } from "../api.js";
 import { StatusChip, EmptyState, ErrorBanner, SkeletonCard, timeAgoHe } from "../components/ui.jsx";
 import RejectDialog from "../components/RejectDialog.jsx";
+import RecommendationDrawer from "../components/RecommendationDrawer.jsx";
 
 const KIND_HE = {
   artifact: "תוצר",
@@ -17,13 +19,26 @@ const KIND_HE = {
   recommendation: "המלצת מדיה",
 };
 
-function ApprovalCard({ item, onApprove, onReject, busy }) {
+const URGENCY_CHIP = {
+  critical:  ["קריטי", "mi-chip-danger"],
+  important: ["חשוב",  "mi-chip-warning"],
+};
+
+function ApprovalCard({ item, onApprove, onReject, onOpen, busy }) {
+  // המלצת מדיה: ההחלטה מתקבלת מול ההמלצה המלאה — הכרטיס פותח אותה,
+  // וכפתורי אישור/לתקן יושבים בפאנל ליד התוכן, לא מול כותרת.
+  const isRec = item.kind === "recommendation";
+  const urgency = URGENCY_CHIP[item.urgency];
+
   return (
     <article className="mi-card" aria-label={item.title}
-             style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+             style={{ display: "flex", flexDirection: "column", gap: 10,
+                      cursor: isRec ? "pointer" : "default" }}
+             onClick={isRec ? () => onOpen(item) : undefined}>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
         {item.course && <span className="mi-chip mi-chip-info">{item.course}</span>}
         <span className="mi-chip mi-chip-primary">{KIND_HE[item.kind] || item.kind}</span>
+        {urgency && <span className={`mi-chip ${urgency[1]}`}>{urgency[0]}</span>}
         {item.version != null && (
           <span className="mi-chip mi-chip-info mi-ltr" title="אישור צמוד-גרסה">
             V{item.version}
@@ -44,29 +59,44 @@ function ApprovalCard({ item, onApprove, onReject, busy }) {
       <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "var(--mi-ink)" }}>
         {item.title}
       </h3>
+      {item.numbers_he && (
+        <p className="mi-body" style={{ margin: 0, fontWeight: 600 }}>{item.numbers_he}</p>
+      )}
       {item.rationale && <p className="mi-meta" style={{ margin: 0 }}>{item.rationale}</p>}
-      <p className="mi-meta" style={{ margin: 0 }}>{timeAgoHe(item.updated_at)}</p>
+      <p className="mi-meta" style={{ margin: 0 }}>
+        {[item.source_he, timeAgoHe(item.updated_at)].filter(Boolean).join(" · ")}
+      </p>
 
-      {/* החלטה פר-פריט בלבד — אין מסלול קבוצתי */}
-      <div className="mi-actionbar" style={{ padding: 0, border: "none", position: "static" }}>
-        <button className="mi-btn mi-btn-primary" disabled={busy}
-                onClick={() => onApprove(item)} style={{ flex: 1, justifyContent: "center" }}>
-          ✓ אישור
+      {isRec ? (
+        <button className="mi-btn mi-btn-secondary"
+                onClick={(e) => { e.stopPropagation(); onOpen(item); }}
+                style={{ justifyContent: "center" }}>
+          📄 לקריאת ההמלצה ולהחלטה
         </button>
-        <button className="mi-btn mi-btn-secondary" disabled={busy}
-                onClick={() => onReject(item)} style={{ flex: 1, justifyContent: "center" }}>
-          ✎ לתקן
-        </button>
-      </div>
+      ) : (
+        /* החלטה פר-פריט בלבד — אין מסלול קבוצתי */
+        <div className="mi-actionbar" style={{ padding: 0, border: "none", position: "static" }}>
+          <button className="mi-btn mi-btn-primary" disabled={busy}
+                  onClick={() => onApprove(item)} style={{ flex: 1, justifyContent: "center" }}>
+            ✓ אישור
+          </button>
+          <button className="mi-btn mi-btn-secondary" disabled={busy}
+                  onClick={() => onReject(item)} style={{ flex: 1, justifyContent: "center" }}>
+            ✎ לתקן
+          </button>
+        </div>
+      )}
     </article>
   );
 }
 
-export default function ApprovalsPage({ onPendingCount }) {
+export default function ApprovalsPage() {
+  const { setPendingCount } = useOutletContext() ?? {};
   const [tab, setTab] = useState("pending");
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [rejecting, setRejecting] = useState(null);   // הפריט שבדיאלוג "לתקן"
+  const [opened, setOpened] = useState(null);          // ההמלצה הפתוחה בפאנל
   const [busyId, setBusyId] = useState(null);
   const [notice, setNotice] = useState(null);
 
@@ -76,10 +106,10 @@ export default function ApprovalsPage({ onPendingCount }) {
     getApprovalsInbox(t)
       .then((d) => {
         setData(d);
-        if (t === "pending") onPendingCount?.(d.count);
+        if (t === "pending") setPendingCount?.(d.count);
       })
       .catch((e) => setError(e.message));
-  }, [tab, onPendingCount]);
+  }, [tab, setPendingCount]);
   useEffect(() => load(tab), [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const doApprove = async (item) => {
@@ -90,6 +120,7 @@ export default function ApprovalsPage({ onPendingCount }) {
       else if (item.kind === "budget_allocation") await decideAllocation(item.id, "approved");
       else await decideRecommendation(item.id, "approve");
       setNotice({ kind: "ok", text: `"${item.title}" אושר ✓` });
+      setOpened(null);
       load();
     } catch (e) {
       setNotice({ kind: "err", text: `האישור נכשל: ${e.message}` });
@@ -107,6 +138,7 @@ export default function ApprovalsPage({ onPendingCount }) {
       else await decideRecommendation(item.id, "reject", reason);
       setNotice({ kind: "ok", text: "בקשת השינויים נשלחה למשרד — גרסה מתוקנת תחזור לאישור" });
       setRejecting(null);
+      setOpened(null);
       load();
     } catch (e) {
       setNotice({ kind: "err", text: `השליחה נכשלה: ${e.message}` });
@@ -166,7 +198,8 @@ export default function ApprovalsPage({ onPendingCount }) {
               <ApprovalCard key={`${item.kind}-${item.id}`} item={item}
                             busy={busyId === item.id}
                             onApprove={doApprove}
-                            onReject={setRejecting} />
+                            onReject={setRejecting}
+                            onOpen={setOpened} />
             ))}
           </div>
         )
@@ -193,6 +226,13 @@ export default function ApprovalsPage({ onPendingCount }) {
             ))}
           </div>
         )
+      )}
+
+      {opened && (
+        <RecommendationDrawer item={opened} busy={busyId === opened.id}
+                              onApprove={doApprove}
+                              onReject={setRejecting}
+                              onClose={() => setOpened(null)} />
       )}
 
       {rejecting && (

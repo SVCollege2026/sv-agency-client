@@ -38,6 +38,11 @@ export function getRecentDecisions(limit = 20) {
   return request("GET", `/api/decisions/?limit=${limit}`);
 }
 
+/** ההמלצה המלאה — טקסט, נימוק, מספרים, payload. נשלף רק בפתיחת הפריט. */
+export function getRecommendation(recId) {
+  return request("GET", `/api/recommendations/${recId}`);
+}
+
 /* ── דלתות החלטה קיימות — פר-פריט, צמוד-גרסה, בלי bulk ── */
 
 export function approveArtifact(artifactId, note = null) {
