@@ -1,0 +1,224 @@
+/**
+ * tokens.css — מערכת-העיצוב של ממשק מנהלת השיווק (PHASE-1).
+ * נגזר מהמוקאפ המחייב (docs/specs/mgmt_interface_phase0_design_plan.md §2).
+ *
+ * ⚠ ניגודיות: כל זוג טקסט/רקע כאן נאכף ל-WCAG-AA ע"י scripts/check-contrast.mjs
+ *   (רץ ב-prebuild). שינוי ערך בלי לעדכן את רשימת-הזוגות שם = הבילד נופל.
+ * ⚠ RTL: רכיבי הממשק משתמשים ב-logical properties בלבד (inline-start/end).
+ */
+
+.mi-root {
+  /* ── רקעים ──────────────────────────────── */
+  --mi-bg:            #F7F6FB;   /* רקע עמוד */
+  --mi-surface:       #FFFFFF;   /* כרטיסים */
+  --mi-border:        #ECEAF4;
+
+  /* ── טקסט ──────────────────────────────── */
+  --mi-ink:           #1D1B2E;   /* כותרות ומספרים */
+  --mi-ink-2:         #4A4760;   /* גוף */
+  --mi-ink-3:         #6B6880;   /* מטא — AA גם על --mi-bg */
+
+  /* ── ראשי (מג'נטה מהמוקאפ) ─────────────── */
+  --mi-primary:       #C7256B;
+  --mi-primary-hover: #A91D59;
+  --mi-primary-soft:  #FBE9F2;
+
+  /* ── סמנטיים (טקסט-כהה על רקע-רך — AA) ── */
+  --mi-success:       #15603F;
+  --mi-success-bg:    #E6F6EE;
+  --mi-warning:       #8A5200;
+  --mi-warning-bg:    #FDF3E2;
+  --mi-info:          #1F4FB8;
+  --mi-info-bg:       #EAF1FD;
+  --mi-danger:        #B02A2A;
+  --mi-danger-bg:     #FCEAEA;
+  --mi-accent:        #5A4BD1;   /* אייקונים בריבועים רכים */
+  --mi-accent-bg:     #EFEDFB;
+
+  --mi-focus:         #2B5FD9;
+
+  /* ── צורה ──────────────────────────────── */
+  --mi-radius-card:   16px;
+  --mi-radius-btn:    10px;
+  --mi-radius-chip:   8px;
+  --mi-shadow-card:   0 1px 3px rgba(29, 27, 46, .06);
+  --mi-shadow-pop:    0 8px 30px rgba(29, 27, 46, .12);
+
+  /* בסיס */
+  font-family: "Heebo", "Inter", system-ui, sans-serif;
+  background: var(--mi-bg);
+  color: var(--mi-ink-2);
+  min-height: 100vh;
+}
+
+/* ── יסודות נגישות ─────────────────────────── */
+.mi-root :focus-visible {
+  outline: 2px solid var(--mi-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.mi-root button { cursor: pointer; font-family: inherit; }
+@media (prefers-reduced-motion: reduce) {
+  .mi-root * { animation: none !important; transition: none !important; }
+}
+
+/* מספרים/תאריכים בתוך טקסט עברי — תמיד LTR מבודד */
+.mi-ltr { direction: ltr; unicode-bidi: isolate; }
+
+/* ── טיפוגרפיה ─────────────────────────────── */
+.mi-h1   { font-size: 28px; font-weight: 700; color: var(--mi-ink); margin: 0; }
+.mi-h2   { font-size: 17px; font-weight: 600; color: var(--mi-ink); margin: 0; }
+.mi-body { font-size: 14px; color: var(--mi-ink-2); }
+.mi-meta { font-size: 12px; color: var(--mi-ink-3); }
+
+/* ── כרטיס ─────────────────────────────────── */
+.mi-card {
+  background: var(--mi-surface);
+  border: 1px solid var(--mi-border);
+  border-radius: var(--mi-radius-card);
+  box-shadow: var(--mi-shadow-card);
+  padding: 20px;
+}
+
+/* ── כפתורים ───────────────────────────────── */
+.mi-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border-radius: var(--mi-radius-btn);
+  font-size: 14px; font-weight: 600;
+  padding: 10px 18px;
+  min-block-size: 44px;             /* יעד-מגע מובייל */
+  border: 1px solid transparent;
+}
+.mi-btn-primary { background: var(--mi-primary); color: #FFFFFF; }
+.mi-btn-primary:hover { background: var(--mi-primary-hover); }
+.mi-btn-secondary {
+  background: var(--mi-surface);
+  color: var(--mi-primary);
+  border-color: var(--mi-primary);
+}
+.mi-btn-secondary:hover { background: var(--mi-primary-soft); }
+.mi-btn-ghost { background: transparent; color: var(--mi-ink-2); }
+.mi-btn[disabled] { opacity: .55; cursor: not-allowed; }
+
+/* ── צ'יפ סטטוס: צבע + טקסט (+אייקון בצד הקורא) — לעולם לא צבע בלבד ── */
+.mi-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  border-radius: var(--mi-radius-chip);
+  font-size: 12px; font-weight: 600;
+  padding: 3px 10px;
+}
+.mi-chip-success { background: var(--mi-success-bg); color: var(--mi-success); }
+.mi-chip-warning { background: var(--mi-warning-bg); color: var(--mi-warning); }
+.mi-chip-info    { background: var(--mi-info-bg);    color: var(--mi-info); }
+.mi-chip-danger  { background: var(--mi-danger-bg);  color: var(--mi-danger); }
+.mi-chip-primary { background: var(--mi-primary-soft); color: var(--mi-primary); }
+
+/* ── כרטיס-עדיפות עם פס בקצה הפותח (ימין ב-RTL) ── */
+.mi-priority {
+  border-inline-start: 4px solid var(--mi-border);
+  padding-inline-start: 16px;
+}
+.mi-priority-approval { border-inline-start-color: var(--mi-primary); }
+.mi-priority-decision { border-inline-start-color: var(--mi-warning); }
+.mi-priority-info     { border-inline-start-color: var(--mi-info); }
+
+/* ── גריד מובייל-first ─────────────────────── */
+.mi-page { max-inline-size: 1200px; margin-inline: auto; padding: 16px; }
+.mi-kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.mi-cols { display: grid; grid-template-columns: 1fr; gap: 16px; margin-block-start: 16px; }
+.mi-cards-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 768px) {
+  .mi-page { padding: 24px 32px; }
+  .mi-kpis { grid-template-columns: repeat(4, 1fr); }
+  .mi-cols { grid-template-columns: 1.2fr 1fr 1fr; }
+  .mi-cards-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1100px) {
+  .mi-cards-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ── תפריט עליון ───────────────────────────── */
+.mi-topnav {
+  position: sticky; inset-block-start: 0; z-index: 40;
+  background: var(--mi-surface);
+  border-block-end: 1px solid var(--mi-border);
+}
+.mi-topnav-inner {
+  max-inline-size: 1200px; margin-inline: auto;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px;
+}
+.mi-navlink {
+  font-size: 14px; font-weight: 500; color: var(--mi-ink-2);
+  padding: 8px 12px; border-radius: 8px; text-decoration: none;
+  background: transparent; border: none;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.mi-navlink:hover { background: var(--mi-bg); }
+.mi-navlink-active { color: var(--mi-primary); font-weight: 700; background: var(--mi-primary-soft); }
+.mi-nav-badge {
+  background: var(--mi-primary); color: #fff;
+  border-radius: 999px; font-size: 11px; font-weight: 700;
+  min-inline-size: 18px; block-size: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding-inline: 5px;
+}
+.mi-nav-desktop { display: none; }
+.mi-nav-burger  { display: inline-flex; }
+@media (min-width: 900px) {
+  .mi-nav-desktop { display: flex; align-items: center; gap: 4px; }
+  .mi-nav-burger  { display: none; }
+}
+.mi-nav-drawer {
+  position: fixed; inset: 0; z-index: 50;
+  background: var(--mi-surface);
+  padding: 24px; display: flex; flex-direction: column; gap: 8px;
+}
+.mi-dropdown {
+  position: absolute; inset-block-start: 100%; inset-inline-start: 0;
+  background: var(--mi-surface); border: 1px solid var(--mi-border);
+  border-radius: 12px; box-shadow: var(--mi-shadow-pop);
+  padding: 8px; min-inline-size: 220px; z-index: 45;
+  display: flex; flex-direction: column; gap: 2px;
+}
+
+/* ── סרגל פעולות תחתון דביק (מובייל) ───────── */
+.mi-actionbar {
+  position: sticky; inset-block-end: 0;
+  background: var(--mi-surface);
+  border-block-start: 1px solid var(--mi-border);
+  padding: 12px 16px;
+  display: flex; gap: 8px;
+}
+@media (min-width: 768px) {
+  .mi-actionbar { position: static; border: none; padding: 12px 0 0; }
+}
+
+/* ── מודאל ─────────────────────────────────── */
+.mi-modal-backdrop {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(29, 27, 46, .45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.mi-modal {
+  background: var(--mi-surface);
+  border-radius: var(--mi-radius-card);
+  box-shadow: var(--mi-shadow-pop);
+  padding: 24px;
+  inline-size: 100%; max-inline-size: 480px;
+}
+.mi-textarea {
+  inline-size: 100%; min-block-size: 96px;
+  border: 1px solid var(--mi-border); border-radius: 10px;
+  padding: 10px 12px; font-family: inherit; font-size: 14px;
+  color: var(--mi-ink-2); resize: vertical;
+}
+
+/* skeleton */
+@keyframes mi-pulse { 50% { opacity: .45; } }
+.mi-skeleton {
+  background: var(--mi-border); border-radius: 8px;
+  animation: mi-pulse 1.4s ease-in-out infinite;
+  min-block-size: 14px;
+}
