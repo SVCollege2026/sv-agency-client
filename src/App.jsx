@@ -19,12 +19,15 @@ export default function App() {
   return (
     <ToastProvider>
     <Routes>
-      {/* ממשק מנהלת השיווק החדש (PHASE-1) — חי לצד הישן, שלד עצמאי משלו.
-          הישן (media-reports?tab=marketing) לא נמחק בשלב זה. */}
-      <Route path="/manager" element={<ManagerLayout />}>
+      {/* ממשק ניהול המדיה (PHASE-1) — חי לצד הישן, שלד עצמאי משלו. */}
+      <Route path="/media" element={<ManagerLayout />}>
         <Route index element={<OverviewPage />} />
         <Route path="approvals" element={<ApprovalsPage />} />
       </Route>
+
+      {/* הנתיב הישן /manager → /media — שלא יישברו קישורים */}
+      <Route path="/manager"           element={<Navigate to="/media" replace />} />
+      <Route path="/manager/approvals" element={<Navigate to="/media/approvals" replace />} />
 
       {/* All routes share the global Layout (fixed top bar + bug button) */}
       <Route element={<Layout />}>
