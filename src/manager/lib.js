@@ -118,8 +118,9 @@ export function isManagerBlocker(blocker) {
   // הבעלות מכריעה: חסם שממוען למחלקה (owner=media/admin) הוא עבודת-המשרד
   const owner = blocker?.owner_role;
   if (owner && !["marketing_manager", "human", "school_director"].includes(owner)) return false;
-  // שאריות ריצות-בדיקה לא מגיעות לפיד (היגיינה — תצוגה בלבד)
-  if (/\btest\b|טסט/i.test(blocker?.description || "")) return false;
+  // שאריות ריצות-בדיקה לא מגיעות לפיד (היגיינה — תצוגה בלבד).
+  // בלי \b — מזהי-טסט כמו int_complete_test_777f33 עטופים בקו-תחתון.
+  if (/test|טסט/i.test(blocker?.description || "")) return false;
   return true;
 }
 
