@@ -1,6 +1,6 @@
 /**
- * ManagerLayout.jsx — שלד ממשק מנהלת השיווק (PHASE-1).
- * חי לצד הממשק הקיים תחת /manager — לא מחליף אותו עדיין.
+ * ManagerLayout.jsx — שלד ממשק ניהול המדיה (PHASE-1).
+ * חי לצד הממשק הקיים תחת /media (הנתיב הישן /manager מפנה לכאן) — לא מחליף אותו עדיין.
  * RTL מלא + טוקנים + תפריט עליון; badge האישורים מתעדכן מה-overview.
  */
 import React, { useEffect, useState } from "react";

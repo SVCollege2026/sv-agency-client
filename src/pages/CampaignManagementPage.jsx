@@ -4,12 +4,15 @@
  * Renamed from MediaReportsPage.jsx per Spec 03 §2.2 mandate.
  * The URL /media-reports remains as a redirect alias — all bookmarks work.
  *
- * 3 טאבים ראשיים:
+ * 2 טאבים ראשיים:
  *   📊 סטטוס מדיה        — יומי / שבועי / טווח / חודשי Y-o-Y
  *   📋 רישום לקורסים     — דשבורד פאי + טבלאות קורסים+מחזורים
- *   🎯 פעילות שיווקית     — ניהול קמפיינים מלא (CampaignTab)
  *
- * נתיב קנוני: /campaign-management?tab=<status|registration|marketing|...>
+ * לשונית "🎯 פעילות שיווקית" הוסרה מהסרגל (11/6 — תצוגה מתה). התצוגה עצמה
+ * (CampaignTab) עדיין נגישה ב-deep-link ?tab=marketing בלבד — ממשק /media
+ * החדש מקשר אליה (בריף/משימות) עד שהזרימות האלה יעברו אליו.
+ *
+ * נתיב קנוני: /campaign-management?tab=<status|registration|...>
  */
 import React, { useState, useEffect, useMemo } from "react";
 import {
@@ -213,7 +216,8 @@ function hebSourceKind(k) {
 const MODES = [
   { id: "media_status", label: "📊 סטטוס מדיה",      url: "status" },
   { id: "registration", label: "📋 רישום לקורסים",   url: "registration" },
-  { id: "marketing",    label: "🎯 פעילות שיווקית", url: "marketing" },
+  // "🎯 פעילות שיווקית" הוסרה מהסרגל — תצוגה מתה. נגישה רק ב-deep-link
+  // ?tab=marketing (ראה הערת הכותרת למעלה).
 ];
 
 // מיפוי URL ↔ mode
@@ -1480,7 +1484,7 @@ export default function CampaignManagementPage() {
           </button>
         </div>
 
-        {/* ── Top-level mode tabs (3) ── */}
+        {/* ── Top-level mode tabs (2) ── */}
         <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
           {MODES.map((m) => {
             // "סטטוס מדיה" = active אם המשתמש בכל אחד מ-4 ה-sub-modes

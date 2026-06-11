@@ -29,12 +29,12 @@ export default function TopNav({ pendingCount = 0 }) {
 
   const links = (
     <>
-      <NavLink to="/manager" end
+      <NavLink to="/media" end
         className={({ isActive }) => `mi-navlink${isActive ? " mi-navlink-active" : ""}`}
         onClick={() => setDrawerOpen(false)}>
         הסקירה שלי
       </NavLink>
-      <NavLink to="/manager/approvals"
+      <NavLink to="/media/approvals"
         className={({ isActive }) => `mi-navlink${isActive ? " mi-navlink-active" : ""}`}
         onClick={() => setDrawerOpen(false)}>
         אישורים

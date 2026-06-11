@@ -8,29 +8,38 @@ import { submitBugReport } from "../api.js";
 
 // ─── Departments ─────────────────────────────────────────────────────────────
 
+// שורה ראשונה: אסטרטגיה · דשבורד מנהלים · ניהול מדיה. שורה שנייה: אנליזה ואילך.
 const DEPARTMENTS = [
-  {
-    id:     "analytics",
-    icon:   "📊",
-    label:  "מחלקת אנליזה",
-    desc:   "לוח בקרה · ניתוח נתונים · אקו-סיסטם · יעדים",
-    path:   "/analytics/dashboard",
-    active: true,
-  },
-  {
-    id:     "media",
-    icon:   "📣",
-    label:  "מחלקת מדיה",
-    desc:   "דוחות · חקירות · תהליך פרסום · שאלות פתוחות",
-    path:   "/media-reports",
-    active: true,
-  },
   {
     id:     "strategy",
     icon:   "🧭",
     label:  "מחלקת אסטרטגיה",
     desc:   "חיזוי · יעדים · תרחישים · המלצות (חלקי בפיתוח)",
     path:   "/strategy",
+    active: true,
+  },
+  {
+    id:     "managers_dashboard",
+    icon:   "📣",
+    label:  "דשבורד מנהלים",
+    desc:   "דוחות · חקירות · תהליך פרסום · שאלות פתוחות",
+    path:   "/media-reports",
+    active: true,
+  },
+  {
+    id:     "media_management",
+    icon:   "🎛️",
+    label:  "ניהול מדיה",
+    desc:   "הסקירה שלי · אישורים · בקשות חדשות",
+    path:   "/media",
+    active: true,
+  },
+  {
+    id:     "analytics",
+    icon:   "📊",
+    label:  "מחלקת אנליזה",
+    desc:   "לוח בקרה · ניתוח נתונים · אקו-סיסטם · יעדים",
+    path:   "/analytics/dashboard",
     active: true,
   },
   {
@@ -45,13 +54,6 @@ const DEPARTMENTS = [
     icon:   "📝",
     label:  "מחלקת תוכן",
     desc:   "בלוג · סושיאל · SEO · GEO",
-    active: false,
-  },
-  {
-    id:     "clients",
-    icon:   "👤",
-    label:  "מסעות לקוח",
-    desc:   "גיוס · אונבורדינג · סטודנט · בוגר",
     active: false,
   },
 ];

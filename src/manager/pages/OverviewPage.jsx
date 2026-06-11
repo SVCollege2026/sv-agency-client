@@ -53,7 +53,7 @@ export default function OverviewPage() {
           freshness, fetch_errors: fetchErrors } = data;
 
   const openItem = (w) => {
-    if (w.tag_he === "דורש אישור") navigate("/manager/approvals");
+    if (w.tag_he === "דורש אישור") navigate("/media/approvals");
     // חסמים נפתרים בינתיים בממשק הקיים — קישור חי, לא כפתור מת.
     else navigate("/media-reports?tab=marketing&sub=tasks");
   };
@@ -72,7 +72,7 @@ export default function OverviewPage() {
 
       <section aria-label="מונים" className="mi-kpis">
         <StatCard value={kpis.pending_approvals} label="פריטים מחכים לאישור" icon="✋"
-                  tone="primary" onClick={() => navigate("/manager/approvals")} />
+                  tone="primary" onClick={() => navigate("/media/approvals")} />
         <StatCard value={kpis.new_requests} label="בקשות בעבודה" icon="📨" tone="info" />
         <StatCard value={kpis.active_items} label="פרויקטים פעילים" icon="🚀" tone="success" />
         <StatCard value={kpis.open_blockers} label="חסמים פתוחים" icon="⛔" tone="danger" />
@@ -116,7 +116,7 @@ export default function OverviewPage() {
           <h2 className="mi-h2" style={{ marginBlockEnd: 10 }}>קיצורי דרך</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <button className="mi-btn mi-btn-secondary"
-                    onClick={() => navigate("/manager/approvals")}
+                    onClick={() => navigate("/media/approvals")}
                     style={{ justifyContent: "center" }}>
               ✋ לתיבת האישורים
             </button>
