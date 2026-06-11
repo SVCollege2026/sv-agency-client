@@ -13,14 +13,14 @@ import {
 } from "../api.js";
 import { ErrorBanner, SkeletonCard, StatusChip, timeAgoHe } from "../components/ui.jsx";
 import {
-  MANAGER, PENDING_STATUSES, artifactThumb, canonicalCourse, copyFields,
+  MANAGER, PENDING_STATUSES, artifactThumb, canonicalCourseOf, copyFields,
   fullDate, isVideoAsset, rawAssetUrl, typeHe,
 } from "../lib.js";
 
-/* קישור-הקורס בנתיב הקנוני (projection) — מתוך שם התיקייה של התוצר */
+/* קישור-הקורס הקנוני — מתוך שם התיקייה של התוצר (טבלת פנימי↔פרסום) */
 function courseLink(artifact) {
-  if (!artifact?.folder_name) return "/media/courses";
-  return `/media/courses/${encodeURIComponent(canonicalCourse({ course_name: artifact.folder_name }))}`;
+  const key = canonicalCourseOf(artifact?.folder_name);
+  return key ? `/media/courses/${encodeURIComponent(key)}` : "/media/courses";
 }
 
 const PLACEMENTS = [["feed", "Feed"], ["story", "Story"], ["reel", "Reel"]];

@@ -10,7 +10,7 @@ import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { getApprovalsInbox, getArtifacts, getFolder } from "../api.js";
 import { EmptyState, ErrorBanner, SkeletonCard, StatusChip } from "../components/ui.jsx";
 import {
-  PENDING_STATUSES, approvalStatus, artifactThumb, groupFoldersByCourse,
+  PENDING_STATUSES, approvalStatus, artifactThumb, courseFolders,
   requiredOfYou, shortDate, typeHe, workStatus,
 } from "../lib.js";
 
@@ -46,7 +46,11 @@ export default function CoursePage() {
 
   const course = useMemo(() => {
     const key = decodeURIComponent(courseKey || "");
-    return groupFoldersByCourse(folders || []).find((c) => c.key === key) || null;
+    if (!key || !folders) return null;
+    // הקורס הקנוני; תיקיות-העבודה שלו נפתרות מטבלת-השמות פנימי↔פרסום.
+    // קורס חדש בלי תיקיות (לדוגמה AI ARCHITECT לפני פתיחה) — לוח ריק, אמיתי.
+    const list = courseFolders(key, folders);
+    return { key, name: key, folders: list, latest: list[0] || null };
   }, [folders, courseKey]);
 
   const folderIds = useMemo(

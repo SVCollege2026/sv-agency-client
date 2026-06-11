@@ -15,9 +15,10 @@ import {
   ErrorBanner, EmptyState, PriorityCard, SkeletonCard, StatCard, timeAgoHe,
 } from "../components/ui.jsx";
 import {
-  MANAGER, activityIcon, cyclesForCourse, filterActivityForManager,
-  filterInboxItems, filterWaitingForMe, folderStatus, groupFoldersByCourse,
-  isManagerBlocker, monthHe, pctOfTarget, pickRelevantCycle, testFolderIdSet,
+  MANAGER, activityIcon, courseStatus, cyclesForCourse,
+  filterActivityForManager, filterInboxItems, filterWaitingForMe,
+  folderStatus, isManagerBlocker, monthHe, pctOfTarget, pickRelevantCycle,
+  testFolderIdSet,
 } from "../lib.js";
 
 function greetingHe() {
@@ -67,7 +68,7 @@ function BlockerDialog({ blocker, onClose, onResolved }) {
 }
 
 export default function OverviewPage() {
-  const { folders } = useOutletContext() ?? {};
+  const { courses, folders } = useOutletContext() ?? {};
   const [data, setData] = useState(null);
   const [activity, setActivity] = useState(null);
   const [cycles, setCycles] = useState(null);
@@ -170,17 +171,17 @@ export default function OverviewPage() {
     else navigate("/media/approvals");
   };
 
-  /* "בקצרה" — קורסים אמיתיים מול יעד-המחזור העסקי (נרשמים מול יעד, לא מדיה) */
-  const briefRows = groupFoldersByCourse(folders || []).map((c) => {
-    const cycle = pickRelevantCycle(cyclesForCourse(cycles || [], c.key));
+  /* "בקצרה" — הקורסים המנוהלים מול יעד-המחזור העסקי (נרשמים מול יעד, לא מדיה) */
+  const briefRows = (courses || []).map((key) => {
+    const cycle = pickRelevantCycle(cyclesForCourse(cycles || [], key));
     const pct = pctOfTarget(cycle);
     const month = monthHe(cycle?.start_date);
-    const [statusHe, statusCls] = folderStatus(c.status);
+    const [statusHe, statusCls] = folderStatus(courseStatus(key, folders || []));
     let line;
     if (pct != null) line = `קמפיין לידים ${month || ""} — ${pct}% מהיעד`.trim();
     else if (cycle) line = `מחזור ${month || ""} — טרם הוגדר יעד`.trim();
     else line = "טרם הוגדר מחזור";
-    return { key: c.key, name: c.name, statusHe, statusCls, line, pct };
+    return { key, name: key, statusHe, statusCls, line, pct };
   });
 
   return (

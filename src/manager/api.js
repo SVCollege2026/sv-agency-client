@@ -49,6 +49,12 @@ export function getDecisionsTrace(correlationId, limit = 100) {
   return request("GET", `/api/decisions/?correlation_id=${correlationId}&limit=${limit}`);
 }
 
+/* ── הגדרות-מדיה גלובליות — היקף-הניהול (פריסת-המדיה המאושרת) ── */
+
+export function getGeneralSettings() {
+  return request("GET", "/api/settings/general");
+}
+
 /* ── תיקיות (קורסים) ומחזורים — עמוד-השדרה של הניווט ── */
 
 export function getFolders() {

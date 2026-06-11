@@ -240,41 +240,65 @@ export function isTestFolder(folder) {
     .test(name) || /sim [0-9a-f]{6}/i.test(name);
 }
 
-/* ── projection "תיקייה לכל קורס" ───────────────────────────
-   הדאטה בפועל מחזיקה תיקיית-עבודה פר-ריצה ("QA — קופי 04/06").
-   המוקאפ דורש תיקייה-פר-קורס — לכן מקבצים לפי הקורס הקנוני:
-   החלק שלפני " — ". זו תצוגה (projection) — לא entity חדש. */
+/* ── הקורסים המנוהלים — עמוד-השדרה של הסרגל (תיקון נירית 11/06) ──
+   המקור: היקף-הניהול שב-DB — media_settings.payload.media_deployment.per_course
+   (פריסת-המדיה המאושרת). לא טבלת-התיקיות הגולמית.
+   שם קנוני אחד לכל קורס לפי טבלת פנימי↔פרסום (agents/_brand_rules.py:
+   COURSE_NAMES) — בלי כפילויות QA/בודק-תוכנה, שיווק/שיווק-דיגיטלי וכו'.
+   קורסים שהוצאו מניהול (Full Stack, DevOps, AI ערב, הייטק) לא בניווט —
+   ההיסטוריה נשארת בדאטה. */
 
-export function canonicalCourse(folder) {
-  const raw = (folder?.course_name || "").trim();
-  const cut = raw.split("—")[0].trim();
-  return cut || raw;
+/* קנוני → וריאציות-הזיהוי (פנימי + פרסומי + EN). שיקוף של COURSE_NAMES
+   בצד-הלקוח, לזיהוי תיקיות ומפתחות-פריסה בלבד. */
+const COURSE_MATCHERS = [
+  ["AI ARCHITECT", [/architect/i, /\bintegration\b/i]],
+  ["QA",           [/\bqa\b/i, /בודק תוכנה/, /פיתוח טכנולוגיות/]],
+  ["AI",           [/mastermind/i, /בינה מלאכותית/, /^ai(?!.*(ערב|בוקר))/i]],
+  ["שיווק לבעלי עסקים", [/בעלי עסקים/]],
+  ["שיווק",        [/^שיווק/, /שיווק דיגיטלי/]],
+  ["גיימינג",      [/גיימינג/, /gaming/i, /פיתוח משחקים/]],
+  ["סייבר",        [/סייבר/]],
+];
+
+/* סדר-התצוגה שאישרה נירית. מפתח-פריסה שלא זוהה — מצטרף בסוף בשמו. */
+const COURSE_ORDER = ["QA", "AI", "שיווק", "AI ARCHITECT", "גיימינג", "סייבר"];
+
+/** שם תיקייה/מפתח-פריסה → הקורס הקנוני, או null אם לא מנוהל/לא זוהה */
+export function canonicalCourseOf(name = "") {
+  const n = String(name).trim();
+  if (!n) return null;
+  for (const [key, patterns] of COURSE_MATCHERS) {
+    if (patterns.some((p) => p.test(n))) return key;
+  }
+  return null;
 }
 
-/** קיבוץ תיקיות לא-טסט לקורסים: [{key, name, folders, latest, status}] ממוין לפי עדכניות */
-export function groupFoldersByCourse(folders = []) {
-  const groups = new Map();
-  for (const f of folders) {
-    if (isTestFolder(f)) continue;
-    const key = canonicalCourse(f);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(f);
+/** רשימת הקורסים המנוהלים מתוך הגדרות-המדיה, בסדר שאישרה נירית */
+export function managedCourses(settings) {
+  const perCourse = settings?.payload?.media_deployment?.per_course || {};
+  const seen = new Set();
+  const extras = [];
+  for (const key of Object.keys(perCourse)) {
+    const canonical = canonicalCourseOf(key);
+    if (canonical) seen.add(canonical);
+    else if (!extras.includes(key)) extras.push(key); // קורס חדש בפריסה — מוצג בשמו
   }
-  return [...groups.entries()].map(([key, list]) => {
-    const sorted = [...list].sort(
-      (a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
-    // סטטוס הקבוצה: live של מישהי גובר; אחרת הסטטוס של העדכנית
-    const live = sorted.find((f) => ["live", "active"].includes(f.status));
-    return {
-      key,
-      name: key,
-      folders: sorted,
-      latest: sorted[0],
-      status: (live || sorted[0]).status,
-    };
-  }).sort((a, b) =>
-    new Date(b.latest.updated_at || b.latest.created_at || 0) -
-    new Date(a.latest.updated_at || a.latest.created_at || 0));
+  return [...COURSE_ORDER.filter((c) => seen.has(c)), ...extras];
+}
+
+/** תיקיות-העבודה של קורס קנוני (בלי תיקיות-טסט), מהעדכנית לישנה */
+export function courseFolders(courseKey, folders = []) {
+  return folders
+    .filter((f) => !isTestFolder(f) && canonicalCourseOf(f.course_name) === courseKey)
+    .sort((a, b) =>
+      new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
+}
+
+/** סטטוס מצרפי לקורס: live של תיקייה כלשהי גובר, אחרת העדכנית, אחרת בתכנון */
+export function courseStatus(courseKey, folders = []) {
+  const list = courseFolders(courseKey, folders);
+  const live = list.find((f) => ["live", "active"].includes(f.status));
+  return (live || list[0])?.status || "planning";
 }
 
 /* התאמת מחזורי-Fireberry לקורס לפי שם — דטרמיניסטי, בניקוד:
@@ -384,13 +408,4 @@ export function copyFields(payload = {}) {
   push("cta", "CTA", src.cta);
   push("lead_form_intro", "פתיח טופס לידים", src.lead_form_intro);
   return out;
-}
-
-/* צבע-אות עקבי לתיקיית-קורס בסרגל-הצד (דטרמיניסטי לפי שם) */
-const COURSE_TONES = ["accent", "info", "success", "warning", "primary", "danger"];
-
-export function courseTone(name = "") {
-  let h = 0;
-  for (const ch of String(name)) h = (h * 31 + ch.codePointAt(0)) % 997;
-  return COURSE_TONES[h % COURSE_TONES.length];
 }

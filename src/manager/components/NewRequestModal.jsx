@@ -7,11 +7,11 @@
  */
 import React, { useEffect, useRef, useState } from "react";
 import { submitRequest, uploadBriefFile } from "../api.js";
-import { groupFoldersByCourse } from "../lib.js";
+import { courseFolders } from "../lib.js";
 
 const PRIORITY = [["normal", "רגילה"], ["high", "דחופה"], ["low", "נמוכה"]];
 
-export default function NewRequestModal({ folders = [], initialFolderId = null, onClose }) {
+export default function NewRequestModal({ courses = [], folders = [], initialFolderId = null, onClose }) {
   const [text, setText] = useState("");
   const [folderId, setFolderId] = useState(initialFolderId || "");
   const [priority, setPriority] = useState("normal");
@@ -130,10 +130,13 @@ export default function NewRequestModal({ folders = [], initialFolderId = null, 
             <select id="nr-folder" className="mi-field" value={folderId}
                     onChange={(e) => setFolderId(e.target.value)}>
               <option value="">פעילות בית-ספרית (כללי)</option>
-              {/* קורס ⇒ תיקיית-העבודה העדכנית שלו (projection) */}
-              {groupFoldersByCourse(folders).map((c) => (
-                <option key={c.key} value={c.latest.id}>{c.name}</option>
-              ))}
+              {/* קורס מנוהל ⇒ תיקיית-העבודה העדכנית שלו */}
+              {courses.map((key) => {
+                const latest = courseFolders(key, folders)[0];
+                return latest
+                  ? <option key={key} value={latest.id}>{key}</option>
+                  : null;
+              })}
             </select>
           </div>
 
