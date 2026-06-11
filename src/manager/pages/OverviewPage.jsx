@@ -5,7 +5,7 @@
  * כשל-שליפה מוצג ב-ErrorBanner.
  */
 import React, { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import { getOverview } from "../api.js";
 import {
   StatCard, PriorityCard, ErrorBanner, EmptyState, SkeletonCard, timeAgoHe,
@@ -19,14 +19,21 @@ function greetingHe() {
 }
 
 export default function OverviewPage() {
+  const { setPendingCount } = useOutletContext() ?? {};
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   const load = useCallback(() => {
     setError(null);
-    getOverview().then(setData).catch((e) => setError(e.message));
-  }, []);
+    getOverview()
+      .then((d) => {
+        setData(d);
+        // ה-badge בתפריט ניזון מכאן — ה-layout לא שולף overview בעצמו
+        setPendingCount?.(d?.kpis?.pending_approvals ?? 0);
+      })
+      .catch((e) => setError(e.message));
+  }, [setPendingCount]);
   useEffect(load, [load]);
 
   if (error) {
