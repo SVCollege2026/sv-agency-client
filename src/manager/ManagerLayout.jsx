@@ -1,23 +1,36 @@
 /**
- * ManagerLayout.jsx — שלד ממשק ניהול המדיה (PHASE-1).
- * חי לצד הממשק הקיים תחת /media (הנתיב הישן /manager מפנה לכאן) — לא מחליף אותו עדיין.
- * RTL מלא + טוקנים + תפריט עליון; badge האישורים מתעדכן מה-overview.
+ * ManagerLayout.jsx — שלד ממשק המנהלת לפי המוקאפ המחייב:
+ * סרגל-צד ימני (הניווט הראשי) + אזור-תוכן + "בקשה חדשה +" גלובלי.
+ * מקור הסרגל: הקורסים המנוהלים-הפעילים מהיקף-הניהול שב-DB
+ * (media_settings.media_deployment) — לא טבלת-התיקיות הגולמית.
  */
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
-import TopNav from "./components/TopNav.jsx";
-import { getOverview } from "./api.js";
+import Sidebar from "./components/Sidebar.jsx";
+import NewRequestModal from "./components/NewRequestModal.jsx";
+import NewCourseModal from "./components/NewCourseModal.jsx";
+import { getFolders, getGeneralSettings } from "./api.js";
+import { managedCourses } from "./lib.js";
 import "./tokens.css";
 
 export default function ManagerLayout() {
-  const [pendingCount, setPendingCount] = useState(0);
+  const [folders, setFolders] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [coursesError, setCoursesError] = useState(null);
+  const [foldersError, setFoldersError] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [requestModal, setRequestModal] = useState(null); // null | {folderId?, newCourse?}
+
+  const loadFolders = useCallback(() => {
+    setFoldersError(null);
+    getFolders().then(setFolders).catch((e) => setFoldersError(e.message));
+  }, []);
+  useEffect(loadFolders, [loadFolders]);
 
   useEffect(() => {
-    let alive = true;
-    getOverview()
-      .then((d) => alive && setPendingCount(d?.kpis?.pending_approvals ?? 0))
-      .catch(() => {});  // ה-badge הוא קישוט — הדפים עצמם מדווחים כשל במלואו
-    return () => { alive = false; };
+    getGeneralSettings()
+      .then((s) => setCourses(managedCourses(s)))
+      .catch((e) => setCoursesError(e.message));
   }, []);
 
   return (
@@ -28,10 +41,41 @@ export default function ManagerLayout() {
          onBlur={(e) => { e.target.style.insetInlineStart = "-9999px"; }}>
         דלגי לתוכן
       </a>
-      <TopNav pendingCount={pendingCount} />
-      <main id="mi-main">
-        <Outlet context={{ setPendingCount }} />
-      </main>
+
+      <div className="mi-shell">
+        <Sidebar courses={courses} coursesError={coursesError}
+                 open={sidebarOpen} onClose={() => setSidebarOpen(false)}
+                 onNewCourse={() => setRequestModal({ newCourse: true })} />
+
+        <div className="mi-main">
+          <div className="mi-topbar">
+            <button className="mi-btn mi-btn-ghost mi-sidebar-burger" aria-label="פתיחת תפריט"
+                    aria-expanded={sidebarOpen}
+                    onClick={() => setSidebarOpen(true)}>
+              ☰
+            </button>
+            <span style={{ flex: 1 }} />
+            <button className="mi-btn mi-btn-primary"
+                    onClick={() => setRequestModal({})}>
+              ＋ בקשה חדשה
+            </button>
+          </div>
+
+          <main id="mi-main">
+            <Outlet context={{ courses, folders, foldersError,
+                               openNewRequest: (opts = {}) => setRequestModal(opts) }} />
+          </main>
+        </div>
+      </div>
+
+      {requestModal && (requestModal.newCourse ? (
+        <NewCourseModal onClose={() => setRequestModal(null)}
+                        onCreated={loadFolders} />
+      ) : (
+        <NewRequestModal courses={courses} folders={folders}
+                         initialFolderId={requestModal.folderId || null}
+                         onClose={() => setRequestModal(null)} />
+      ))}
     </div>
   );
 }

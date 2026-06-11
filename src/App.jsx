@@ -14,15 +14,30 @@ import { ToastProvider } from "./components/campaign/Toast.jsx";
 import ManagerLayout from "./manager/ManagerLayout.jsx";
 import OverviewPage from "./manager/pages/OverviewPage.jsx";
 import ApprovalsPage from "./manager/pages/ApprovalsPage.jsx";
+import CoursesPage from "./manager/pages/CoursesPage.jsx";
+import CoursePage from "./manager/pages/CoursePage.jsx";
+import ItemPage from "./manager/pages/ItemPage.jsx";
+import ReviewPage from "./manager/pages/ReviewPage.jsx";
+import ActivityPage from "./manager/pages/ActivityPage.jsx";
+import SocialPage from "./manager/pages/SocialPage.jsx";
+import PlansBudgetPage from "./manager/pages/PlansBudgetPage.jsx";
 
 export default function App() {
   return (
     <ToastProvider>
     <Routes>
-      {/* ממשק ניהול המדיה (PHASE-1) — חי לצד הישן, שלד עצמאי משלו. */}
+      {/* ממשק ניהול המדיה — המסכים מהמוקאפ של נירית, אחד-לאחד.
+          סרגל-צד תיקיות = הניווט הראשי; שרשרת: תיקייה → טבלה → פריט → Review. */}
       <Route path="/media" element={<ManagerLayout />}>
         <Route index element={<OverviewPage />} />
+        <Route path="courses" element={<CoursesPage />} />
+        <Route path="courses/:courseKey" element={<CoursePage />} />
+        <Route path="items/:artifactId" element={<ItemPage />} />
+        <Route path="items/:artifactId/review" element={<ReviewPage />} />
         <Route path="approvals" element={<ApprovalsPage />} />
+        <Route path="activity" element={<ActivityPage />} />
+        <Route path="social" element={<SocialPage />} />
+        <Route path="plans" element={<PlansBudgetPage />} />
       </Route>
 
       {/* הנתיב הישן /manager → /media — שלא יישברו קישורים */}

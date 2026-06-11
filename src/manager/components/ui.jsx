@@ -34,14 +34,18 @@ const TAG_TONE = {
   "חסר מידע":   ["mi-priority-info",     "mi-chip-info"],
 };
 
-/* כרטיס "מה מחכה לך עכשיו" — פס-צבע בקצה הפותח + תגית + כותרת + מטא. */
-export function PriorityCard({ tag, title, meta, onClick }) {
+/* כרטיס "מה מחכה לך עכשיו" — פס-צבע בקצה הפותח + תגית + תגית-תיקייה
+   (כל פריט מציג את שיוכו בכל הופעה) + כותרת + מטא. */
+export function PriorityCard({ tag, folder, title, meta, onClick }) {
   const [edge, chip] = TAG_TONE[tag] || ["", "mi-chip-info"];
   return (
     <button className={`mi-card mi-priority ${edge}`} onClick={onClick}
             style={{ display: "block", inlineSize: "100%", textAlign: "start",
                      padding: "14px 16px" }}>
-      <span className={`mi-chip ${chip}`}>{tag}</span>
+      <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <span className={`mi-chip ${chip}`}>{tag}</span>
+        {folder && <span className="mi-chip mi-chip-info">🗂 {folder}</span>}
+      </span>
       <span style={{ display: "block", fontWeight: 600, color: "var(--mi-ink)",
                      fontSize: 14, marginBlockStart: 6 }}>{title}</span>
       {meta && <span className="mi-meta" style={{ display: "block", marginBlockStart: 4 }}>{meta}</span>}
