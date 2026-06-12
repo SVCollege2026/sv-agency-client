@@ -16,6 +16,7 @@ import {
   getCourses,
   getCycles,
   updateCycle,
+  updateCycleTarget,
   triggerCoursesScan,
   getCoursesSyncRuns,
 } from "../api.js";
@@ -218,6 +219,73 @@ function StatusBadge({ status }) {
     return <span style={S.badge("#fee2e2", "#991b1b")}>{txt}</span>;
   }
   return <span style={S.badge("#e2e8f0", "#475569")}>{txt}</span>;
+}
+
+// ─── Target cell — יעד נרשמים, עריכה ישירה בטבלה ────────────────────────────
+// נכתב דרך הדלת הייעודית ל-Supabase בלבד: לא חוזר ל-Fireberry, והסנכרון
+// הלילי לא דורס אותו (UI-owned). היעד מזין את האסטרטג ומחשבון-הפריסה —
+// מחזור עתידי בלי יעד מסומן "חסר יעד" כי סוכני התכנון מדלגים עליו.
+
+function TargetCell({ cycle, isFuture, onSaved, onError }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue]     = useState("");
+  const [saving, setSaving]   = useState(false);
+
+  const target = cycle.target_min_enrollments;
+
+  async function save() {
+    const n = parseInt(value, 10);
+    if (!Number.isInteger(n) || n <= 0) {
+      onError("יעד נרשמים חייב להיות מספר שלם גדול מ-0");
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateCycleTarget(cycle.cycle_id, n);
+      onSaved(cycle.cycle_id, n);
+      setEditing(false);
+    } catch (e) {
+      onError(e.message || String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+        <input
+          type="number" min="1" autoFocus value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") save();
+            if (e.key === "Escape") setEditing(false);
+          }}
+          style={{ ...S.input, width: 70, padding: "6px 8px" }}
+          aria-label="יעד נרשמים"
+        />
+        <button type="button" onClick={save} disabled={saving} title="שמור יעד"
+                style={{ ...S.btnGhost, color: "#166534", fontWeight: 700, fontSize: 15 }}>
+          {saving ? "…" : "✓"}
+        </button>
+        <button type="button" onClick={() => setEditing(false)} disabled={saving} title="בטל"
+                style={{ ...S.btnGhost, color: "#991b1b", fontWeight: 700, fontSize: 15 }}>✕</button>
+      </span>
+    );
+  }
+
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      {target !== null && target !== undefined
+        ? <span style={{ fontWeight: 600, color: T.textPrimary }}>{fmtNum(target)}</span>
+        : isFuture
+          ? <span style={S.badge("#fef3c7", "#92400e")} title="סוכני התכנון מדלגים על מחזור בלי יעד">חסר יעד</span>
+          : <span style={{ color: T.textMuted }}>—</span>}
+      <button type="button" title="עדכן יעד נרשמים"
+              onClick={() => { setValue(target !== null && target !== undefined ? String(target) : ""); setEditing(true); }}
+              style={S.btnGhost}>✏️</button>
+    </span>
+  );
 }
 
 // ─── Pie chart card — donut style with center label ─────────────────────────
@@ -496,6 +564,13 @@ export default function CoursesCyclesPanel() {
     if (!editing) return;
     await updateCycle(editing.cycle_id, payload);
     await loadAll();
+  }
+
+  // עדכון מקומי אחרי שמירת יעד — בלי טעינה מחדש של כל הדף (הערך כבר ב-DB).
+  function handleTargetSaved(cycleId, n) {
+    setErr(null);
+    setCycles((prev) => prev.map((c) =>
+      c.cycle_id === cycleId ? { ...c, target_min_enrollments: n } : c));
   }
 
   // ── Year-filtered cycles (single source of truth for everything) ──
@@ -802,6 +877,7 @@ export default function CoursesCyclesPanel() {
                 <th style={S.th}>סיום הרשמה</th>
                 <th style={S.th}>סטטוס רישום</th>
                 <th style={S.th}>נרשמים</th>
+                <th style={S.th} title="יעד מינימלי לתכנון — מזין את האסטרטג ואת מחשבון הפריסה. נשמר במערכת בלבד, לא חוזר ל-Fireberry.">יעד נרשמים</th>
                 <th style={S.th}>עסקאות לאחר הנחה</th>
                 <th style={S.th}>נגבה בפועל</th>
                 <th style={S.th}>סניף</th>
@@ -834,6 +910,14 @@ export default function CoursesCyclesPanel() {
                       <td style={S.tdSecondary}>{fmtDate(reg.endDate)}</td>
                       <td style={S.td}><StatusBadge status={reg.status} /></td>
                       <td style={S.tdSecondary}>{fmtNum(c.total_enrollees)}</td>
+                      <td style={S.td}>
+                        <TargetCell
+                          cycle={c}
+                          isFuture={(c.start_date || "") >= todayIso()}
+                          onSaved={handleTargetSaved}
+                          onError={setErr}
+                        />
+                      </td>
                       <td style={{ ...S.td, color: T.cDeals }}>{fmtMoney(c.total_after_discounts)}</td>
                       <td style={{ ...S.td, color: T.cCollected }}>{fmtMoney(c.total_collected)}</td>
                       <td style={S.tdSecondary}>{c.branch || "—"}</td>
@@ -848,9 +932,10 @@ export default function CoursesCyclesPanel() {
               {filteredCycles.length > 0 && (() => {
                 const sum = filteredCycles.reduce((s, c) => ({
                   total_enrollees:       s.total_enrollees       + Number(c.total_enrollees       || 0),
+                  target_min:            s.target_min            + Number(c.target_min_enrollments || 0),
                   total_after_discounts: s.total_after_discounts + Number(c.total_after_discounts || 0),
                   total_collected:       s.total_collected       + Number(c.total_collected       || 0),
-                }), { total_enrollees: 0, total_after_discounts: 0, total_collected: 0 });
+                }), { total_enrollees: 0, target_min: 0, total_after_discounts: 0, total_collected: 0 });
                 const tdTotal = { ...S.td, fontWeight: 700, background: "#f1f5f9", borderTop: `2px solid ${T.navy}` };
                 return (
                   <tr>
@@ -859,6 +944,7 @@ export default function CoursesCyclesPanel() {
                     <td style={tdTotal}></td>
                     <td style={tdTotal}></td>
                     <td style={tdTotal}>{fmtNum(sum.total_enrollees)}</td>
+                    <td style={tdTotal}>{sum.target_min > 0 ? fmtNum(sum.target_min) : "—"}</td>
                     <td style={{ ...tdTotal, color: T.cDeals }}>{fmtMoney(sum.total_after_discounts)}</td>
                     <td style={{ ...tdTotal, color: T.cCollected }}>{fmtMoney(sum.total_collected)}</td>
                     <td style={tdTotal}></td>
@@ -868,7 +954,7 @@ export default function CoursesCyclesPanel() {
               })()}
               {filteredCycles.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ ...S.td, textAlign: "center", padding: 32, color: T.textMuted }}>
+                  <td colSpan={10} style={{ ...S.td, textAlign: "center", padding: 32, color: T.textMuted }}>
                     אין מחזורים תואמי סינון בשנת {filterYear}
                   </td>
                 </tr>
