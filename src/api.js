@@ -389,6 +389,15 @@ export async function updateCycle(cycleId, fields) {
   return request("PATCH", `/api/courses-cycles/cycles/${cycleId}`, fields);
 }
 
+// יעד-נרשמים למחזור — דלת ייעודית (UI-owned): נכתב ל-Supabase בלבד, לעולם לא
+// חוזר ל-Fireberry, והסנכרון הלילי לא דורס אותו. כל שינוי נרשם ב-audit בשרת.
+export async function updateCycleTarget(cycleId, target, updatedBy = "marketing_manager") {
+  return request("PATCH", `/api/courses-cycles/cycles/${cycleId}/target`, {
+    target_min_enrollments: target,
+    updated_by: updatedBy,
+  });
+}
+
 export async function createCycle(payload) {
   return request("POST", "/api/courses-cycles/cycles", payload);
 }
