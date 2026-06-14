@@ -41,6 +41,30 @@ export function getRecentDecisions(limit = 50) {
   return request("GET", `/api/decisions/?limit=${limit}`);
 }
 
+/* ── תוכנית-ההשתלטות של האסטרטג (מסך-אחד, פירוט פר-קורס + תגובה פר-קורס) ── */
+
+/** התוכנית העדכנית + ההערות פר-קורס. available=false אם טרם הופקה. */
+export function getTakeoverPlan() {
+  return request("GET", "/api/media/takeover-plan");
+}
+
+/** הפקת תוכנית-האסטרטג (קריאת-מנוע ארוכה; התוכנית נשמרת בצד-השרת גם אם הבקשה נחתכת). */
+export function generateTakeoverPlan() {
+  return request("POST", "/api/media/takeover-plan/generate?triggered_by=marketing_manager");
+}
+
+/** הערה/תגובה פר-קורס על התוכנית — מנגנון-ההערות האחוד (section_key = course_key). */
+export function addCourseComment(artifactId, courseKey, body) {
+  return request("POST", "/api/comments/", {
+    object_type: "takeover_plan",
+    object_id: artifactId,
+    section_key: courseKey,
+    body,
+    author: "marketing_manager",
+    provenance: "ui",
+  });
+}
+
 export function getDecisionsFor(subjectId, limit = 50) {
   return request("GET", `/api/decisions/?subject_id=${subjectId}&limit=${limit}`);
 }
