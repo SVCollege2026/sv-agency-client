@@ -66,6 +66,36 @@ function VerdictChip({ verdict }) {
   );
 }
 
+function fmtIls(n) {
+  return typeof n === "number" ? `₪${Math.round(n).toLocaleString()}` : null;
+}
+
+// העובדות הדטרמיניסטיות שהמנהלת שואלת פר-קורס: CBO? · תקציב 10-ימי-למידה · אחרי-המעבר.
+// מחושב מההקצאה הקיימת (לא קביעת-תקציב) — מוצג כך שלא צריך לשאול.
+function FactsPanel({ facts }) {
+  if (!facts) return null;
+  const cbo = facts.cbo === true ? "CBO" : facts.cbo === false ? "Adset" : "—";
+  const items = [
+    ["מבנה", cbo],
+    facts.transition_date ? ["מעבר", facts.transition_date] : null,
+    fmtIls(facts.learning_10d_ils) ? ["10 ימי-למידה", fmtIls(facts.learning_10d_ils)] : null,
+    fmtIls(facts.budget_after_ils) ? ["אחרי המעבר", fmtIls(facts.budget_after_ils)] : null,
+  ].filter(Boolean);
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 10, margin: "6px 0 10px",
+                  padding: "8px 10px", background: "var(--mi-soft, #f6f7f9)", borderRadius: 8 }}>
+      {items.map(([k, v]) => (
+        <span key={k} className="mi-meta" style={{ whiteSpace: "nowrap" }}>
+          <strong style={{ color: "var(--mi-ink)" }}>{k}:</strong> {v}
+        </span>
+      ))}
+      {facts.computed_note && (
+        <span className="mi-meta" style={{ opacity: 0.65, whiteSpace: "nowrap" }}>· {facts.computed_note}</span>
+      )}
+    </div>
+  );
+}
+
 export default function TakeoverPlanPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -207,6 +237,8 @@ export default function TakeoverPlanPage() {
                 <h3 className="mi-h2" style={{ margin: 0 }}>{labelFor(key)}</h3>
                 <VerdictChip verdict={c.verdict} />
               </div>
+
+              <FactsPanel facts={c.facts} />
 
               {c.reasoning && (
                 <p className="mi-body" style={{ whiteSpace: "pre-wrap", marginBlockEnd: 6 }}>{c.reasoning}</p>
