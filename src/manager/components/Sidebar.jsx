@@ -51,6 +51,7 @@ export default function Sidebar({ courses = [], coursesError, open, onClose, onN
 
             <hr className="mi-sidebar-divider" />
 
+            <SideLink to="/media/takeover-plan" icon="spark" label="תוכנית השתלטות" onNavigate={onClose} />
             <SideLink to="/media/social" icon="users" label="קידומי סושיאל" onNavigate={onClose} />
             <SideLink to="/media/plans" icon="chart" label="פריסות מדיה ותקציב" onNavigate={onClose} />
 
