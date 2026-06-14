@@ -27,6 +27,11 @@ const COURSE_LABELS = {
 
 // מיפוי שם-קורס (כפי שהאסטרטג כתב) ל-course_key — הספציפי לפני הכללי
 // (ai_architect לפני ai, marketing_b2b לפני marketing).
+// קונסולידציה: וריאנטים של אותו קורס מתאחדים למפתח אחד → כרטיס אחד פר-קורס,
+// לא כרטיס פר-מחזור (תיקון נירית 14/06: "כבר יש התייחסות לשיווק, למה שוב?").
+const CANON = { marketing_social_ai: "marketing" };
+const canon = (k) => (k && CANON[k]) || k;
+
 const COURSE_ALIASES = [
   ["ai_architect", ["architect", "ארכיטקט"]],
   ["marketing_b2b", ["b2b"]],
@@ -170,18 +175,19 @@ export default function TakeoverPlanPage() {
   const priorities = plan.course_priorities || [];
   const commentsByCourse = data.comments_by_course || {};
 
-  // קיבוץ הפירוט-העשיר פר-מחזור תחת ה-course_key המתאים.
+  // קיבוץ המחזורים תחת מפתח-הקורס הקנוני (וריאנטים מתאחדים → מחזורים בתוך כרטיס אחד).
   const prioritiesByCourse = {};
   for (const pr of priorities) {
-    const key = matchCourseKey(pr.course);
+    const key = canon(matchCourseKey(pr.course));
     (prioritiesByCourse[key] = prioritiesByCourse[key] || []).push(pr);
   }
-  // קורסים להצגה: כל course מהתוכנית + כל course שיש לו priorities/הערות בלבד.
+  // כרטיס אחד פר-קורס: course מהתוכנית (קנוני) + קורס שיש לו רק מחזורים/הערות.
   const courseKeys = [...new Set([
-    ...courses.map((c) => c.course_key).filter(Boolean),
+    ...courses.map((c) => canon(c.course_key)).filter(Boolean),
     ...Object.keys(prioritiesByCourse).filter((k) => k !== "_other"),
   ])];
-  const courseByKey = Object.fromEntries(courses.filter((c) => c.course_key).map((c) => [c.course_key, c]));
+  const courseByKey = Object.fromEntries(
+    courses.filter((c) => c.course_key).map((c) => [canon(c.course_key), c]));
 
   const dep = overall.macro_deployment_ils || {};
 
