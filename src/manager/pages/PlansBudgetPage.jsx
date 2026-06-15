@@ -102,15 +102,18 @@ export default function PlansBudgetPage() {
             ) : (
               <div className="mi-card" style={{ padding: 8 }}>
                 {shown.map((a) => {
-                  const [label, cls] = ALLOC_STATUS[a.status] || [a.status, "mi-chip-info"];
+                  // מיובא מהחשבון (active/approved בלי decided_by) ≠ אישור המנהלת.
+                  const imported = (a.status === "active" || a.status === "approved") && !a.decided_by;
+                  const [label, cls] = imported
+                    ? ["קיים בחשבון (מיובא)", "mi-chip-info"]
+                    : (ALLOC_STATUS[a.status] || [a.status, "mi-chip-info"]);
                   return (
                     <div key={a.id}
                          style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
                                   padding: "10px 12px", borderBlockEnd: "1px solid var(--mi-border)" }}>
                       <span className={`mi-chip ${cls}`}>{label}</span>
                       <span className="mi-body" style={{ flex: 1, minInlineSize: 160 }}>
-                        {a.platform || "כל הפלטפורמות"}
-                        {a.rationale && <span className="mi-meta" style={{ display: "block" }}>{a.rationale}</span>}
+                        {a.platform === "google" ? "גוגל" : a.platform === "meta" ? "מטא" : (a.platform || "כל הפלטפורמות")}
                       </span>
                       <strong style={{ color: "var(--mi-ink)" }}>{ils(a.amount_ils)}</strong>
                       {a.period_start && (
