@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { getApprovalsInbox, getArtifacts, getFolder, getBudgetAllocations, decideAllocation, submitRequest } from "../api.js";
+import { getApprovalsInbox, getArtifacts, getFolder, getBudgetAllocations, decideAllocation, submitRequest, requestGoLive } from "../api.js";
 import { EmptyState, ErrorBanner, SkeletonCard, StatusChip } from "../components/ui.jsx";
 import {
   PENDING_STATUSES, approvalStatus, artifactThumb, courseFolders,
@@ -53,6 +53,8 @@ export default function CoursePage() {
   const [allocations, setAllocations] = useState(null);
   const [budgetBusy, setBudgetBusy] = useState({});
   const [starting, setStarting] = useState(false);
+  const [goLiveBusy, setGoLiveBusy] = useState(false);
+  const [goLiveMsg, setGoLiveMsg] = useState(null);
   const [error, setError] = useState(null);
 
   const course = useMemo(() => {
@@ -129,6 +131,29 @@ export default function CoursePage() {
       .finally(() => setStarting(false));
   };
 
+  // "העלאה לאוויר" — דרך שער-הבטיחות (request_go_live): מעלה כל פלטפורמה מוכנה, מחזיר
+  // pending/blockers על מה שלא מוכן (לא הכל-או-כלום). שולח רק folder; ה-workflow נפתר בשרת.
+  const doGoLive = () => {
+    const folderId = course?.latest?.id;
+    if (!folderId) { setError("אין תיקייה לקורס"); return; }
+    if (!window.confirm("להעלות את הקמפיין של הקורס לאוויר? יעלו רק הפלטפורמות המוכנות.")) return;
+    setGoLiveBusy(true); setGoLiveMsg(null); setError(null);
+    requestGoLive(folderId)
+      .then((r) => {
+        if (r.ok) {
+          const live = (r.live_platforms || []).join(", ") || "—";
+          const pend = (r.pending_platforms || []).join(", ");
+          setGoLiveMsg({ ok: true, text: `עלה לאוויר: ${live}${pend ? ` · ממתינות: ${pend}` : ""}` });
+        } else {
+          const why = (r.blockers || []).join(" · ") || (r.pending_platforms || []).join(", ") || "טרם מוכן";
+          setGoLiveMsg({ ok: false, text: `טרם מוכן לעלייה: ${why}` });
+        }
+        load();
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setGoLiveBusy(false));
+  };
+
   /* שורות הטבלה — תוצרים (גרסה עדכנית) + בקשות, מכל תיקיות הקורס */
   const rows = useMemo(() => {
     const out = [];
@@ -198,11 +223,24 @@ export default function CoursePage() {
           {course && course.folders.length > 1 && ` · ${course.folders.length} תיקיות עבודה`}
         </span>
         <span style={{ flex: 1 }} />
+        <button className="mi-btn mi-btn-secondary" disabled={goLiveBusy || !course?.latest?.id}
+                onClick={doGoLive}>
+          {goLiveBusy ? "מעלה…" : "🚀 העלאה לאוויר"}
+        </button>
         <button className="mi-btn mi-btn-primary"
                 onClick={() => openNewRequest?.({ folderId: course?.latest?.id })}>
           ＋ בקשה חדשה
         </button>
       </header>
+
+      {goLiveMsg && (
+        <div className="mi-card" role="status" aria-live="polite"
+             style={{ marginBlockEnd: 14, padding: "10px 16px", borderColor: "transparent",
+                      background: goLiveMsg.ok ? "var(--mi-success-bg)" : "var(--mi-warning-bg)",
+                      color: goLiveMsg.ok ? "var(--mi-success)" : "var(--mi-warning)" }}>
+          {goLiveMsg.text}
+        </div>
+      )}
 
       {/* טבלת-התקציב הייעודית של הקורס — בראש העמוד (אפיון נירית) */}
       <section className="mi-card" style={{ padding: 16, marginBlockEnd: 16 }}>

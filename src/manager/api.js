@@ -190,6 +190,17 @@ export function submitRequest({ folderId = null, requestType, briefPayload, brie
   });
 }
 
+/**
+ * העלאה-לאוויר של קמפיין הקורס — דרך שער-הבטיחות של ה-controller (מאמת חיבור-Make פר-פלטפורמה,
+ * מעלה רק מה שמוכן, חוסם רק על בריאות-Make קריטית). שולח רק folder_id; ה-workflow_item נפתר בשרת.
+ */
+export function requestGoLive(folderId) {
+  return request("POST", "/api/lifecycle/go-live", {
+    folder_id: folderId,
+    requested_by: "marketing_manager",
+  });
+}
+
 export async function uploadBriefFile(file) {
   const fd = new FormData();
   fd.append("file", file);
