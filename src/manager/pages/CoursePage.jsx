@@ -12,7 +12,7 @@ import { EmptyState, ErrorBanner, SkeletonCard, StatusChip } from "../components
 import RejectDialog from "../components/RejectDialog.jsx";
 import {
   artifactThumb, canonPlanKey as canon, courseFolders, deploymentStructure, fullDate,
-  matchPlanCourseKey as matchCourseKey, requiredOfYou,
+  matchPlanCourseKey as matchCourseKey, opensReview, requiredOfYou,
   shortDate, stripInternalSteps, typeHe, workStatus,
 } from "../lib.js";
 
@@ -322,9 +322,8 @@ export default function CoursePage() {
      תוצרי-תקציב מיוצגים בטבלת-התקציב שלמעלה — לא כופלים אותם כאן (היה מבלבל). */
   const _isBudgetArtifact = (t) => /budget|allocation|redeploy/i.test(t || "");
   // fix #7: שורות קראייטיב/קופי נפתחות ישירות למסך ה-Review (קונספט+קופי+ויזואל),
-  // לא לתווית-פריט סתמית. שאר התוצרים נפתחים לתיק-הפריט.
-  const _opensReview = (t) =>
-    /creative|copy|concept|render|visual|video|art_direction|ad_copy/i.test(t || "");
+  // לא לתווית-פריט סתמית. שאר התוצרים נפתחים לתיק-הפריט. מקור-אמת אחד (lib.js).
+  const _opensReview = (t) => opensReview({ artifact_type: t });
   // fix #5: עמודת-מצב אחת במקום שתיים (סטטוס-עבודה + אישור). שלושה מצבים בלבד:
   //   "מחכה לך" — נדרשת ממנה פעולה (requiredOfYou) ⇒ בראש העדיפות.
   //   "הושלם"   — עבודת-המשרד הסתיימה (הושלם/בוצע) ובלי פעולה פתוחה.

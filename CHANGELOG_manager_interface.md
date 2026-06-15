@@ -1,5 +1,31 @@
 # CHANGELOG — ממשק מנהלת השיווק (/media)
 
+## 16/06/2026 — FINISH-TAKEOVER-CHAIN-UI (branch `fix/finish-takeover-chain-ui`)
+
+הצגת תוצר ה-`media_deployment` החדש (פריסת-מדיה מלאה משינוי-תקציב, GAP 2 בצד-ה-API)
+בממשק. עד הסבב הזה התוצר אכן הגיע לתיבת-האישורים, אך לחיצה עליו נתבה אותו למסך
+ה-Review של הקראייטיב — שהראה "אין נכס ויזואלי / אין קופי", כך שהמנהלת אישרה בלי
+לראות מה היא מאשרת. הסבב מנתב אותו לתיק-הפריט ומרנדר שם את החלוקה-המחדש האמיתית.
+
+### נוסף
+- **טבלת פריסת-מדיה ב-ItemPage** (`MediaDeploymentPanel`): פר-קורס — הוצא-עד-כה /
+  סך-בסיס / סך-מעודכן, ופירוט-חודשי מתקפל (₪ פר-חודש, החודש-הנוכחי מסומן). הכל
+  נגזר מ-payload (`deltas`/`months`/`period`) — אפס המצאת-מספר; חסר → "—" או null.
+- **פעולת-החלטה לתוצר-לא-קראייטיב הממתין לאישור** ב-ItemPage (אישור / בקשת-שינויים
+  עם סיבה חובה) — דרך אותן דלתות גנריות של ה-API (`approve` / `request-revision`).
+  קראייטיב/קופי ממשיכים להיות מוכרעים ב-Review (אין כפילות).
+
+### שונה
+- **ניתוב תיבת-האישורים** (`ApprovalsPage`): תוצר נפתח ל-Review רק אם הוא
+  קראייטיב/קופי; תוצר-מדיה/תקציב/פריסה נפתח לתיק-הפריט ("פתחי לצפייה ואישור").
+- **קונסולידציית מקור-אמת**: ההיגיון "Review או תיק-פריט" אוחד ל-`opensReview`
+  ב-`lib.js` (היה משוכפל כ-`isReviewable` ב-ItemPage וכ-`_opensReview` ב-CoursePage).
+
+### בדיקות
+- `src/manager/lib.deployment.test.mjs` — 6 בדיקות הרמטיות (node --test) לעזרים
+  הטהורים: `opensReview` / `isMediaDeployment` / `monthLabelHe` / `mediaDeploymentRows`
+  מול צורת-ה-payload האמיתית של `takeover_redeploy`. אפס רשת/DB/React.
+
 ## 11/06/2026 — MEDIA-INTERFACE-MOCKUP-FIDELITY (branch `feature/media-mockup-fidelity`)
 
 הכשל שתוקן: מהמוקאפ של נירית נלקחו רק טוקנים (צבע/פונט) ונבנו מסכים אחרים.
