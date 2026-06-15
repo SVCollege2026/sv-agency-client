@@ -146,6 +146,7 @@ export default function CoursePage() {
   const [budgetBusy, setBudgetBusy] = useState({});
   const [rejectingAlloc, setRejectingAlloc] = useState(null);  // ההקצאה שנדחית (RejectDialog)
   const [starting, setStarting] = useState(false);
+  const [startedMsg, setStartedMsg] = useState(null);  // הודעת "התחלנו" לקורס חסר-תיקייה
   const [goLiveBusy, setGoLiveBusy] = useState(false);
   const [goLiveMsg, setGoLiveMsg] = useState(null);
   const [takeover, setTakeover] = useState(null);
@@ -261,18 +262,29 @@ export default function CoursePage() {
       .finally(() => setBudgetBusy((b) => ({ ...b, [id]: false })));
   };
 
-  // "התחל עבודה על הקורס" — לקורס שתיקייתו קיימת אך אין בה עבודה (למשל AI ARCHITECT):
-  // משגר בקשת new_course על התיקייה הקיימת → המשרד מפיק תוכנית-מדיה + קראייטיב, וחוזר לאישור.
+  // "התחל עבודה על הקורס" — משגר בקשת new_course למשרד שמפיק תוכנית-מדיה + קראייטיב
+  // וחוזר לאישור. שני מצבים:
+  //   • לקורס שכבר יש תיקיית-עבודה (course.latest) — הבקשה נצמדת אליה.
+  //   • קורס מנוהל בלי תיקייה (למשל AI ARCHITECT, שמופיע בניווט מהיקף-הניהול אך
+  //     אין לו עדיין folder) — שולחים new_course **בלי** folder_id; זרימת ה-new_course
+  //     בצד-השרת פותחת את התיקייה. submitRequest כבר תומך ב-folderId=null.
   const startWork = () => {
-    const folderId = course?.latest?.id;
-    if (!folderId) { setError("אין תיקייה לקורס — פתחי קורס חדש כדי להתחיל"); return; }
+    const folderId = course?.latest?.id || null;
     setStarting(true);
     setError(null);
+    setStartedMsg(null);
     submitRequest({
-      folderId,
+      folderId,  // null ⇒ השרת יפתח תיקייה חדשה לקורס המנוהל
       requestType: "new_course",
       briefPayload: { course_name: course.name, source: "manager_interface_start_work" },
-    }).then(() => load())
+    }).then(() => {
+        // קורס חסר-תיקייה: אין מה לרענן עדיין (התיקייה נפתחת בשרת), אז מציגים
+        // מצב-"התחלנו" קריא במקום לוח-ריק שנראה כאילו כלום לא קרה.
+        if (!folderId) {
+          setStartedMsg("התחלנו — המשרד פותח את תיקיית-הקורס ומפיק תוכנית-מדיה וקראייטיב. הפריטים יופיעו כאן ויחזרו אלייך לאישור.");
+        }
+        load();
+      })
       .catch((e) => setError(e.message))
       .finally(() => setStarting(false));
   };
@@ -555,11 +567,20 @@ export default function CoursePage() {
           <div>
             <EmptyState icon="🗂" title="אין עדיין פריטי עבודה בקורס הזה"
                         hint="התחילי עבודה — והמשרד יפיק תוכנית-מדיה וקראייטיב שיחזרו אלייך לאישור." />
-            <div style={{ marginBlockStart: 16, textAlign: "center" }}>
-              <button className="mi-btn mi-btn-primary" disabled={starting} onClick={startWork}>
-                {starting ? "מתחיל…" : "התחל עבודה על הקורס"}
-              </button>
-            </div>
+            {startedMsg ? (
+              <div className="mi-card" role="status" aria-live="polite"
+                   style={{ marginBlockStart: 16, padding: "12px 16px", borderColor: "transparent",
+                            background: "var(--mi-success-bg)", color: "var(--mi-success)",
+                            textAlign: "center" }}>
+                {startedMsg}
+              </div>
+            ) : (
+              <div style={{ marginBlockStart: 16, textAlign: "center" }}>
+                <button className="mi-btn mi-btn-primary" disabled={starting} onClick={startWork}>
+                  {starting ? "מתחיל…" : "התחל עבודה על הקורס"}
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <>
