@@ -11,7 +11,7 @@ import { getApprovalsInbox, getArtifacts, getFolder, getBudgetAllocations, decid
 import { EmptyState, ErrorBanner, SkeletonCard, StatusChip } from "../components/ui.jsx";
 import RejectDialog from "../components/RejectDialog.jsx";
 import {
-  artifactThumb, canonPlanKey as canon, courseFolders, fullDate,
+  artifactThumb, canonPlanKey as canon, courseFolders, deploymentStructure, fullDate,
   matchPlanCourseKey as matchCourseKey, requiredOfYou,
   shortDate, stripInternalSteps, typeHe, workStatus,
 } from "../lib.js";
@@ -112,12 +112,18 @@ const verdictPair = (v) =>
   v ? [VERDICT_HE[v] || v, v === "keep" ? "mi-chip-success" : "mi-chip-warning"] : null;
 
 // שורות-הפריסה הדטרמיניסטיות מתוך facts — "—" כשאין נתון, בלי להמציא.
+// "מבנה" + "תאריך מעבר" מוצגים ביושר דרך deploymentStructure: מבנה-מתוכנן ביחס
+// להיום (לא "כבר CBO" כשהמעבר עתידי), ותאריך-מעבר שעבר מסומן כ"(עבר)" במקום
+// להיראות עתידי. אין מבנה/תאריך אמיתי → השורה לא נוספת (בלי להמציא).
 const deploymentRows = (facts) => {
   if (!facts) return [];
-  const cbo = facts.cbo === true ? "CBO" : facts.cbo === false ? "Adset" : null;
+  const dep = deploymentStructure(facts);
   const rows = [];
-  if (cbo) rows.push(["מבנה", cbo]);
-  if (facts.transition_date) rows.push(["תאריך מעבר", fullDate(facts.transition_date)]);
+  if (dep.structure) rows.push(["מבנה", dep.structure]);
+  if (facts.transition_date) {
+    const passed = dep.when === "past";
+    rows.push(["תאריך מעבר", `${fullDate(facts.transition_date)}${passed ? " (עבר)" : ""}`]);
+  }
   if (facts.learning_10d_ils != null) rows.push(["10 ימי-למידה", fmtIls(facts.learning_10d_ils)]);
   if (facts.daily_rate_ils != null) rows.push(["קצב יומי", `${fmtIls(facts.daily_rate_ils)}/יום`]);
   if (facts.budget_after_ils != null) rows.push(["אחרי המעבר", fmtIls(facts.budget_after_ils)]);

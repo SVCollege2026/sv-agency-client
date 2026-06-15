@@ -422,6 +422,56 @@ export function fullDate(iso) {
   return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
 }
 
+/* ── הצגה כנה של מבנה-הקמפיין והמעבר (facts.cbo + facts.transition_date) ──
+   facts.cbo הוא המבנה ה**מתוכנן/יעד** (CBO/Adset), ו-transition_date הוא **מתי**
+   מתוכנן לעבור אליו. לעולם לא מציגים מבנה-מתוכנן כעובדה-קיימת ("כבר CBO"): אם
+   המעבר עוד לפנינו — זה "מתוכנן", ואם התאריך כבר עבר — מציינים זאת ביושר במקום
+   להעמיד פנים שהמעבר טרי/עתידי. אין נתון → null (לא ממציאים מבנה/תאריך). */
+
+/** מסווג תאריך-מעבר מול היום: "future" | "past" | "today" | null (אין/לא-תקין) */
+export function transitionWhen(iso, now = new Date()) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const day = (x) => Date.UTC(x.getFullYear(), x.getMonth(), x.getDate());
+  const diff = day(d) - day(now);
+  if (diff > 0) return "future";
+  if (diff < 0) return "past";
+  return "today";
+}
+
+/** שם-המבנה ה**מתוכנן** מתוך facts.cbo (CBO/Adset), או null אם לא ידוע. */
+export function structureName(cbo) {
+  if (cbo === true) return "CBO";
+  if (cbo === false) return "Adset";
+  return null;
+}
+
+/**
+ * הצגה כנה של מבנה-הקמפיין: המבנה-המתוכנן + מתי, ביחס להיום. מחזיר
+ * { structure, when, label } — label הוא המחרוזת המוצגת ("—" אם אין מבנה).
+ *   • מעבר עתידי  → "CBO — מתוכנן ל-DD.MM.YYYY" (לא "כבר CBO")
+ *   • מעבר שעבר   → "CBO — מעבר תוכנן ל-DD.MM.YYYY (עבר)"
+ *   • מעבר היום   → "CBO — מעבר מתוכנן להיום (DD.MM.YYYY)"
+ *   • בלי תאריך   → המבנה בלבד ("CBO"/"Adset"), בלי טענת-מעבר.
+ * אף פעם לא ממציא: אין מבנה → label "—".
+ */
+export function deploymentStructure(facts, now = new Date()) {
+  const structure = structureName(facts?.cbo);
+  const when = transitionWhen(facts?.transition_date, now);
+  if (!structure) {
+    // אין מבנה מתוכנן — אם בכל-זאת יש תאריך-מעבר אמיתי, מציגים אותו ביושר.
+    if (when) return { structure: null, when, label: `מעבר ${fullDate(facts.transition_date)}` };
+    return { structure: null, when: null, label: "—" };
+  }
+  if (!when) return { structure, when: null, label: structure };
+  const d = fullDate(facts.transition_date);
+  const label = when === "future" ? `${structure} — מתוכנן ל-${d}`
+    : when === "past" ? `${structure} — מעבר תוכנן ל-${d} (עבר)`
+    : `${structure} — מעבר מתוכנן להיום (${d})`;
+  return { structure, when, label };
+}
+
 /** קישור-צפייה של Drive → קישור-תמונה שנטען ב-<img> (אותו קובץ, אותו Drive) */
 export function displayableAssetUrl(url) {
   if (!url) return null;
