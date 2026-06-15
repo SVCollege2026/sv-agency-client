@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { getApprovalsInbox, getArtifacts, getFolder } from "../api.js";
+import { getApprovalsInbox, getArtifacts, getFolder, getBudgetAllocations, decideAllocation } from "../api.js";
 import { EmptyState, ErrorBanner, SkeletonCard, StatusChip } from "../components/ui.jsx";
 import {
   PENDING_STATUSES, approvalStatus, artifactThumb, courseFolders,
@@ -16,6 +16,14 @@ import {
 
 const TABS = [["table", "טבלה"], ["timeline", "ציר זמן"],
               ["active", "פעילים"], ["approvals", "אישורים"]];
+
+/* טבלת-התקציב הייעודית של הקורס (אפיון נירית: כל קורס נפתח עם התקציב שלו) */
+const fmtIls = (n) => (n != null && !isNaN(Number(n))) ? `₪${Math.round(Number(n)).toLocaleString()}` : "—";
+const platformHe = (p) => ({ meta: "מטא", google: "גוגל", social: "סושיאל", all: "כללי" }[p] || p || "כללי");
+const allocStatusHe = (s) =>
+  s === "recommended" ? { he: "ממתין לאישורך", cls: "mi-chip-primary" }
+  : (s === "active" || s === "approved") ? { he: "מאושר ✓", cls: "mi-chip-info" }
+  : { he: s, cls: "" };
 
 function Chip({ pair }) {
   if (!pair) return <span className="mi-meta">—</span>;
@@ -42,6 +50,8 @@ export default function CoursePage() {
   const [artifacts, setArtifacts] = useState(null);
   const [briefs, setBriefs] = useState([]);
   const [inboxItems, setInboxItems] = useState(null);
+  const [allocations, setAllocations] = useState(null);
+  const [budgetBusy, setBudgetBusy] = useState({});
   const [error, setError] = useState(null);
 
   const course = useMemo(() => {
@@ -72,8 +82,35 @@ export default function CoursePage() {
       .then((d) => setInboxItems((d.items || []).filter(
         (i) => i.folder_id && folderIds.has(i.folder_id))))
       .catch(() => setInboxItems([]));
+    // טבלת-התקציב הייעודית: ההקצאות של כל תיקיות-הקורס
+    Promise.all(course.folders.map((f) =>
+      getBudgetAllocations(f.id).catch(() => [])))
+      .then((lists) => setAllocations(lists.flat()))
+      .catch(() => setAllocations([]));
   }, [course, folderIds]);
   useEffect(load, [load]);
+
+  // רק התקציב הרלוונטי: ממתין-לאישור + מאושר/פעיל (בלי ארכיון/נדחה — בלי בלגן).
+  const budgetRows = useMemo(() =>
+    (allocations || [])
+      .filter((a) => ["recommended", "active", "approved"].includes(a.status))
+      .sort((x, y) => new Date(y.created_at || 0) - new Date(x.created_at || 0)),
+    [allocations]);
+
+  const approveAlloc = (id) => {
+    setBudgetBusy((b) => ({ ...b, [id]: true }));
+    decideAllocation(id, "approved")
+      .then(load).catch((e) => setError(e.message))
+      .finally(() => setBudgetBusy((b) => ({ ...b, [id]: false })));
+  };
+  const rejectAlloc = (id) => {
+    const reason = window.prompt("סיבת הדחייה (חובה):");
+    if (!reason || !reason.trim()) return;
+    setBudgetBusy((b) => ({ ...b, [id]: true }));
+    decideAllocation(id, "rejected", reason.trim())
+      .then(load).catch((e) => setError(e.message))
+      .finally(() => setBudgetBusy((b) => ({ ...b, [id]: false })));
+  };
 
   /* שורות הטבלה — תוצרים (גרסה עדכנית) + בקשות, מכל תיקיות הקורס */
   const rows = useMemo(() => {
@@ -149,6 +186,55 @@ export default function CoursePage() {
           ＋ בקשה חדשה
         </button>
       </header>
+
+      {/* טבלת-התקציב הייעודית של הקורס — בראש העמוד (אפיון נירית) */}
+      <section className="mi-card" style={{ padding: 16, marginBlockEnd: 16 }}>
+        <h2 className="mi-h2" style={{ marginBlockEnd: 10 }}>תקציב הקורס</h2>
+        {allocations == null ? (
+          <SkeletonCard lines={2} />
+        ) : budgetRows.length === 0 ? (
+          <p className="mi-meta">
+            אין עדיין תקציב מאושר או מומלץ לקורס — יופק מתוכנית-ההשתלטות או מבקשה.
+          </p>
+        ) : (
+          <div className="mi-table-wrap">
+            <table className="mi-table">
+              <thead>
+                <tr><th>פלטפורמה</th><th>סכום</th><th>סטטוס</th><th>נימוק</th><th>נדרש ממך</th></tr>
+              </thead>
+              <tbody>
+                {budgetRows.map((a) => {
+                  const st = allocStatusHe(a.status);
+                  return (
+                    <tr key={a.id}>
+                      <td className="mi-meta" style={{ whiteSpace: "nowrap" }}>{platformHe(a.platform)}</td>
+                      <td className="mi-ltr" style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{fmtIls(a.amount_ils)}</td>
+                      <td><span className={`mi-chip ${st.cls}`}>{st.he}</span></td>
+                      <td className="mi-meta" style={{ maxInlineSize: 300 }}>{a.rationale || "—"}</td>
+                      <td>
+                        {a.status === "recommended" ? (
+                          <span style={{ display: "flex", gap: 6 }}>
+                            <button className="mi-btn mi-btn-secondary" disabled={!!budgetBusy[a.id]}
+                                    style={{ minBlockSize: 34, padding: "4px 12px" }}
+                                    onClick={() => approveAlloc(a.id)}>
+                              {budgetBusy[a.id] ? "…" : "אשרי"}
+                            </button>
+                            <button className="mi-btn mi-btn-ghost" disabled={!!budgetBusy[a.id]}
+                                    style={{ minBlockSize: 34, padding: "4px 10px" }}
+                                    onClick={() => rejectAlloc(a.id)}>
+                              דחייה
+                            </button>
+                          </span>
+                        ) : <span className="mi-meta">—</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <div className="mi-tabs" role="tablist" aria-label="תצוגות הקורס"
            style={{ marginBlockEnd: 16 }}>

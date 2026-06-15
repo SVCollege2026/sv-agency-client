@@ -153,8 +153,9 @@ export function getRecommendations(limit = 100) {
 
 /* ── תקציב — פריסות מדיה ותקציב ── */
 
-export function getBudgetAllocations() {
-  return request("GET", "/api/settings/budgets/allocations");
+export function getBudgetAllocations(folderId = null) {
+  const q = folderId ? `?folder_id=${folderId}` : "";
+  return request("GET", `/api/settings/budgets/allocations${q}`);
 }
 
 export function getBudgetSources() {
