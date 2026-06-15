@@ -267,7 +267,9 @@ export function isTestFolder(folder) {
 /* קנוני → וריאציות-הזיהוי (פנימי + פרסומי + EN). שיקוף של COURSE_NAMES
    בצד-הלקוח, לזיהוי תיקיות ומפתחות-פריסה בלבד. */
 const COURSE_MATCHERS = [
-  ["AI ARCHITECT", [/architect/i, /\bintegration\b/i]],
+  // 'integration' מצומצם ל-AI Integration Specialist בלבד — שלא יתפוס תיקיות-בדיקה
+  // כמו "Integration Test Course" (שגם נחסמות ב-isTestFolder, אך הדיוק חשוב כאן).
+  ["AI ARCHITECT", [/architect/i, /ai\s*integration/i, /אינטגרצי/]],
   ["QA",           [/\bqa\b/i, /בודק תוכנה/, /פיתוח טכנולוגיות/]],
   ["AI",           [/mastermind/i, /בינה מלאכותית/, /^ai(?!.*(ערב|בוקר))/i]],
   ["שיווק לבעלי עסקים", [/בעלי עסקים/]],
@@ -351,6 +353,56 @@ export function cyclesForCourse(cycles = [], courseKey = "") {
   });
   if (best === 0) return [];
   return scored.filter(([s]) => s === best).map(([, c]) => c);
+}
+
+/* ── מפתח-קורס של תוכנית-ההשתלטות (course_key) — מקור-אמת אחד ──
+   האסטרטג כותב course_keys כמו 'ai_architect'/'marketing_b2b'; CoursePage
+   ו-TakeoverPlanPage צריכים למפות שם-קורס חופשי לאותו מפתח. עד היום כל עמוד
+   שיכפל את המפה (sweep #6) — כאן מאחדים. הספציפי לפני הכללי (ai_architect
+   לפני ai, marketing_b2b לפני marketing). קונסולידציה: וריאנטים של אותו קורס
+   מתאחדים למפתח קנוני אחד דרך PLAN_KEY_CANON (כרטיס אחד פר-קורס). */
+const PLAN_KEY_CANON = { marketing_social_ai: "marketing" };
+
+/** מאחד וריאנטים של אותו course_key למפתח-קורס קנוני אחד */
+export function canonPlanKey(k) {
+  return (k && PLAN_KEY_CANON[k]) || k;
+}
+
+const PLAN_COURSE_ALIASES = [
+  ["ai_architect", ["architect", "ארכיטקט", "ai integration", "אינטגרצי"]],
+  ["marketing_b2b", ["b2b", "בעלי עסקים"]],
+  ["qa", ["qa", "פיתוח טכנולוגיות", "בדיקות"]],
+  ["cyber", ["cyber", "סייבר"]],
+  ["gaming", ["gaming", "גיימינג", "פיתוח משחקים"]],
+  ["marketing_social_ai", ["סושיאל"]],
+  ["marketing", ["שיווק", "marketing"]],
+  ["ai", ["ai", "בינה"]],
+];
+
+/** שם-קורס חופשי → course_key של תוכנית-ההשתלטות (הספציפי לפני הכללי) */
+export function matchPlanCourseKey(name) {
+  const s = (name || "").toLowerCase();
+  for (const [key, aliases] of PLAN_COURSE_ALIASES) {
+    if (aliases.some((a) => s.includes(a))) return key;
+  }
+  return "_other";
+}
+
+/* תוויות-עברית פר course_key של תוכנית-ההשתלטות (לכותרות-קורס בעמודי-ההשתלטות) */
+const PLAN_COURSE_LABELS = {
+  qa: "QA — פיתוח טכנולוגיות",
+  ai: "AI",
+  ai_architect: "AI Architect",
+  cyber: "סייבר",
+  gaming: "גיימינג",
+  marketing: "שיווק",
+  marketing_b2b: "שיווק B2B",
+  marketing_social_ai: "שיווק / סושיאל / AI",
+};
+
+/** תווית-עברית ל-course_key של תוכנית-ההשתלטות, או המפתח עצמו אם לא ידוע */
+export function planCourseLabel(key) {
+  return PLAN_COURSE_LABELS[key] || key;
 }
 
 /* ── עזרי תצוגה ─────────────────────────────────────────── */

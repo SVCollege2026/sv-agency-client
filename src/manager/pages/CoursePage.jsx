@@ -11,31 +11,16 @@ import { getApprovalsInbox, getArtifacts, getFolder, getBudgetAllocations, decid
 import { EmptyState, ErrorBanner, SkeletonCard, StatusChip } from "../components/ui.jsx";
 import RejectDialog from "../components/RejectDialog.jsx";
 import {
-  artifactThumb, courseFolders, fullDate, requiredOfYou,
+  artifactThumb, canonPlanKey as canon, courseFolders, fullDate,
+  matchPlanCourseKey as matchCourseKey, requiredOfYou,
   shortDate, stripInternalSteps, typeHe, workStatus,
 } from "../lib.js";
 
 const TABS = [["table", "טבלה"], ["timeline", "ציר זמן"],
               ["active", "פעילים"], ["approvals", "אישורים"]];
 
-/* התאמת שם-קורס ל-course_key של תוכנית-ההשתלטות (זהה ל-TakeoverPlanPage) — הספציפי לפני הכללי */
-const CANON = { marketing_social_ai: "marketing" };
-const canon = (k) => (k && CANON[k]) || k;
-const COURSE_ALIASES = [
-  ["ai_architect", ["architect", "ארכיטקט"]],
-  ["marketing_b2b", ["b2b"]],
-  ["qa", ["qa", "פיתוח טכנולוגיות", "בדיקות"]],
-  ["cyber", ["cyber", "סייבר"]],
-  ["gaming", ["gaming", "גיימינג", "פיתוח משחקים"]],
-  ["marketing_social_ai", ["סושיאל"]],
-  ["marketing", ["שיווק", "marketing"]],
-  ["ai", ["ai", "בינה"]],
-];
-function matchCourseKey(name) {
-  const s = (name || "").toLowerCase();
-  for (const [key, aliases] of COURSE_ALIASES) if (aliases.some((a) => s.includes(a))) return key;
-  return "_other";
-}
+/* התאמת שם-קורס ל-course_key של תוכנית-ההשתלטות — מקור-אמת אחד (lib.js),
+   משותף ל-TakeoverPlanPage (sweep #6). היה משוכפל פה. */
 
 /* טבלת-התקציב הייעודית של הקורס (אפיון נירית: כל קורס נפתח עם התקציב שלו) */
 const fmtIls = (n) => (n != null && !isNaN(Number(n))) ? `₪${Math.round(Number(n)).toLocaleString()}` : "—";
@@ -84,12 +69,60 @@ const periodHe = (a) => {
   return `${fullDate(start)} – ${fullDate(end)}`;
 };
 
+// fix #2: הסכום בטבלה הוא ה**נותר** (הקצאה − הוצאה-עד-כה) — לבד הוא נקרא כמספר
+// קטן שלא תואם את התקציב-המאושר. כאן בונים שורת-פירוק מה-metadata שכבר קיים בהקצאה
+// (allocation_june_ils / spend_to_date_ils / daily_rate_ils) כך ש"נותר ₪5,536" נקרא
+// כ"נותר מתוך ₪24,551 שאושרו". אין חישוב ואין המצאה — רק הצגת מה שכבר שמור.
+const budgetBreakdown = (a) => {
+  const md = a.metadata || {};
+  const parts = [];
+  if (md.allocation_june_ils != null) parts.push(`מאושר ${fmtIls(md.allocation_june_ils)}`);
+  if (md.spend_to_date_ils != null) parts.push(`הוצא ${fmtIls(md.spend_to_date_ils)}`);
+  if (a.amount_ils != null) parts.push(`נותר ${fmtIls(a.amount_ils)}`);
+  if (md.daily_rate_ils != null) parts.push(`${fmtIls(md.daily_rate_ils)}/יום`);
+  return parts;
+};
+
+// fix #1 (client fallback): כשאין שורת-הקצאה אמיתית לקורס (למשל AI ARCHITECT עד
+// שתיפתח לו תיקייה ויכתב folder_id — באג-המקור הוא בצד-השרת), אבל לתוכנית-ההשתלטות
+// יש facts לקורס — מציגים שורת-"מתוכנן" קריאה-בלבד מתוך ה-facts שכבר נשלפו, בלי
+// כפתורי-אישור ובלי להמציא מספר. facts.daily_rate_ils / learning_10d_ils נכתבים
+// ע"י מנוע-ההשתלטות (media_strategy_agent._build_takeover_facts) — מספרים אמיתיים.
+const factsPlannedParts = (facts) => {
+  if (!facts) return [];
+  const parts = [];
+  if (facts.daily_rate_ils != null) parts.push(`${fmtIls(facts.daily_rate_ils)}/יום`);
+  if (facts.learning_10d_ils != null) parts.push(`10 ימי-למידה ${fmtIls(facts.learning_10d_ils)}`);
+  if (facts.budget_after_ils != null) parts.push(`אחרי המעבר ${fmtIls(facts.budget_after_ils)}`);
+  return parts;
+};
+
 function Chip({ pair }) {
   if (!pair) return <span className="mi-meta">—</span>;
   const [label, cls] = pair;
   if (!cls) return <span className="mi-meta">{label}</span>;
   return <span className={`mi-chip ${cls}`}>{label}</span>;
 }
+
+// fix #4: הנחיית-האסטרטג מוצגת כ**פריסת-מדיה מובנית** (מבנה / תקציב / תאריכים),
+// לא כפסקאות-פרוזה. הנתונים מ-courseGuidance.c.facts (אותו מבנה כמו FactsPanel
+// ב-TakeoverPlanPage) + verdict + platform_emphasis — כולם כבר נשלפו מהתוכנית.
+const VERDICT_HE = { keep: "להשאיר", adjust: "לתקן" };
+const verdictPair = (v) =>
+  v ? [VERDICT_HE[v] || v, v === "keep" ? "mi-chip-success" : "mi-chip-warning"] : null;
+
+// שורות-הפריסה הדטרמיניסטיות מתוך facts — "—" כשאין נתון, בלי להמציא.
+const deploymentRows = (facts) => {
+  if (!facts) return [];
+  const cbo = facts.cbo === true ? "CBO" : facts.cbo === false ? "Adset" : null;
+  const rows = [];
+  if (cbo) rows.push(["מבנה", cbo]);
+  if (facts.transition_date) rows.push(["תאריך מעבר", fullDate(facts.transition_date)]);
+  if (facts.learning_10d_ils != null) rows.push(["10 ימי-למידה", fmtIls(facts.learning_10d_ils)]);
+  if (facts.daily_rate_ils != null) rows.push(["קצב יומי", `${fmtIls(facts.daily_rate_ils)}/יום`]);
+  if (facts.budget_after_ils != null) rows.push(["אחרי המעבר", fmtIls(facts.budget_after_ils)]);
+  return rows;
+};
 
 function Thumb({ item }) {
   const [failed, setFailed] = React.useState(false);
@@ -178,8 +211,9 @@ export default function CoursePage() {
     return out;
   }, [allocations]);
 
-  // הנחיית-האסטרטג לקורס הזה מתוך תוכנית-ההשתלטות (נימוק + פעולות פר-קורס) — הסיגנל,
-  // לא הטקסט הגנרי על שורת-תקציב. מותאם לפי course_key.
+  // הנחיית-האסטרטג לקורס הזה מתוך תוכנית-ההשתלטות — מותאם לפי course_key.
+  // fix #4: ה-facts הם המקור לפריסה המובנית (CBO/תקציב/תאריכים); ה-prs מספקים
+  // את דגש-הפלטפורמה. אין יותר תלות בפסקאות reasoning/why/note.
   const courseGuidance = useMemo(() => {
     const plan = takeover?.plan;
     if (!plan || !course) return null;
@@ -188,6 +222,22 @@ export default function CoursePage() {
     const prs = (plan.course_priorities || []).filter((p) => canon(matchCourseKey(p.course)) === want);
     return (c || prs.length) ? { c, prs } : null;
   }, [takeover, course]);
+
+  // fix #4: שורות-הפריסה המובנית + שבבי-דגש-הפלטפורמה — נגזרים מ-courseGuidance.
+  const deployRows = useMemo(
+    () => deploymentRows(courseGuidance?.c?.facts), [courseGuidance]);
+  const emphasisChips = useMemo(() => {
+    const seen = new Set();
+    for (const pr of courseGuidance?.prs || []) {
+      const e = (pr.platform_emphasis || "").trim();
+      if (e) seen.add(e);
+    }
+    return [...seen];
+  }, [courseGuidance]);
+
+  // fix #1 (client fallback): תקציב-מתוכנן מה-facts כשאין שורת-הקצאה אמיתית.
+  const plannedBudgetParts = useMemo(
+    () => factsPlannedParts(courseGuidance?.c?.facts), [courseGuidance]);
 
   const approveAlloc = (id) => {
     setBudgetBusy((b) => ({ ...b, [id]: true }));
@@ -374,27 +424,34 @@ export default function CoursePage() {
         </div>
       )}
 
-      {/* הנחיית-האסטרטג לקורס — הסיגנל האמיתי (נימוק + פעולות פר-קורס), לא טקסט גנרי */}
-      {courseGuidance && (
+      {/* fix #4: פריסת-המדיה של הקורס — טבלה מובנית (מבנה / תקציב / תאריכים) + שבבים
+          (verdict + דגש-פלטפורמה), לא פסקאות-פרוזה. הנתונים מתוכנית-ההשתלטות (facts). */}
+      {courseGuidance && (deployRows.length > 0 || courseGuidance.c?.verdict || emphasisChips.length > 0) && (
         <section className="mi-card" style={{ padding: 16, marginBlockEnd: 16 }}>
-          <h2 className="mi-h2" style={{ marginBlockEnd: 8 }}>הנחיית האסטרטג לקורס</h2>
-          {courseGuidance.c?.reasoning && (
-            <p className="mi-body" style={{ whiteSpace: "pre-wrap", marginBlockEnd: 8 }}>
-              {courseGuidance.c.reasoning}
-            </p>
-          )}
-          {courseGuidance.prs.map((pr, i) => (
-            <div key={i} style={{ borderInlineStart: "3px solid var(--mi-border)",
-                                  paddingInlineStart: 10, marginBlockStart: 6 }}>
-              {pr.why && <p className="mi-body" style={{ whiteSpace: "pre-wrap", margin: "4px 0" }}>{pr.why}</p>}
-              {pr.note_to_platform_manager && (
-                <p className="mi-body" style={{ whiteSpace: "pre-wrap", margin: "4px 0",
-                                                color: "var(--mi-ink-soft, #444)" }}>
-                  📌 {pr.note_to_platform_manager}
-                </p>
-              )}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBlockEnd: 10 }}>
+            <h2 className="mi-h2" style={{ margin: 0 }}>פריסת המדיה לקורס</h2>
+            {courseGuidance.c?.verdict && <Chip pair={verdictPair(courseGuidance.c.verdict)} />}
+            {emphasisChips.map((e, i) => (
+              <span key={i} className="mi-chip mi-chip-info">{e}</span>
+            ))}
+          </div>
+          {deployRows.length > 0 ? (
+            <div className="mi-table-wrap">
+              <table className="mi-table">
+                <thead><tr><th>פרמטר</th><th>ערך</th></tr></thead>
+                <tbody>
+                  {deployRows.map(([k, v]) => (
+                    <tr key={k}>
+                      <td className="mi-meta" style={{ whiteSpace: "nowrap" }}>{k}</td>
+                      <td className="mi-ltr" style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{v}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
+          ) : (
+            <p className="mi-meta">פרטי-הפריסה (מבנה · תקציב · תאריכים) יתווספו עם הפקת תוכנית-ההשתלטות לקורס.</p>
+          )}
         </section>
       )}
 
@@ -404,23 +461,50 @@ export default function CoursePage() {
         {allocations == null ? (
           <SkeletonCard lines={2} />
         ) : budgetRows.length === 0 ? (
-          <p className="mi-meta">
-            אין עדיין תקציב מאושר או מומלץ לקורס — יופק מתוכנית-ההשתלטות או מבקשה.
-          </p>
+          /* fix #1 (client fallback): אין שורת-הקצאה (folder_id חסר — שורש בצד-השרת).
+             אם לתוכנית-ההשתלטות יש facts לקורס, מציגים תקציב-מתוכנן קריאה-בלבד מהמספרים
+             האמיתיים שכבר נשלפו, במקום קופסה ריקה. */
+          plannedBudgetParts.length > 0 ? (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span className="mi-chip">תקציב מתוכנן</span>
+                <span className="mi-meta mi-ltr" style={{ fontWeight: 600 }}>
+                  {plannedBudgetParts.join(" · ")}
+                </span>
+              </div>
+              <p className="mi-meta" style={{ marginBlockStart: 8 }}>
+                זהו התקציב המתוכנן מתוכנית-ההשתלטות. שורת-תקציב לאישור תיווצר כשתיפתח תיקיית-קמפיין לקורס.
+              </p>
+            </div>
+          ) : (
+            <p className="mi-meta">
+              אין עדיין תקציב מאושר או מומלץ לקורס — יופק מתוכנית-ההשתלטות או מבקשה.
+            </p>
+          )
         ) : (
           <div className="mi-table-wrap">
             <table className="mi-table">
               <thead>
-                <tr><th>פלטפורמה</th><th>תקופה</th><th>סכום</th><th>סטטוס</th><th>נדרש ממך</th></tr>
+                <tr><th>פלטפורמה</th><th>תקופה</th><th>נותר (לתקופה)</th><th>סטטוס</th><th>נדרש ממך</th></tr>
               </thead>
               <tbody>
                 {budgetRows.map((a) => {
                   const st = allocStatusHe(a);
+                  // fix #2: הסכום הראשי הוא ה-נותר; שורת-פירוק מתחתיו מציבה אותו בהקשר
+                  //         (מאושר · הוצא · נותר · קצב-יומי) כדי שלא ייקרא כמספר תלוש.
+                  const breakdown = budgetBreakdown(a);
                   return (
                     <tr key={a.id}>
                       <td className="mi-meta" style={{ whiteSpace: "nowrap" }}>{platformHe(a.platform)}</td>
                       <td className="mi-meta mi-ltr" style={{ whiteSpace: "nowrap" }}>{periodHe(a)}</td>
-                      <td className="mi-ltr" style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{fmtIls(a.amount_ils)}</td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <div className="mi-ltr" style={{ fontWeight: 600 }}>{fmtIls(a.amount_ils)}</div>
+                        {breakdown.length > 0 && (
+                          <div className="mi-meta mi-ltr" style={{ fontSize: 11, marginBlockStart: 2 }}>
+                            {breakdown.join(" · ")}
+                          </div>
+                        )}
+                      </td>
                       <td><span className={`mi-chip ${st.cls}`}>{st.he}</span></td>
                       <td>
                         {a.status === "recommended" ? (

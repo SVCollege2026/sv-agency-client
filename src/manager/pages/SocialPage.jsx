@@ -26,18 +26,36 @@ export default function SocialPage() {
   const [sources, setSources] = useState(null);
   const [error, setError] = useState(null);
 
-  // סושיאל = פעילות בית-ספרית שאינה משויכת לקורס (folder_id ריק). מסירים רק תוצרי-
-  // אסטרטגיה/מחקר/תקציב פנימיים שאינם "תוכן" — כל היתר (קראייטיב/קופי/פוסט/בקשות
-  // בית-ספריות) מוצג. רשימת-החסימה רחבה מספיק שלא יחסום בקשות-תוכן אמיתיות (fix #9).
-  const _isInternalNonContent = (t) =>
-    /market_research|competitor|media_plan|media_deployment|budget|allocation|redeploy|forecast|strategy/i
-      .test(t || "");
+  // fix #3: סושיאל = תוכן בית-ספרי אמיתי שאינו משויך לקורס — לא פלט-מכונה פנימי.
+  // עברנו מ"רשימת-חסימה" (שדלפו דרכה make_scenario / *_performance / takeover_plan /
+  // limann / art_direction) ל**רשימת-היתר מפורשת** של סוגי-תוכן בלבד: נכסים, קופי,
+  // ופעילות-סושיאל בית-ספרית. כל השאר לא מוצג.
+  const _CONTENT_TYPES = new Set([
+    "creative_rendered", "creative_asset", "creative", "visual", "video",
+    "ad_copy_meta", "ad_copy_google", "ad_copy_tiktok", "copy",
+    "school_level", "course_activity",
+  ]);
+  const _isContentType = (t) => {
+    const k = String(t || "").toLowerCase();
+    if (_CONTENT_TYPES.has(k)) return true;
+    return /^ad_copy_/.test(k); // קופי לכל פלטפורמה עתידית
+  };
+  // פריטים בסטטוס פנימי/מת או בארכיון לא מוצגים כפעילות חיה.
+  const _isDeadOrArchived = (s) =>
+    /^(draft|internal_review|in_progress|superseded|archived|rejected)$/i.test(s || "");
+  // שאריות ריצות-בדיקה (אותם מזהים כמו isTestFolder, על כותרת/שם-התוצר).
+  const _isTestResidue = (a) =>
+    /\btest\b|בדיקה|טסט|demo|דמו|\be2e\b|\bsim\b|\bdiag\b|sanity|integration/i
+      .test(`${a?.title || ""} ${a?.artifact_type || ""}`);
 
   const load = useCallback(() => {
     setError(null);
-    getArtifacts({ limit: 200 })
+    // limit מורם ל-500 (המקסימום בשרת): המסנן צד-לקוח, וברירת-המחדל 200 הסתירה
+    // תוכן-אמיתי ישן יותר (sweep). השרת לא תומך ב-include-list רב-ערכי, לכן מסננים כאן.
+    getArtifacts({ limit: 500 })
       .then((rows) => setItems(rows.filter(
-        (a) => !a.folder_id && !_isInternalNonContent(a.artifact_type))))
+        (a) => !a.folder_id && _isContentType(a.artifact_type)
+               && !_isDeadOrArchived(a.status) && !_isTestResidue(a))))
       .catch((e) => setError(e.message));
     // מקור-תקציב הסושיאל = מקורות בית-ספריים שאינם משויכים לקורס (folder_id ריק) —
     // קריאה-בלבד; ההקצאות עצמן מנוהלות תחת "פריסות מדיה ותקציב".

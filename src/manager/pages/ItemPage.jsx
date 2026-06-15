@@ -101,10 +101,21 @@ export default function ItemPage() {
   const driveUrl = payload.drive_url || payload.drive_folder_url || payload.attached_file?.access_url;
   const pending = PENDING_STATUSES.includes(artifact.status);
 
+  // sweep: תוצרי-מדיה (media_plan/market_research/budget_recommendation) לא נושאים
+  // goal/usages/due_date, ולכן הפאנל היה כמעט-ריק. מרחיבים לשדות שהם **כן** נושאים
+  // (summary/period/platform/amount/rationale) — מוצגים רק אם קיימים בפועל, בלי המצאה.
+  const _period = payload.period_start || payload.period_end
+    ? `${payload.period_start ? fullDate(payload.period_start) : "—"} – ${payload.period_end ? fullDate(payload.period_end) : "—"}`
+    : (payload.period || null);
+  const _amount = payload.amount_ils ?? payload.estimated_budget ?? payload.amount;
   const details = [
     ["מטרה",          payload.goal || payload.purpose || payload.objective],
+    ["תקציר",         payload.summary || payload.overview || payload.description],
     ["שימושים מוצעים", Array.isArray(payload.usages) ? payload.usages.join(" · ") : payload.usages],
-    ["תקציב משוער",   payload.estimated_budget != null ? `${Number(payload.estimated_budget).toLocaleString()} ₪` : null],
+    ["פלטפורמה",      payload.platform],
+    ["תקופה",         _period],
+    ["סכום",          _amount != null ? `${Number(_amount).toLocaleString()} ₪` : null],
+    ["נימוק",         payload.rationale],
     ["תאריך יעד",     payload.due_date ? fullDate(payload.due_date) : null],
     ["מחלקה מבצעת",   null], // שמות-מחלקות פנימיים לא מוצגים למנהלת (עיקרון UX)
   ].filter(([, v]) => v);
