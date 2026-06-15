@@ -14,7 +14,8 @@ import {
   prepareTakeoverDirectives, generateTakeoverBudget,
 } from "../api.js";
 import { ErrorBanner, EmptyState, SkeletonCard, timeAgoHe } from "../components/ui.jsx";
-import { fullDate } from "../lib.js";
+import { fullDate, canonPlanKey as canon, matchPlanCourseKey as matchCourseKey,
+         planCourseLabel as labelFor } from "../lib.js";
 
 const PLATFORM_HE = { meta: "מטא", google: "גוגל", social: "סושיאל" };
 
@@ -27,46 +28,9 @@ function oneLine(text) {
   return first.length > 140 ? `${first.slice(0, 139)}…` : first;
 }
 
-const COURSE_LABELS = {
-  qa: "QA — פיתוח טכנולוגיות",
-  ai: "AI",
-  ai_architect: "AI Architect",
-  cyber: "סייבר",
-  gaming: "גיימינג",
-  marketing: "שיווק",
-  marketing_b2b: "שיווק B2B",
-  marketing_social_ai: "שיווק / סושיאל / AI",
-};
-
-// מיפוי שם-קורס (כפי שהאסטרטג כתב) ל-course_key — הספציפי לפני הכללי
-// (ai_architect לפני ai, marketing_b2b לפני marketing).
-// קונסולידציה: וריאנטים של אותו קורס מתאחדים למפתח אחד → כרטיס אחד פר-קורס,
-// לא כרטיס פר-מחזור (תיקון נירית 14/06: "כבר יש התייחסות לשיווק, למה שוב?").
-const CANON = { marketing_social_ai: "marketing" };
-const canon = (k) => (k && CANON[k]) || k;
-
-const COURSE_ALIASES = [
-  ["ai_architect", ["architect", "ארכיטקט"]],
-  ["marketing_b2b", ["b2b"]],
-  ["qa", ["qa", "פיתוח טכנולוגיות", "בדיקות"]],
-  ["cyber", ["cyber", "סייבר"]],
-  ["gaming", ["gaming", "גיימינג", "פיתוח משחקים"]],
-  ["marketing_social_ai", ["סושיאל"]],
-  ["marketing", ["שיווק", "marketing"]],
-  ["ai", ["ai", "בינה"]],
-];
-
-function matchCourseKey(courseName) {
-  const s = (courseName || "").toLowerCase();
-  for (const [key, aliases] of COURSE_ALIASES) {
-    if (aliases.some((a) => s.includes(a))) return key;
-  }
-  return "_other";
-}
-
-function labelFor(key) {
-  return COURSE_LABELS[key] || key;
-}
+// מיפוי שם-קורס↔course_key + תוויות + קנוניזציה — מקור-אמת אחד ב-lib.js
+// (canonPlanKey / matchPlanCourseKey / planCourseLabel). היו משוכפלים פה
+// וב-CoursePage (sweep #6) → אוחדו, כך שקורס חדש/שינוי-שם נערך במקום אחד.
 
 const VERDICT_TONE = {
   keep: { bg: "var(--mi-success-bg, #e6f7ec)", ink: "var(--mi-success, #1a7f44)", he: "להשאיר" },
