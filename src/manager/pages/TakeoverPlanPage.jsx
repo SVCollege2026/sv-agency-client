@@ -259,20 +259,29 @@ export default function TakeoverPlanPage() {
       {/* הפעלת ההשתלטות — חיבור "אישור בממשק" לביצוע בפועל */}
       <section className="mi-card" style={{ padding: 16, marginBlockEnd: 16 }}>
         <h2 className="mi-h2" style={{ marginBlockEnd: 8 }}>הפעלת ההשתלטות</h2>
-        <p className="mi-meta" style={{ marginBlockEnd: 10 }}>
-          אחרי שכתבת הערות פר-קורס — <strong>שלחי אותן למשרד</strong> כדי שיתחיל לעבוד (רענוני-קראייטיב
-          ושינויי-מבנה עוברים למבצע). ולהפעלת ההשתלטות עצמה — <strong>הפיקי את המלצות-התקציב</strong>:
-          הן נכנסות לתיבת-האישורים, ואישורן שם מפעיל את ניהול המערכת בפועל.
+        <p className="mi-meta" style={{ marginBlockEnd: 12 }}>
+          התוכנית שלמעלה היא האסטרטגיה <strong>במילים</strong>. שני צעדים הופכים אותה למעשה:
         </p>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="mi-btn mi-btn-secondary" disabled={acting === "directives"}
-                  onClick={sendDirectives}>
-            {acting === "directives" ? "שולח…" : "שלחי את ההערות למשרד"}
-          </button>
-          <button className="mi-btn mi-btn-primary" disabled={acting === "budget"}
-                  onClick={armBudget}>
-            {acting === "budget" ? "מפיק…" : "הפק תקציב-השתלטות לאישור"}
-          </button>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minInlineSize: 230 }}>
+            <button className="mi-btn mi-btn-secondary" disabled={acting === "directives"}
+                    onClick={sendDirectives} style={{ inlineSize: "100%", justifyContent: "center" }}>
+              {acting === "directives" ? "שולח…" : "1 · שלחי את ההערות למשרד"}
+            </button>
+            <p className="mi-meta" style={{ marginBlockStart: 6 }}>
+              ההערות שכתבת על הקורסים נשלחות למבצעים (קראייטיב/מדיה) ויחזרו אלייך לאישור.
+            </p>
+          </div>
+          <div style={{ flex: 1, minInlineSize: 230 }}>
+            <button className="mi-btn mi-btn-primary" disabled={acting === "budget"}
+                    onClick={armBudget} style={{ inlineSize: "100%", justifyContent: "center" }}>
+              {acting === "budget" ? "מפיק…" : "2 · הפק תקציב-השתלטות לאישור"}
+            </button>
+            <p className="mi-meta" style={{ marginBlockStart: 6 }}>
+              התוכנית במילים לא מכילה ₪. זה מחשב את חלוקת-התקציב פר-קורס ושם אותה בתיבת-האישורים —
+              <strong> אישורה שם = ההשתלטות מתחילה בפועל.</strong>
+            </p>
+          </div>
         </div>
         {actionMsg && (
           <p className="mi-body" role="status" style={{

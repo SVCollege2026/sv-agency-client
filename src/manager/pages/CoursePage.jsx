@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { getApprovalsInbox, getArtifacts, getFolder, getBudgetAllocations, decideAllocation, submitRequest, requestGoLive } from "../api.js";
+import { getApprovalsInbox, getArtifacts, getFolder, getBudgetAllocations, decideAllocation, submitRequest, requestGoLive, getTakeoverPlan } from "../api.js";
 import { EmptyState, ErrorBanner, SkeletonCard, StatusChip } from "../components/ui.jsx";
 import {
   PENDING_STATUSES, approvalStatus, artifactThumb, courseFolders,
@@ -17,13 +17,35 @@ import {
 const TABS = [["table", "טבלה"], ["timeline", "ציר זמן"],
               ["active", "פעילים"], ["approvals", "אישורים"]];
 
+/* התאמת שם-קורס ל-course_key של תוכנית-ההשתלטות (זהה ל-TakeoverPlanPage) — הספציפי לפני הכללי */
+const CANON = { marketing_social_ai: "marketing" };
+const canon = (k) => (k && CANON[k]) || k;
+const COURSE_ALIASES = [
+  ["ai_architect", ["architect", "ארכיטקט"]],
+  ["marketing_b2b", ["b2b"]],
+  ["qa", ["qa", "פיתוח טכנולוגיות", "בדיקות"]],
+  ["cyber", ["cyber", "סייבר"]],
+  ["gaming", ["gaming", "גיימינג", "פיתוח משחקים"]],
+  ["marketing_social_ai", ["סושיאל"]],
+  ["marketing", ["שיווק", "marketing"]],
+  ["ai", ["ai", "בינה"]],
+];
+function matchCourseKey(name) {
+  const s = (name || "").toLowerCase();
+  for (const [key, aliases] of COURSE_ALIASES) if (aliases.some((a) => s.includes(a))) return key;
+  return "_other";
+}
+
 /* טבלת-התקציב הייעודית של הקורס (אפיון נירית: כל קורס נפתח עם התקציב שלו) */
 const fmtIls = (n) => (n != null && !isNaN(Number(n))) ? `₪${Math.round(Number(n)).toLocaleString()}` : "—";
 const platformHe = (p) => ({ meta: "מטא", google: "גוגל", social: "סושיאל", all: "כללי" }[p] || p || "כללי");
-const allocStatusHe = (s) =>
-  s === "recommended" ? { he: "ממתין לאישורך", cls: "mi-chip-primary" }
-  : (s === "active" || s === "approved") ? { he: "מאושר ✓", cls: "mi-chip-info" }
-  : { he: s, cls: "" };
+// הבחנה לפי decided_by: רק מה שהמנהלת אישרה בפועל = "מאושר". active/approved בלי decided_by =
+// יובא מהחשבון הקיים (מצב-נוכחי) — לא אישור שלה.
+const allocStatusHe = (a) => {
+  if (a.status === "recommended") return { he: "ממתין לאישורך", cls: "mi-chip-primary" };
+  if (a.decided_by) return { he: "מאושר על ידך ✓", cls: "mi-chip-info" };
+  return { he: "קיים בחשבון (לא אישור שלך)", cls: "" };
+};
 
 function Chip({ pair }) {
   if (!pair) return <span className="mi-meta">—</span>;
@@ -55,6 +77,7 @@ export default function CoursePage() {
   const [starting, setStarting] = useState(false);
   const [goLiveBusy, setGoLiveBusy] = useState(false);
   const [goLiveMsg, setGoLiveMsg] = useState(null);
+  const [takeover, setTakeover] = useState(null);
   const [error, setError] = useState(null);
 
   const course = useMemo(() => {
@@ -85,6 +108,8 @@ export default function CoursePage() {
       .then((d) => setInboxItems((d.items || []).filter(
         (i) => i.folder_id && folderIds.has(i.folder_id))))
       .catch(() => setInboxItems([]));
+    // הנחיית-האסטרטג לקורס מתוך תוכנית-ההשתלטות (best-effort; חסר ⇒ פשוט לא מוצג)
+    getTakeoverPlan().then(setTakeover).catch(() => setTakeover(null));
     // טבלת-התקציב הייעודית: ההקצאות של כל תיקיות-הקורס
     Promise.all(course.folders.map((f) =>
       getBudgetAllocations(f.id).catch(() => [])))
@@ -99,6 +124,17 @@ export default function CoursePage() {
       .filter((a) => ["recommended", "active", "approved"].includes(a.status))
       .sort((x, y) => new Date(y.created_at || 0) - new Date(x.created_at || 0)),
     [allocations]);
+
+  // הנחיית-האסטרטג לקורס הזה מתוך תוכנית-ההשתלטות (נימוק + פעולות פר-קורס) — הסיגנל,
+  // לא הטקסט הגנרי על שורת-תקציב. מותאם לפי course_key.
+  const courseGuidance = useMemo(() => {
+    const plan = takeover?.plan;
+    if (!plan || !course) return null;
+    const want = canon(matchCourseKey(course.key));
+    const c = (plan.courses || []).find((x) => canon(x.course_key) === want) || null;
+    const prs = (plan.course_priorities || []).filter((p) => canon(matchCourseKey(p.course)) === want);
+    return (c || prs.length) ? { c, prs } : null;
+  }, [takeover, course]);
 
   const approveAlloc = (id) => {
     setBudgetBusy((b) => ({ ...b, [id]: true }));
@@ -245,6 +281,30 @@ export default function CoursePage() {
         </div>
       )}
 
+      {/* הנחיית-האסטרטג לקורס — הסיגנל האמיתי (נימוק + פעולות פר-קורס), לא טקסט גנרי */}
+      {courseGuidance && (
+        <section className="mi-card" style={{ padding: 16, marginBlockEnd: 16 }}>
+          <h2 className="mi-h2" style={{ marginBlockEnd: 8 }}>הנחיית האסטרטג לקורס</h2>
+          {courseGuidance.c?.reasoning && (
+            <p className="mi-body" style={{ whiteSpace: "pre-wrap", marginBlockEnd: 8 }}>
+              {courseGuidance.c.reasoning}
+            </p>
+          )}
+          {courseGuidance.prs.map((pr, i) => (
+            <div key={i} style={{ borderInlineStart: "3px solid var(--mi-border)",
+                                  paddingInlineStart: 10, marginBlockStart: 6 }}>
+              {pr.why && <p className="mi-body" style={{ whiteSpace: "pre-wrap", margin: "4px 0" }}>{pr.why}</p>}
+              {pr.note_to_platform_manager && (
+                <p className="mi-body" style={{ whiteSpace: "pre-wrap", margin: "4px 0",
+                                                color: "var(--mi-ink-soft, #444)" }}>
+                  📌 {pr.note_to_platform_manager}
+                </p>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
+
       {/* טבלת-התקציב הייעודית של הקורס — בראש העמוד (אפיון נירית) */}
       <section className="mi-card" style={{ padding: 16, marginBlockEnd: 16 }}>
         <h2 className="mi-h2" style={{ marginBlockEnd: 10 }}>תקציב הקורס</h2>
@@ -258,17 +318,16 @@ export default function CoursePage() {
           <div className="mi-table-wrap">
             <table className="mi-table">
               <thead>
-                <tr><th>פלטפורמה</th><th>סכום</th><th>סטטוס</th><th>נימוק</th><th>נדרש ממך</th></tr>
+                <tr><th>פלטפורמה</th><th>סכום</th><th>סטטוס</th><th>נדרש ממך</th></tr>
               </thead>
               <tbody>
                 {budgetRows.map((a) => {
-                  const st = allocStatusHe(a.status);
+                  const st = allocStatusHe(a);
                   return (
                     <tr key={a.id}>
                       <td className="mi-meta" style={{ whiteSpace: "nowrap" }}>{platformHe(a.platform)}</td>
                       <td className="mi-ltr" style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{fmtIls(a.amount_ils)}</td>
                       <td><span className={`mi-chip ${st.cls}`}>{st.he}</span></td>
-                      <td className="mi-meta" style={{ maxInlineSize: 300 }}>{a.rationale || "—"}</td>
                       <td>
                         {a.status === "recommended" ? (
                           <span style={{ display: "flex", gap: 6 }}>
