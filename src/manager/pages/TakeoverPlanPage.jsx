@@ -15,7 +15,7 @@ import {
 } from "../api.js";
 import { ErrorBanner, EmptyState, SkeletonCard, timeAgoHe } from "../components/ui.jsx";
 import { fullDate, canonPlanKey as canon, matchPlanCourseKey as matchCourseKey,
-         planCourseLabel as labelFor } from "../lib.js";
+         planCourseLabel as labelFor, deploymentStructure } from "../lib.js";
 
 const PLATFORM_HE = { meta: "מטא", google: "גוגל", social: "סושיאל" };
 
@@ -54,12 +54,13 @@ function fmtIls(n) {
 
 // העובדות הדטרמיניסטיות שהמנהלת שואלת פר-קורס: CBO? · תקציב 10-ימי-למידה · אחרי-המעבר.
 // מחושב מההקצאה הקיימת (לא קביעת-תקציב) — מוצג כך שלא צריך לשאול.
+// "מבנה" מוצג ביושר דרך deploymentStructure: מבנה-מתוכנן + מתי ביחס להיום — לעולם
+// לא "כבר CBO" כשהמעבר עוד לפנינו, ולא תאריך-עבר מוצג כאילו הוא טרי.
 function FactsPanel({ facts }) {
   if (!facts) return null;
-  const cbo = facts.cbo === true ? "CBO" : facts.cbo === false ? "Adset" : "—";
+  const dep = deploymentStructure(facts);
   const items = [
-    ["מבנה", cbo],
-    facts.transition_date ? ["מעבר", facts.transition_date] : null,
+    ["מבנה", dep.label],
     fmtIls(facts.learning_10d_ils) ? ["10 ימי-למידה", fmtIls(facts.learning_10d_ils)] : null,
     fmtIls(facts.budget_after_ils) ? ["אחרי המעבר", fmtIls(facts.budget_after_ils)] : null,
   ].filter(Boolean);
