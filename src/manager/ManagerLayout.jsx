@@ -9,8 +9,10 @@ import { Outlet } from "react-router-dom";
 import Sidebar from "./components/Sidebar.jsx";
 import NewRequestModal from "./components/NewRequestModal.jsx";
 import NewCourseModal from "./components/NewCourseModal.jsx";
-import { getFolders, getGeneralSettings } from "./api.js";
-import { managedCourses } from "./lib.js";
+import { getApprovalsInbox, getFolders, getGeneralSettings } from "./api.js";
+import {
+  filterInboxItems, managedCourses, stripInternalSteps, testFolderIdSet,
+} from "./lib.js";
 import "./tokens.css";
 
 export default function ManagerLayout() {
@@ -20,6 +22,7 @@ export default function ManagerLayout() {
   const [foldersError, setFoldersError] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [requestModal, setRequestModal] = useState(null); // null | {folderId?, newCourse?}
+  const [pendingCount, setPendingCount] = useState(null);  // מונה "מחכה לך" לתג בניווט
 
   const loadFolders = useCallback(() => {
     setFoldersError(null);
@@ -33,6 +36,19 @@ export default function ManagerLayout() {
       .catch((e) => setCoursesError(e.message));
   }, []);
 
+  // מונה הפריטים שמחכים להחלטת המנהלת — לתג בניווט (אישורים = פריט-ניווט מהשורה הראשונה).
+  // אותו מסנן בדיוק כמו ApprovalsPage: בלי תיקיות-טסט, בלי שלבי-ביניים פנימיים.
+  // ApprovalsPage יכול לעדכן את המונה דרך setPendingCount בלי טעינה כפולה.
+  useEffect(() => {
+    getApprovalsInbox("pending")
+      .then((d) => {
+        const items = stripInternalSteps(
+          filterInboxItems(d.items || [], testFolderIdSet(folders || [])));
+        setPendingCount(items.length);
+      })
+      .catch(() => setPendingCount(null));
+  }, [folders]);
+
   return (
     <div className="mi-root" dir="rtl" lang="he">
       <a href="#mi-main" className="mi-meta"
@@ -44,6 +60,7 @@ export default function ManagerLayout() {
 
       <div className="mi-shell">
         <Sidebar courses={courses} coursesError={coursesError}
+                 pendingCount={pendingCount}
                  open={sidebarOpen} onClose={() => setSidebarOpen(false)}
                  onNewCourse={() => setRequestModal({ newCourse: true })} />
 
@@ -63,6 +80,7 @@ export default function ManagerLayout() {
 
           <main id="mi-main">
             <Outlet context={{ courses, folders, foldersError,
+                               pendingCount, setPendingCount,
                                openNewRequest: (opts = {}) => setRequestModal(opts) }} />
           </main>
         </div>

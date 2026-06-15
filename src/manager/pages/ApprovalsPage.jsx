@@ -14,7 +14,8 @@ import {
 import { StatusChip, EmptyState, ErrorBanner, SkeletonCard, timeAgoHe } from "../components/ui.jsx";
 import RejectDialog from "../components/RejectDialog.jsx";
 import {
-  artifactThumb, filterInboxItems, isVideoAsset, testFolderIdSet, typeHe,
+  artifactThumb, filterInboxItems, isVideoAsset, stripInternalSteps,
+  testFolderIdSet, typeHe,
 } from "../lib.js";
 
 const KIND_ICON = { budget_allocation: "💰", recommendation: "💡", artifact: "🖼" };
@@ -112,8 +113,11 @@ export default function ApprovalsPage() {
     setData(null);
     getApprovalsInbox(t)
       .then((d) => {
-        // מסנן-התצוגה הקבוע: פריטים של תיקיות-טסט לא מוצגים ולא נספרים
-        const items = filterInboxItems(d.items || [], testFolderIdSet(folders || []));
+        // מסנן-התצוגה הקבוע: פריטים של תיקיות-טסט לא מוצגים ולא נספרים.
+        let items = filterInboxItems(d.items || [], testFolderIdSet(folders || []));
+        // שלבי-ביניים פנימיים (internal_review וכו') לא דולפים לתיבת-האישורים —
+        // השרת עדיין מחזיר אותם בפיד ה-pending, אז מסירים בצד-הלקוח (fix #1).
+        if (t === "pending") items = stripInternalSteps(items);
         setData({ ...d, items });
         if (t === "pending") setPendingCount?.(items.length);
       })

@@ -9,9 +9,10 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { getApprovalsInbox, getArtifacts, getFolder, getBudgetAllocations, decideAllocation, submitRequest, requestGoLive, getTakeoverPlan } from "../api.js";
 import { EmptyState, ErrorBanner, SkeletonCard, StatusChip } from "../components/ui.jsx";
+import RejectDialog from "../components/RejectDialog.jsx";
 import {
-  PENDING_STATUSES, approvalStatus, artifactThumb, courseFolders,
-  requiredOfYou, shortDate, typeHe, workStatus,
+  artifactThumb, courseFolders, fullDate, requiredOfYou,
+  shortDate, stripInternalSteps, typeHe, workStatus,
 } from "../lib.js";
 
 const TABS = [["table", "טבלה"], ["timeline", "ציר זמן"],
@@ -39,12 +40,48 @@ function matchCourseKey(name) {
 /* טבלת-התקציב הייעודית של הקורס (אפיון נירית: כל קורס נפתח עם התקציב שלו) */
 const fmtIls = (n) => (n != null && !isNaN(Number(n))) ? `₪${Math.round(Number(n)).toLocaleString()}` : "—";
 const platformHe = (p) => ({ meta: "מטא", google: "גוגל", social: "סושיאל", all: "כללי" }[p] || p || "כללי");
-// הבחנה לפי decided_by: רק מה שהמנהלת אישרה בפועל = "מאושר". active/approved בלי decided_by =
-// יובא מהחשבון הקיים (מצב-נוכחי) — לא אישור שלה.
+
+// טקסונומיית-סטטוס לפי המקור-האמיתי, לא לפי פלטפורמה (fix #2):
+//   recommended            → "ממתין לאישורך" (כפתורי אשרי/דחייה)
+//   decided_by=manager      → "מאושר על ידך" (רק החלטה שלה בפועל)
+//   active/approved בלי שלה → "קיים בחשבון (לא אישור שלך)" — מצב-נוכחי שיובא, גם גוגל.
+// אף פעם לא מציגים active/approved של המערכת כאישור שלה.
 const allocStatusHe = (a) => {
   if (a.status === "recommended") return { he: "ממתין לאישורך", cls: "mi-chip-primary" };
-  if (a.decided_by) return { he: "מאושר על ידך ✓", cls: "mi-chip-info" };
+  if (a.decided_by === "marketing_manager") return { he: "מאושר על ידך ✓", cls: "mi-chip-info" };
   return { he: "קיים בחשבון (לא אישור שלך)", cls: "" };
+};
+
+// תקופת-ההקצאה (from→to) — טבלת-תקציב מתוארכת (fix #4). מקורות, בסדר עדיפות:
+//   1. עמודות period_start/period_end (הקצאות סוכן רגילות; כמו PlansBudgetPage).
+//   2. metadata של takeover_redeploy: התחלה = pacing_start | go_live | computed_for;
+//      סיום = period_month_end. ל-AI מאוחד אין שורת-תקציב פשוטה — הטווח נגזר משלבי-
+//      האופציות (option_a/b.phases[].from/to: ההתחלה המוקדמת ביותר → הסיום המאוחר).
+//   3. אין נתון אמיתי → null (מוצג "—" ביושר, בלי להמציא תאריך).
+const _minMaxPhaseDates = (md) => {
+  const phases = [];
+  for (const opt of [md?.option_a_convert, md?.option_b_adset_to_end]) {
+    for (const ph of (opt?.phases || [])) {
+      if (ph?.from) phases.push(ph.from);
+      if (ph?.to) phases.push(ph.to);
+    }
+  }
+  if (!phases.length) return [null, null];
+  const sorted = phases.filter(Boolean).sort();
+  return [sorted[0], sorted[sorted.length - 1]];
+};
+const allocPeriod = (a) => {
+  if (a.period_start || a.period_end) return [a.period_start || null, a.period_end || null];
+  const md = a.metadata || {};
+  const [phaseFrom, phaseTo] = _minMaxPhaseDates(md);
+  const start = md.pacing_start || md.go_live || phaseFrom || md.computed_for || null;
+  const end = phaseTo || md.period_month_end || null;
+  return [start, end];
+};
+const periodHe = (a) => {
+  const [start, end] = allocPeriod(a);
+  if (!start && !end) return "—";
+  return `${fullDate(start)} – ${fullDate(end)}`;
 };
 
 function Chip({ pair }) {
@@ -74,6 +111,7 @@ export default function CoursePage() {
   const [inboxItems, setInboxItems] = useState(null);
   const [allocations, setAllocations] = useState(null);
   const [budgetBusy, setBudgetBusy] = useState({});
+  const [rejectingAlloc, setRejectingAlloc] = useState(null);  // ההקצאה שנדחית (RejectDialog)
   const [starting, setStarting] = useState(false);
   const [goLiveBusy, setGoLiveBusy] = useState(false);
   const [goLiveMsg, setGoLiveMsg] = useState(null);
@@ -105,8 +143,8 @@ export default function CoursePage() {
       .then((lists) => setBriefs(lists.flat()))
       .catch(() => setBriefs([]));
     getApprovalsInbox("pending")
-      .then((d) => setInboxItems((d.items || []).filter(
-        (i) => i.folder_id && folderIds.has(i.folder_id))))
+      .then((d) => setInboxItems(stripInternalSteps((d.items || []).filter(
+        (i) => i.folder_id && folderIds.has(i.folder_id)))))
       .catch(() => setInboxItems([]));
     // הנחיית-האסטרטג לקורס מתוך תוכנית-ההשתלטות (best-effort; חסר ⇒ פשוט לא מוצג)
     getTakeoverPlan().then(setTakeover).catch(() => setTakeover(null));
@@ -120,15 +158,19 @@ export default function CoursePage() {
 
   // טבלת-התקציב מציגה רק את **תקציב-ההשתלטות** (recommendation_kind=takeover_redeploy) +
   // מה שהמנהלת אישרה בפועל (decided_by) — לא את ערימת ההמלצות-מאתמול (initial_allocation/
-  // spend_rate), לא גוגל (לא onboarded), ואחת פר-פלטפורמה (בלי כפילויות). זה מה ש"תקציב הקורס"
-  // אמור להיות: ההצעה הנקייה לאישור, לא רשימת-כל-השורות.
+  // spend_rate), ואחת פר-פלטפורמה (בלי כפילויות). זה מה ש"תקציב הקורס" אמור להיות:
+  // ההצעה הנקייה לאישור, לא רשימת-כל-השורות.
+  // fix #2: גוגל **כן** מוצגת — בכנות תחת "קיים בחשבון (לא אישור שלך)" דרך הטקסונומיה;
+  // לא מסתירים אותה ולא מתייגים אותה כאישור-שלה. ה-hack שדילג על גוגל הוסר.
   const allocKind = (a) => (a.metadata || {}).recommendation_kind || (a.metadata || {}).decision_kind || "";
   const budgetRows = useMemo(() => {
     const relevant = (allocations || []).filter((a) =>
-      a.platform !== "google" && (allocKind(a) === "takeover_redeploy" || !!a.decided_by));
+      allocKind(a) === "takeover_redeploy" || a.decided_by === "marketing_manager");
     const seen = new Set(); const out = [];
     for (const a of relevant.sort((x, y) => new Date(y.created_at || 0) - new Date(x.created_at || 0))) {
-      const grp = a.status === "recommended" ? "proposal" : (a.decided_by ? "approved" : "current");
+      const grp = a.status === "recommended"
+        ? "proposal"
+        : (a.decided_by === "marketing_manager" ? "approved" : "current");
       const key = `${grp}:${a.platform}`;
       if (seen.has(key)) continue;
       seen.add(key); out.push(a);
@@ -153,12 +195,19 @@ export default function CoursePage() {
       .then(load).catch((e) => setError(e.message))
       .finally(() => setBudgetBusy((b) => ({ ...b, [id]: false })));
   };
-  const rejectAlloc = (id) => {
-    const reason = window.prompt("סיבת הדחייה (חובה):");
-    if (!reason || !reason.trim()) return;
+  // דחיית-תקציב מחייבת סיבה — דרך RejectDialog (אותו מודאל נגיש כמו ApprovalsPage),
+  // לא window.prompt (fix #3). פותחים את הדיאלוג עם הקצאה כ-item; ההכרעה ב-confirmRejectAlloc.
+  const rejectAlloc = (a) => setRejectingAlloc({
+    id: a.id,
+    title: `${platformHe(a.platform)} · ${fmtIls(a.amount_ils)}`,
+  });
+  const confirmRejectAlloc = (reason) => {
+    const id = rejectingAlloc?.id;
+    if (!id) return;
     setBudgetBusy((b) => ({ ...b, [id]: true }));
-    decideAllocation(id, "rejected", reason.trim())
-      .then(load).catch((e) => setError(e.message))
+    decideAllocation(id, "rejected", reason)
+      .then(() => { setRejectingAlloc(null); load(); })
+      .catch((e) => setError(e.message))
       .finally(() => setBudgetBusy((b) => ({ ...b, [id]: false })));
   };
 
@@ -204,36 +253,61 @@ export default function CoursePage() {
   /* שורות הטבלה — תוצרים (גרסה עדכנית) + בקשות, מכל תיקיות הקורס.
      תוצרי-תקציב מיוצגים בטבלת-התקציב שלמעלה — לא כופלים אותם כאן (היה מבלבל). */
   const _isBudgetArtifact = (t) => /budget|allocation|redeploy/i.test(t || "");
+  // fix #7: שורות קראייטיב/קופי נפתחות ישירות למסך ה-Review (קונספט+קופי+ויזואל),
+  // לא לתווית-פריט סתמית. שאר התוצרים נפתחים לתיק-הפריט.
+  const _opensReview = (t) =>
+    /creative|copy|concept|render|visual|video|art_direction|ad_copy/i.test(t || "");
+  // fix #5: עמודת-מצב אחת במקום שתיים (סטטוס-עבודה + אישור). שלושה מצבים בלבד:
+  //   "מחכה לך" — נדרשת ממנה פעולה (requiredOfYou) ⇒ בראש העדיפות.
+  //   "הושלם"   — עבודת-המשרד הסתיימה (הושלם/בוצע) ובלי פעולה פתוחה.
+  //   "בעבודה"  — כל השאר (כולל בקשות בעבודה).
+  const STATE = {
+    waiting: ["מחכה לך", "mi-chip-warning"],
+    done:    ["הושלם",   "mi-chip-success"],
+    working: ["בעבודה",  "mi-chip-info"],
+  };
+  const deriveState = (workLabel, action) => {
+    if (action) return "waiting";
+    if (["הושלם", "בוצע"].includes(workLabel)) return "done";
+    return "working";
+  };
   const rows = useMemo(() => {
     const out = [];
     for (const a of artifacts || []) {
       if (a.is_current_version === false) continue;
       if (_isBudgetArtifact(a.artifact_type)) continue;
+      const work = workStatus(a.status);
+      const action = requiredOfYou(a.status);
       out.push({
         rowKind: "artifact",
         id: a.id,
         title: a.title || typeHe(a.artifact_type),
         type: typeHe(a.artifact_type),
+        artifactType: a.artifact_type,
+        opensReview: _opensReview(a.artifact_type),
         thumb: artifactThumb(a),
-        work: workStatus(a.status),
-        approval: approvalStatus(a.status),
-        action: requiredOfYou(a.status),
+        work,
+        action,
+        state: deriveState(work[0], action),
         date: a.updated_at,
         version: a.version_number,
       });
     }
     for (const b of briefs) {
       if (b.is_current_version === false) continue;
+      const work = workStatus(b.status === "pending" ? "in_progress" : b.status);
       out.push({
         rowKind: "request",
         id: b.id,
         title: b.brief_payload?.free_text?.slice(0, 60)
                || b.brief_doc_name || typeHe(b.request_type),
         type: "בקשה",
+        artifactType: null,
+        opensReview: false,
         thumb: null,
-        work: workStatus(b.status === "pending" ? "in_progress" : b.status),
-        approval: ["—", null],
+        work,
         action: null,
+        state: deriveState(work[0], null),
         date: b.updated_at || b.created_at,
         version: b.version_number,
       });
@@ -241,11 +315,19 @@ export default function CoursePage() {
     return out.sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0));
   }, [artifacts, briefs]);
 
+  // fix #5: ברירת-המחדל של תצוגת-הטבלה = "מחכה לך"; "הכל" משני.
+  const [tableFilter, setTableFilter] = useState("waiting");
+  const tableRows = useMemo(
+    () => tableFilter === "waiting" ? rows.filter((r) => r.state === "waiting") : rows,
+    [rows, tableFilter]);
+
   const activeRows = rows.filter((r) =>
     !["הושלם", "נדחה", "בארכיון"].includes(r.work[0]));
 
+  // fix #7: קראייטיב/קופי → ישר ל-Review; שאר התוצרים → תיק-הפריט.
   const openRow = (r) => {
-    if (r.rowKind === "artifact") navigate(`/media/items/${r.id}`);
+    if (r.rowKind !== "artifact") return;
+    navigate(r.opensReview ? `/media/items/${r.id}/review` : `/media/items/${r.id}`);
   };
 
   if (folders && !course) {
@@ -329,7 +411,7 @@ export default function CoursePage() {
           <div className="mi-table-wrap">
             <table className="mi-table">
               <thead>
-                <tr><th>פלטפורמה</th><th>סכום</th><th>סטטוס</th><th>נדרש ממך</th></tr>
+                <tr><th>פלטפורמה</th><th>תקופה</th><th>סכום</th><th>סטטוס</th><th>נדרש ממך</th></tr>
               </thead>
               <tbody>
                 {budgetRows.map((a) => {
@@ -337,6 +419,7 @@ export default function CoursePage() {
                   return (
                     <tr key={a.id}>
                       <td className="mi-meta" style={{ whiteSpace: "nowrap" }}>{platformHe(a.platform)}</td>
+                      <td className="mi-meta mi-ltr" style={{ whiteSpace: "nowrap" }}>{periodHe(a)}</td>
                       <td className="mi-ltr" style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{fmtIls(a.amount_ils)}</td>
                       <td><span className={`mi-chip ${st.cls}`}>{st.he}</span></td>
                       <td>
@@ -349,7 +432,7 @@ export default function CoursePage() {
                             </button>
                             <button className="mi-btn mi-btn-ghost" disabled={!!budgetBusy[a.id]}
                                     style={{ minBlockSize: 34, padding: "4px 10px" }}
-                                    onClick={() => rejectAlloc(a.id)}>
+                                    onClick={() => rejectAlloc(a)}>
                               דחייה
                             </button>
                           </span>
@@ -395,6 +478,26 @@ export default function CoursePage() {
             </div>
           </div>
         ) : (
+          <>
+            {/* fix #5: ברירת-מחדל "מחכה לך"; "הכל" משני */}
+            <div className="mi-tabs" role="tablist" aria-label="סינון מצב"
+                 style={{ marginBlockEnd: 12 }}>
+              {[["waiting", "מחכה לך"], ["all", "הכל"]].map(([key, label]) => (
+                <button key={key} role="tab" aria-selected={tableFilter === key}
+                        className="mi-tab" onClick={() => setTableFilter(key)}>
+                  {label}
+                  {key === "waiting" && rows.filter((r) => r.state === "waiting").length > 0 && (
+                    <span className="mi-nav-badge" style={{ marginInlineStart: 6 }}>
+                      {rows.filter((r) => r.state === "waiting").length}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+            {tableRows.length === 0 ? (
+              <EmptyState title="אין כרגע פריטים שמחכים לך"
+                          hint='הכל בעבודה או הושלם — לחצי "הכל" כדי לראות את המצב המלא' />
+            ) : (
           <div className="mi-table-wrap">
             <table className="mi-table">
               <thead>
@@ -402,14 +505,12 @@ export default function CoursePage() {
                   <th>נושא</th>
                   <th>סוג</th>
                   <th>תצוגה</th>
-                  <th>סטטוס עבודה</th>
-                  <th>אישור</th>
-                  <th>נדרש ממך</th>
+                  <th>מצב</th>
                   <th>תאריך</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
+                {tableRows.map((r) => (
                   <tr key={`${r.rowKind}-${r.id}`} onClick={() => openRow(r)}
                       tabIndex={r.rowKind === "artifact" ? 0 : -1}
                       onKeyDown={(e) => e.key === "Enter" && openRow(r)}
@@ -423,13 +524,7 @@ export default function CoursePage() {
                     </td>
                     <td className="mi-meta" style={{ whiteSpace: "nowrap" }}>{r.type}</td>
                     <td><Thumb item={r} /></td>
-                    <td><Chip pair={r.work} /></td>
-                    <td><Chip pair={r.approval} /></td>
-                    <td>
-                      {r.action
-                        ? <span className="mi-chip mi-chip-primary">{r.action}</span>
-                        : <span className="mi-meta">—</span>}
-                    </td>
+                    <td><Chip pair={STATE[r.state]} /></td>
                     <td className="mi-meta mi-ltr" style={{ whiteSpace: "nowrap" }}>
                       {shortDate(r.date)}
                     </td>
@@ -438,6 +533,8 @@ export default function CoursePage() {
               </tbody>
             </table>
           </div>
+            )}
+          </>
         )
       )}
 
@@ -513,6 +610,13 @@ export default function CoursePage() {
             ))}
           </div>
         )
+      )}
+
+      {/* fix #3: דחיית-תקציב דרך RejectDialog (סיבה חובה), במקום window.prompt */}
+      {rejectingAlloc && (
+        <RejectDialog item={rejectingAlloc} busy={!!budgetBusy[rejectingAlloc.id]}
+                      onClose={() => setRejectingAlloc(null)}
+                      onConfirm={confirmRejectAlloc} />
       )}
     </div>
   );

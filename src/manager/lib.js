@@ -95,8 +95,24 @@ export function requiredOfYou(status) {
   return null; // אין פעולה => "—". לעולם לא ממציאים משימה.
 }
 
-/* פריט שמחכה להחלטת המנהלת */
-export const PENDING_STATUSES = ["qa_passed", "waiting_for_marketing_approval", "internal_review"];
+/* פריט שמחכה להחלטת המנהלת. internal_review = שלב פנימי של המשרד (כיוון/בדיקה
+   באמצע הפס), לא תוצר-גמור — לא נספר כ"מחכה לך" כדי שלא ידלוף לתיבת-האישורים. */
+export const PENDING_STATUSES = ["qa_passed", "waiting_for_marketing_approval"];
+
+/* שלבי-עבודה פנימיים של המשרד — לעולם לא מוצגים כ"החלטה שמחכה לה". השרת
+   (api/routes/manager.py) עדיין מחזיר internal_review בפיד ה-pending; כל מסך
+   שטוען pending מסנן אותם בצד-הלקוח דרך isInternalStep, כך שאף שלב-ביניים
+   לא דולף לתיבת-האישורים — גם אם השרת יחזיר אותו. */
+const INTERNAL_STEP_STATUSES = ["internal_review", "draft", "in_progress"];
+
+export function isInternalStep(status) {
+  return INTERNAL_STEP_STATUSES.includes(status);
+}
+
+/** מסנן פריטי-pending: משאיר רק החלטות אמיתיות, מסיר כל שלב-ביניים פנימי. */
+export function stripInternalSteps(items = []) {
+  return items.filter((i) => !isInternalStep(i?.status));
+}
 
 /* ── מסנני-התצוגה הקבועים של המנהלת ─────────────────────── */
 
