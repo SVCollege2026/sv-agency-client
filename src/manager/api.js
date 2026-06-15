@@ -65,6 +65,24 @@ export function addCourseComment(artifactId, courseKey, body) {
   });
 }
 
+/**
+ * שולחת את ההערות-פר-קורס ה**פתוחות** של התוכנית למשרד — כל אחת הופכת ל-request מנותב
+ * דרך ה-spine והתזמורת (רענון→קראייטיב, מבנה/CBO→מדיה). אידמפוטנטי: הערה שכבר טופלה מדולגת.
+ * זה מה שגורם להערות "להיכנס למסלול" במקום להישאר 'פתוח'.
+ */
+export function prepareTakeoverDirectives() {
+  return request("POST", "/api/media/takeover-plan/prepare?triggered_by=marketing_manager");
+}
+
+/**
+ * מפיקה את המלצות-תקציב-ההשתלטות (מנוע דטרמיניסטי, status='recommended') → הן נכנסות
+ * לתיבת-האישורים. אישור ההמלצות שם מעביר אותן ל-active = פתיחת שער-ההשתלטות (המערכת מתחילה
+ * לנהל). התקציב לעולם לא אוטומטי — נוצרת המלצה, המנהלת מאשרת, האישור מפעיל.
+ */
+export function generateTakeoverBudget() {
+  return request("POST", "/api/media/takeover-redeploy/run?apply=true&triggered_by=marketing_manager");
+}
+
 export function getDecisionsFor(subjectId, limit = 50) {
   return request("GET", `/api/decisions/?subject_id=${subjectId}&limit=${limit}`);
 }

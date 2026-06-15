@@ -11,6 +11,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   getTakeoverPlan, generateTakeoverPlan, addCourseComment,
+  prepareTakeoverDirectives, generateTakeoverBudget,
 } from "../api.js";
 import { ErrorBanner, EmptyState, SkeletonCard, timeAgoHe } from "../components/ui.jsx";
 
@@ -107,6 +108,8 @@ export default function TakeoverPlanPage() {
   const [generating, setGenerating] = useState(false);
   const [drafts, setDrafts] = useState({});
   const [posting, setPosting] = useState({});
+  const [acting, setActing] = useState(null);
+  const [actionMsg, setActionMsg] = useState(null);
 
   const load = useCallback(() => {
     setError(null);
@@ -121,6 +124,31 @@ export default function TakeoverPlanPage() {
       .then(() => load())
       .catch((e) => setError(e.message))
       .finally(() => setGenerating(false));
+  };
+
+  // שליחת ההערות-פר-קורס הפתוחות למשרד — הן עוברות מ'פתוח' ל'בעבודה' ומגיעות למבצע.
+  const sendDirectives = () => {
+    setActing("directives"); setActionMsg(null); setError(null);
+    prepareTakeoverDirectives()
+      .then((r) => {
+        const n = r.course_count ?? 0;
+        setActionMsg(n > 0
+          ? `נשלחו הוראות מ-${n} קורסים למשרד — ההערות שטרם טופלו עוברות לביצוע (רענון-קראייטיב / שינויי-מבנה).`
+          : "אין כרגע הערות חדשות לשליחה (כולן כבר נשלחו למשרד).");
+        load();
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setActing(null));
+  };
+
+  // הפקת המלצות-תקציב-ההשתלטות → נכנסות לתיבת-האישורים; אישורן שם מפעיל את ההשתלטות.
+  const armBudget = () => {
+    setActing("budget"); setActionMsg(null); setError(null);
+    generateTakeoverBudget()
+      .then(() => setActionMsg(
+        "המלצות-תקציב ההשתלטות הופקו ונכנסו לתיבת-האישורים. אישור ההמלצות שם = הפעלת ההשתלטות בפועל."))
+      .catch((e) => setError(e.message))
+      .finally(() => setActing(null));
   };
 
   const submitComment = (courseKey) => {
@@ -225,6 +253,33 @@ export default function TakeoverPlanPage() {
             <strong>החלטת AI:</strong> {overall.ai_decision.decision}
             {overall.ai_decision.reasoning ? ` — ${overall.ai_decision.reasoning}` : ""}
           </div>
+        )}
+      </section>
+
+      {/* הפעלת ההשתלטות — חיבור "אישור בממשק" לביצוע בפועל */}
+      <section className="mi-card" style={{ padding: 16, marginBlockEnd: 16 }}>
+        <h2 className="mi-h2" style={{ marginBlockEnd: 8 }}>הפעלת ההשתלטות</h2>
+        <p className="mi-meta" style={{ marginBlockEnd: 10 }}>
+          אחרי שכתבת הערות פר-קורס — <strong>שלחי אותן למשרד</strong> כדי שיתחיל לעבוד (רענוני-קראייטיב
+          ושינויי-מבנה עוברים למבצע). ולהפעלת ההשתלטות עצמה — <strong>הפיקי את המלצות-התקציב</strong>:
+          הן נכנסות לתיבת-האישורים, ואישורן שם מפעיל את ניהול המערכת בפועל.
+        </p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button className="mi-btn mi-btn-secondary" disabled={acting === "directives"}
+                  onClick={sendDirectives}>
+            {acting === "directives" ? "שולח…" : "שלחי את ההערות למשרד"}
+          </button>
+          <button className="mi-btn mi-btn-primary" disabled={acting === "budget"}
+                  onClick={armBudget}>
+            {acting === "budget" ? "מפיק…" : "הפק תקציב-השתלטות לאישור"}
+          </button>
+        </div>
+        {actionMsg && (
+          <p className="mi-body" role="status" style={{
+               marginBlockStart: 10, background: "var(--mi-success-bg, #e6f7ec)",
+               color: "var(--mi-success, #1a7f44)", borderRadius: 8, padding: "8px 12px" }}>
+            ✓ {actionMsg}
+          </p>
         )}
       </section>
 

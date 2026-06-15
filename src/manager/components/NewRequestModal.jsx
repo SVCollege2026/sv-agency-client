@@ -45,7 +45,9 @@ export default function NewRequestModal({ courses = [], folders = [], initialFol
       }
       await submitRequest({
         folderId: folderId || null,
-        requestType: folderId ? "course_activity" : "school_level",
+        // קורס מצויין → אופטימיזציית-קורס-קיים (מנותב למדיה, הבעלים); בלי שיוך → רמת בית-ספר.
+        // ('course_activity' לא היה ב-traffic_router והקריס את הבקשה ב-500 — תוקן.)
+        requestType: folderId ? "existing_course_optimization" : "school_level",
         briefPayload: {
           free_text: text.trim(),
           priority,
@@ -105,8 +107,8 @@ export default function NewRequestModal({ courses = [], folders = [], initialFol
                    onChange={(e) => setFile(e.target.files?.[0] || null)} />
             <input className="mi-field" type="url" dir="ltr" value={driveUrl}
                    onChange={(e) => setDriveUrl(e.target.value)}
-                   placeholder="או קישור מ-Drive"
-                   aria-label="קישור מ-Drive"
+                   placeholder="קישור מ-Drive (לא חובה)"
+                   aria-label="קישור מ-Drive (לא חובה)"
                    style={{ flex: 1, minInlineSize: 180 }} />
           </div>
 
