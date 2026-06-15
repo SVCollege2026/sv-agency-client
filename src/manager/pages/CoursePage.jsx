@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { getApprovalsInbox, getArtifacts, getFolder, getBudgetAllocations, decideAllocation } from "../api.js";
+import { getApprovalsInbox, getArtifacts, getFolder, getBudgetAllocations, decideAllocation, submitRequest } from "../api.js";
 import { EmptyState, ErrorBanner, SkeletonCard, StatusChip } from "../components/ui.jsx";
 import {
   PENDING_STATUSES, approvalStatus, artifactThumb, courseFolders,
@@ -52,6 +52,7 @@ export default function CoursePage() {
   const [inboxItems, setInboxItems] = useState(null);
   const [allocations, setAllocations] = useState(null);
   const [budgetBusy, setBudgetBusy] = useState({});
+  const [starting, setStarting] = useState(false);
   const [error, setError] = useState(null);
 
   const course = useMemo(() => {
@@ -110,6 +111,22 @@ export default function CoursePage() {
     decideAllocation(id, "rejected", reason.trim())
       .then(load).catch((e) => setError(e.message))
       .finally(() => setBudgetBusy((b) => ({ ...b, [id]: false })));
+  };
+
+  // "התחל עבודה על הקורס" — לקורס שתיקייתו קיימת אך אין בה עבודה (למשל AI ARCHITECT):
+  // משגר בקשת new_course על התיקייה הקיימת → המשרד מפיק תוכנית-מדיה + קראייטיב, וחוזר לאישור.
+  const startWork = () => {
+    const folderId = course?.latest?.id;
+    if (!folderId) { setError("אין תיקייה לקורס — פתחי קורס חדש כדי להתחיל"); return; }
+    setStarting(true);
+    setError(null);
+    submitRequest({
+      folderId,
+      requestType: "new_course",
+      briefPayload: { course_name: course.name, source: "manager_interface_start_work" },
+    }).then(() => load())
+      .catch((e) => setError(e.message))
+      .finally(() => setStarting(false));
   };
 
   /* שורות הטבלה — תוצרים (גרסה עדכנית) + בקשות, מכל תיקיות הקורס */
@@ -257,8 +274,15 @@ export default function CoursePage() {
 
       {artifacts && tab === "table" && (
         rows.length === 0 ? (
-          <EmptyState icon="🗂" title="אין עדיין פריטי עבודה בקורס הזה"
-                      hint='אפשר לפתוח עבודה דרך "בקשה חדשה"' />
+          <div>
+            <EmptyState icon="🗂" title="אין עדיין פריטי עבודה בקורס הזה"
+                        hint="התחילי עבודה — והמשרד יפיק תוכנית-מדיה וקראייטיב שיחזרו אלייך לאישור." />
+            <div style={{ marginBlockStart: 16, textAlign: "center" }}>
+              <button className="mi-btn mi-btn-primary" disabled={starting} onClick={startWork}>
+                {starting ? "מתחיל…" : "התחל עבודה על הקורס"}
+              </button>
+            </div>
+          </div>
         ) : (
           <div className="mi-table-wrap">
             <table className="mi-table">
