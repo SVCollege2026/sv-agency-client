@@ -816,16 +816,6 @@ export async function submitChangeRequest(folderId, intent, action, payload = {}
   });
 }
 
-/** Manager sends a question to the account manager agent (תקציבאית). */
-export async function submitManagerQuestion(message, folderId = null, mentions = []) {
-  return request("POST", "/api/workflow/requests", {
-    request_type: "manager_question",
-    folder_id: folderId,
-    brief_payload: { intent: "question", message, mentions },
-    requested_by: "marketing_manager",
-  });
-}
-
 /** List all workflow items for a specific folder (for ActivityIndicator). */
 export async function listWorkflowItemsByFolder(folderId, { limit = 50 } = {}) {
   const p = new URLSearchParams({ folder_id: folderId, limit: String(limit) });
