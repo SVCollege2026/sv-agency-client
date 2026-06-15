@@ -48,6 +48,12 @@ function GalleryCard({ item, thumb, busy, onOpenReview, onApprove, onReject }) {
       <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "var(--mi-ink)" }}>
         {item.rec_text || item.title}
       </h3>
+      {/* הנימוק המלא — כדי שיהיה על מה להחליט (תקציב: rationale; המלצה: human_explanation) */}
+      {(item.rationale || item.rec_explanation) && (
+        <p className="mi-body" style={{ margin: 0, color: "var(--mi-ink-soft, #555)", whiteSpace: "pre-wrap" }}>
+          {item.rationale || item.rec_explanation}
+        </p>
+      )}
       {item.rec_campaign && (
         <p className="mi-meta" style={{ margin: 0 }}>קמפיין: {item.rec_campaign}</p>
       )}
@@ -217,6 +223,7 @@ export default function ApprovalsPage() {
                 ...item,
                 rec_text: (rec.recommendation_text || "").slice(0, 160) || null,
                 rec_campaign: rec.campaign_ref || null,
+                rec_explanation: rec.human_explanation || null,
               } : item;
               return (
                 <GalleryCard key={`${item.kind}-${item.id}`} item={enriched}

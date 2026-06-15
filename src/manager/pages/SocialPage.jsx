@@ -15,23 +15,34 @@ export default function SocialPage() {
   const [items, setItems] = useState(null);
   const [error, setError] = useState(null);
 
+  // תוצרי-מדיה/תקציב (תוכנית-מדיה, המלצת-תקציב, תרחיש-Make, פריסה) אינם פעילות-סושיאל —
+  // הם מנוהלים תחת "תוכנית ותקציב". סושיאל = תוכן בית-ספרי (קופי/קראייטיב/קידום).
+  const _isMediaDeployment = (t) =>
+    /media|budget|deploy|plan|scenario|allocation|forecast|redeploy/i.test(t || "");
+
   const load = useCallback(() => {
     setError(null);
-    // פריטים בית-ספריים = תוצרים בלי שיוך לתיקיית-קורס
+    // פעילות-סושיאל בית-ספרית = תוצרי-תוכן בלי שיוך לקורס (לא תוצרי-מדיה/תקציב)
     getArtifacts({ limit: 200 })
-      .then((rows) => setItems(rows.filter((a) => !a.folder_id)))
+      .then((rows) => setItems(rows.filter(
+        (a) => !a.folder_id && !_isMediaDeployment(a.artifact_type))))
       .catch((e) => setError(e.message));
   }, []);
   useEffect(load, [load]);
 
   return (
     <div className="mi-page">
-      <header style={{ display: "flex", alignItems: "center", gap: 10, marginBlockEnd: 16 }}>
-        <h1 className="mi-h1" style={{ fontSize: 22 }}>קידומי סושיאל</h1>
-        <span style={{ flex: 1 }} />
-        <button className="mi-btn mi-btn-primary" onClick={() => openNewRequest?.({})}>
-          ＋ בקשה חדשה
-        </button>
+      <header style={{ marginBlockEnd: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <h1 className="mi-h1" style={{ fontSize: 22 }}>קידומי סושיאל</h1>
+          <span style={{ flex: 1 }} />
+          <button className="mi-btn mi-btn-primary" onClick={() => openNewRequest?.({})}>
+            ＋ בקשה חדשה
+          </button>
+        </div>
+        <p className="mi-meta" style={{ marginBlockStart: 4 }}>
+          תוכן וקידום בית-ספריים שאינם משויכים לקורס. תקציב הסושיאל עצמו מנוהל תחת "תוכנית ותקציב".
+        </p>
       </header>
 
       {error && <ErrorBanner errors={[{ source: error }]} onRetry={load} />}

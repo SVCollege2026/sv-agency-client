@@ -153,8 +153,9 @@ export function getRecommendations(limit = 100) {
 
 /* ── תקציב — פריסות מדיה ותקציב ── */
 
-export function getBudgetAllocations() {
-  return request("GET", "/api/settings/budgets/allocations");
+export function getBudgetAllocations(folderId = null) {
+  const q = folderId ? `?folder_id=${folderId}` : "";
+  return request("GET", `/api/settings/budgets/allocations${q}`);
 }
 
 export function getBudgetSources() {
@@ -186,6 +187,17 @@ export function submitRequest({ folderId = null, requestType, briefPayload, brie
     brief_doc_url: briefDocUrl,
     brief_doc_name: briefDocName,
     submitter: "marketing_manager",
+  });
+}
+
+/**
+ * העלאה-לאוויר של קמפיין הקורס — דרך שער-הבטיחות של ה-controller (מאמת חיבור-Make פר-פלטפורמה,
+ * מעלה רק מה שמוכן, חוסם רק על בריאות-Make קריטית). שולח רק folder_id; ה-workflow_item נפתר בשרת.
+ */
+export function requestGoLive(folderId) {
+  return request("POST", "/api/lifecycle/go-live", {
+    folder_id: folderId,
+    requested_by: "marketing_manager",
   });
 }
 

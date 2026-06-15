@@ -38,6 +38,10 @@ export default function PlansBudgetPage() {
 
   const loading = sources == null || allocations == null;
   const pending = (allocations || []).filter((a) => a.status === "recommended");
+  // מציגים רק הקצאות רלוונטיות (ממתינות/מאושרות/פעילות) — לא ישנות/נדחות/ארכיון.
+  // כך לא מתערבבות הקצאות-עבר (מאי) עם ההווה ויוצרות בלבול.
+  const shown = (allocations || []).filter((a) =>
+    ["recommended", "active", "approved"].includes(a.status));
 
   return (
     <div className="mi-page">
@@ -92,12 +96,12 @@ export default function PlansBudgetPage() {
 
           <section aria-label="הקצאות">
             <h2 className="mi-h2" style={{ marginBlockEnd: 10 }}>הקצאות</h2>
-            {(allocations || []).length === 0 ? (
-              <EmptyState icon="📊" title="אין עדיין הקצאות תקציב"
+            {shown.length === 0 ? (
+              <EmptyState icon="📊" title="אין עדיין הקצאות תקציב פעילות"
                           hint="כשהמשרד ימליץ על פריסה — היא תופיע כאן ובגלריית האישורים" />
             ) : (
               <div className="mi-card" style={{ padding: 8 }}>
-                {allocations.map((a) => {
+                {shown.map((a) => {
                   const [label, cls] = ALLOC_STATUS[a.status] || [a.status, "mi-chip-info"];
                   return (
                     <div key={a.id}

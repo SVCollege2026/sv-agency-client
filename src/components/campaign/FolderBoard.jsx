@@ -41,7 +41,6 @@ import ActionMenu from "./ActionMenu.jsx";
 import ActivityIndicator from "./ActivityIndicator.jsx";
 import LongTextCell from "./LongTextCell.jsx";
 import RecommendationsBadge from "./RecommendationsBadge.jsx";
-import AccountManagerChat from "./AccountManagerChat.jsx";
 import ColumnVisibilityMenu from "./ColumnVisibilityMenu.jsx";
 import { useColumnPrefs } from "./useColumnPrefs.js";
 
@@ -434,9 +433,6 @@ export default function FolderBoard({ refreshKey = 0 }) {
           onSuccess={() => { setImportModalOpen(false); refresh(); }}
         />
       )}
-
-      {/* Floating account-manager chat */}
-      <AccountManagerChat />
     </div>
   );
 }
