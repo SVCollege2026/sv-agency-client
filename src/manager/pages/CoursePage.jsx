@@ -154,11 +154,14 @@ export default function CoursePage() {
       .finally(() => setGoLiveBusy(false));
   };
 
-  /* שורות הטבלה — תוצרים (גרסה עדכנית) + בקשות, מכל תיקיות הקורס */
+  /* שורות הטבלה — תוצרים (גרסה עדכנית) + בקשות, מכל תיקיות הקורס.
+     תוצרי-תקציב מיוצגים בטבלת-התקציב שלמעלה — לא כופלים אותם כאן (היה מבלבל). */
+  const _isBudgetArtifact = (t) => /budget|allocation|redeploy/i.test(t || "");
   const rows = useMemo(() => {
     const out = [];
     for (const a of artifacts || []) {
       if (a.is_current_version === false) continue;
+      if (_isBudgetArtifact(a.artifact_type)) continue;
       out.push({
         rowKind: "artifact",
         id: a.id,

@@ -19,6 +19,16 @@ function courseLink(artifact) {
   return key ? `/media/courses/${encodeURIComponent(key)}` : "/media/courses";
 }
 
+/* מסך ה-Review הוא לתוצרי-קראייטיב/קופי (מודעה כפי שהגולש רואה). תוצר-תקציב/מדיה/מחקר
+   אינו "נכס ויזואלי" — אסור שכפתור "צפייה ובדיקה" יוביל אותו למסך-הקראייטיב ("אין נכס ויזואלי"). */
+function isReviewable(artifact) {
+  const t = (artifact?.artifact_type || "").toLowerCase();
+  const d = (artifact?.producing_department || "").toLowerCase();
+  if (d === "creative" || d === "copy") return true;
+  if (/media|budget|deploy|plan|scenario|allocation|forecast|research|redeploy/.test(t)) return false;
+  return /creative|visual|design|ad_copy|copy|concept|render/.test(t);
+}
+
 function Panel({ title, children }) {
   return (
     <section className="mi-card" aria-label={title}
@@ -123,10 +133,12 @@ export default function ItemPage() {
           <span className="mi-chip mi-chip-info mi-ltr">V{artifact.version_number}</span>
         )}
         <span style={{ flex: 1 }} />
-        <button className="mi-btn mi-btn-primary"
-                onClick={() => navigate(`/media/items/${artifact.id}/review`)}>
-          {pending ? "צפייה ובדיקה" : "פתח Review"}
-        </button>
+        {isReviewable(artifact) && (
+          <button className="mi-btn mi-btn-primary"
+                  onClick={() => navigate(`/media/items/${artifact.id}/review`)}>
+            {pending ? "צפייה ובדיקה" : "פתח Review"}
+          </button>
+        )}
       </header>
 
       <div className="mi-cards-grid" style={{ alignItems: "start" }}>
