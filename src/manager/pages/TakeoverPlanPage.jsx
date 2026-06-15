@@ -14,6 +14,18 @@ import {
   prepareTakeoverDirectives, generateTakeoverBudget,
 } from "../api.js";
 import { ErrorBanner, EmptyState, SkeletonCard, timeAgoHe } from "../components/ui.jsx";
+import { fullDate } from "../lib.js";
+
+const PLATFORM_HE = { meta: "מטא", google: "גוגל", social: "סושיאל" };
+
+// משפט-תקציר אחד פר-קורס מתוך נימוק חופשי — לא dump של פסקה. המשפט הראשון
+// (עד נקודה / שורה), חתוך באורך סביר. אין נתון → null.
+function oneLine(text) {
+  if (!text) return null;
+  const first = String(text).split(/[\n.]/).map((s) => s.trim()).find(Boolean);
+  if (!first) return null;
+  return first.length > 140 ? `${first.slice(0, 139)}…` : first;
+}
 
 const COURSE_LABELS = {
   qa: "QA — פיתוח טכנולוגיות",
@@ -218,6 +230,12 @@ export default function TakeoverPlanPage() {
     courses.filter((c) => c.course_key).map((c) => [canon(c.course_key), c]));
 
   const dep = overall.macro_deployment_ils || {};
+  const period = plan.period || {};
+  const periodLabel = (period.start || period.end)
+    ? `${fullDate(period.start)} – ${fullDate(period.end)}`
+    : null;
+  // שורת-תקציר אחת פר-קורס (verdict + משפט) — במקום dump של נימוק-העל החופשי.
+  const macroPlatforms = ["meta", "google", "social"].filter((p) => dep[p] != null);
 
   return (
     <div className="mi-page">
@@ -232,26 +250,62 @@ export default function TakeoverPlanPage() {
 
       <ErrorBanner errors={error ? [{ source: error }] : []} onRetry={load} />
 
-      {/* נימוק-העל + פריסת-מאקרו + החלטת-AI */}
+      {/* התמונה הכוללת — תקציר אחד פר-קורס (verdict + משפט) + פריסת-מאקרו מתוארכת.
+          fix #6: לא dump של פסקת-נימוק; שורה ברורה לכל קורס + טבלת-תקציב תקופה→פלטפורמה→₪. */}
       <section className="mi-card" style={{ padding: 16, marginBlockEnd: 16 }}>
-        <h2 className="mi-h2" style={{ marginBlockEnd: 8 }}>התמונה הכוללת</h2>
-        {overall.rationale && (
-          <p className="mi-body" style={{ whiteSpace: "pre-wrap", marginBlockEnd: 10 }}>
-            {overall.rationale}
-          </p>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBlockEnd: 10, flexWrap: "wrap" }}>
+          <h2 className="mi-h2" style={{ margin: 0 }}>התמונה הכוללת</h2>
+          {periodLabel && <span className="mi-meta mi-ltr">תקופה: {periodLabel}</span>}
+        </div>
+
+        {courseKeys.length > 0 && (
+          <ul style={{ listStyle: "none", margin: "0 0 12px", padding: 0,
+                       display: "flex", flexDirection: "column", gap: 6 }}>
+            {courseKeys.map((key) => {
+              const c = courseByKey[key] || {};
+              const line = oneLine(c.reasoning)
+                || oneLine((prioritiesByCourse[key] || [])[0]?.why);
+              return (
+                <li key={key} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <strong style={{ color: "var(--mi-ink)", minInlineSize: 120 }}>{labelFor(key)}</strong>
+                  <VerdictChip verdict={c.verdict} />
+                  {line && <span className="mi-meta" style={{ flex: 1, minInlineSize: 0 }}>{line}</span>}
+                </li>
+              );
+            })}
+          </ul>
         )}
-        {(dep.meta != null || dep.google != null || dep.social != null) && (
-          <p className="mi-meta">
-            פריסת-מאקרו לתקופה:{" "}
-            {["meta", "google", "social"].filter((p) => dep[p] != null)
-              .map((p) => `${p === "meta" ? "מטא" : p === "google" ? "גוגל" : "סושיאל"} ₪${Math.round(dep[p]).toLocaleString()}`)
-              .join(" · ")}
-          </p>
+
+        {macroPlatforms.length > 0 && (
+          <div className="mi-table-wrap" style={{ marginBlockEnd: 10 }}>
+            <table className="mi-table">
+              <thead>
+                <tr><th>תקופה</th><th>פלטפורמה</th><th>תקציב</th></tr>
+              </thead>
+              <tbody>
+                {macroPlatforms.map((p) => (
+                  <tr key={p}>
+                    <td className="mi-meta mi-ltr" style={{ whiteSpace: "nowrap" }}>{periodLabel || "—"}</td>
+                    <td className="mi-meta" style={{ whiteSpace: "nowrap" }}>{PLATFORM_HE[p]}</td>
+                    <td className="mi-ltr" style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                      ₪{Math.round(dep[p]).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
+
+        <p className="mi-meta" style={{ marginBlockStart: 4 }}>
+          זו פריסת-המאקרו לתקופה. ה-₪ המדויק לאישור פר-קורס מופיע בעמוד הקורס תחת
+          "תקציב הקורס" — שם מאשרים/דוחים את ההקצאה.
+        </p>
+
         {overall.ai_decision?.decision && (
           <div style={{ marginBlockStart: 10, padding: 10, background: "var(--mi-soft, #f6f7f9)", borderRadius: 8 }}>
             <strong>החלטת AI:</strong> {overall.ai_decision.decision}
-            {overall.ai_decision.reasoning ? ` — ${overall.ai_decision.reasoning}` : ""}
+            {oneLine(overall.ai_decision.reasoning) ? ` — ${oneLine(overall.ai_decision.reasoning)}` : ""}
           </div>
         )}
       </section>

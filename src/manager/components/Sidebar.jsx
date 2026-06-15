@@ -10,18 +10,22 @@ import { NavLink, useNavigate } from "react-router-dom";
 import Icon, { courseIconName } from "./icons.jsx";
 import { MANAGER } from "../lib.js";
 
-function SideLink({ to, icon, label, end = false, onNavigate }) {
+function SideLink({ to, icon, label, end = false, onNavigate, badge = null }) {
   return (
     <NavLink to={to} end={end} onClick={onNavigate}
       className={({ isActive }) => `mi-sidelink${isActive ? " mi-sidelink-active" : ""}`}>
       <span className="mi-sidelink-ic" aria-hidden="true"><Icon name={icon} /></span>
       <span style={{ flex: 1, minInlineSize: 0, overflow: "hidden",
                      textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+      {badge != null && badge > 0 && (
+        <span className="mi-nav-badge" aria-label={`${badge} ממתינים`}>{badge}</span>
+      )}
     </NavLink>
   );
 }
 
-export default function Sidebar({ courses = [], coursesError, open, onClose, onNewCourse }) {
+export default function Sidebar({ courses = [], coursesError, pendingCount = null,
+                                  open, onClose, onNewCourse }) {
   const navigate = useNavigate();
 
   return (
@@ -37,6 +41,8 @@ export default function Sidebar({ courses = [], coursesError, open, onClose, onN
 
           <nav aria-label="תיקיות">
             <SideLink to="/media" end icon="overview" label="סקירה כללית" onNavigate={onClose} />
+            <SideLink to="/media/approvals" icon="gallery" label="מה מחכה לי"
+                      badge={pendingCount} onNavigate={onClose} />
             <SideLink to="/media/courses" end icon="folders" label="כל הקורסים" onNavigate={onClose} />
 
             {coursesError && (
