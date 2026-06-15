@@ -15,17 +15,18 @@ export default function SocialPage() {
   const [items, setItems] = useState(null);
   const [error, setError] = useState(null);
 
-  // תוצרי-מדיה/תקציב (תוכנית-מדיה, המלצת-תקציב, תרחיש-Make, פריסה) אינם פעילות-סושיאל —
-  // הם מנוהלים תחת "תוכנית ותקציב". סושיאל = תוכן בית-ספרי (קופי/קראייטיב/קידום).
-  const _isMediaDeployment = (t) =>
-    /media|budget|deploy|plan|scenario|allocation|forecast|redeploy/i.test(t || "");
+  // סושיאל = תוכן בית-ספרי בלבד (קופי/קראייטיב/וידאו/פוסט). allowlist מפורש — כך ש"מחקר שוק",
+  // מחקר-מתחרים, תוכניות-מדיה, תקציב וכל יתר תוצרי-האסטרטגיה **לא** ידלפו לכאן. אין תוכן-סושיאל
+  // עדיין ⇒ הדף ריק בכנות (לא מוצף בתוצרים לא-קשורים).
+  const _isSocialContent = (t) =>
+    /creative|copy|concept|render|visual|video|social|post|story|content|reel|carousel|ad_/i
+      .test(t || "");
 
   const load = useCallback(() => {
     setError(null);
-    // פעילות-סושיאל בית-ספרית = תוצרי-תוכן בלי שיוך לקורס (לא תוצרי-מדיה/תקציב)
     getArtifacts({ limit: 200 })
       .then((rows) => setItems(rows.filter(
-        (a) => !a.folder_id && !_isMediaDeployment(a.artifact_type))))
+        (a) => !a.folder_id && _isSocialContent(a.artifact_type))))
       .catch((e) => setError(e.message));
   }, []);
   useEffect(load, [load]);
