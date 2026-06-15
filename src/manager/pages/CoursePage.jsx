@@ -118,12 +118,23 @@ export default function CoursePage() {
   }, [course, folderIds]);
   useEffect(load, [load]);
 
-  // רק התקציב הרלוונטי: ממתין-לאישור + מאושר/פעיל (בלי ארכיון/נדחה — בלי בלגן).
-  const budgetRows = useMemo(() =>
-    (allocations || [])
-      .filter((a) => ["recommended", "active", "approved"].includes(a.status))
-      .sort((x, y) => new Date(y.created_at || 0) - new Date(x.created_at || 0)),
-    [allocations]);
+  // טבלת-התקציב מציגה רק את **תקציב-ההשתלטות** (recommendation_kind=takeover_redeploy) +
+  // מה שהמנהלת אישרה בפועל (decided_by) — לא את ערימת ההמלצות-מאתמול (initial_allocation/
+  // spend_rate), לא גוגל (לא onboarded), ואחת פר-פלטפורמה (בלי כפילויות). זה מה ש"תקציב הקורס"
+  // אמור להיות: ההצעה הנקייה לאישור, לא רשימת-כל-השורות.
+  const allocKind = (a) => (a.metadata || {}).recommendation_kind || (a.metadata || {}).decision_kind || "";
+  const budgetRows = useMemo(() => {
+    const relevant = (allocations || []).filter((a) =>
+      a.platform !== "google" && (allocKind(a) === "takeover_redeploy" || !!a.decided_by));
+    const seen = new Set(); const out = [];
+    for (const a of relevant.sort((x, y) => new Date(y.created_at || 0) - new Date(x.created_at || 0))) {
+      const grp = a.status === "recommended" ? "proposal" : (a.decided_by ? "approved" : "current");
+      const key = `${grp}:${a.platform}`;
+      if (seen.has(key)) continue;
+      seen.add(key); out.push(a);
+    }
+    return out;
+  }, [allocations]);
 
   // הנחיית-האסטרטג לקורס הזה מתוך תוכנית-ההשתלטות (נימוק + פעולות פר-קורס) — הסיגנל,
   // לא הטקסט הגנרי על שורת-תקציב. מותאם לפי course_key.
