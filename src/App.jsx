@@ -21,6 +21,7 @@ import ReviewPage from "./manager/pages/ReviewPage.jsx";
 import ActivityPage from "./manager/pages/ActivityPage.jsx";
 import SocialPage from "./manager/pages/SocialPage.jsx";
 import PlansBudgetPage from "./manager/pages/PlansBudgetPage.jsx";
+import BudgetDashboardPage from "./manager/pages/BudgetDashboardPage.jsx";
 
 export default function App() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="takeover-plan" element={<Navigate to="/media" replace />} />
         <Route path="activity" element={<ActivityPage />} />
         <Route path="social" element={<SocialPage />} />
+        <Route path="budget" element={<BudgetDashboardPage />} />
         <Route path="plans" element={<PlansBudgetPage />} />
       </Route>
 

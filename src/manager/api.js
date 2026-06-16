@@ -183,6 +183,12 @@ export function getBudgetSources() {
   return request("GET", "/api/settings/budgets/sources");
 }
 
+/** דשבורד-תקציב נקי (5ב) — projection מעל approved_media_budget + media_settings +
+    monthly_school_kpi. מתעלם מ-budget_allocations הרקוב (אסור לקרוא כהוצאה). */
+export function getBudgetOverview() {
+  return request("GET", "/api/campaigns/budget-overview");
+}
+
 /* ── הערות — חוזה-ההערות האחוד (sql/091) ── */
 
 export function getComments(objectType, objectId, { version = null, status = null } = {}) {

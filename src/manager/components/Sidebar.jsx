@@ -58,6 +58,7 @@ export default function Sidebar({ courses = [], coursesError, pendingCount = nul
             <hr className="mi-sidebar-divider" />
 
             <SideLink to="/media/social" icon="users" label="קידומי סושיאל" onNavigate={onClose} />
+            <SideLink to="/media/budget" icon="grid" label="דשבורד תקציב" onNavigate={onClose} />
             <SideLink to="/media/plans" icon="chart" label="פריסות מדיה ותקציב" onNavigate={onClose} />
 
             <button type="button" className="mi-sidelink"
