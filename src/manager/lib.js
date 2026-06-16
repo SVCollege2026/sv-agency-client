@@ -496,9 +496,10 @@ export function takeoverGloballyApproved(allAllocations) {
 export function courseTakeoverState(courseAllocations) {
   const tk = (courseAllocations || []).filter(_isTakeoverAlloc);
   const proposals = tk.filter((a) => a.status === "recommended");
-  const approved = tk.some(
-    (a) => a.decided_by === "marketing_manager"
-        || ["approved", "active"].includes(a.status));
+  // approved = סטטוס-ההקצאה בלבד — זהה ל-takeoverGloballyApproved ול-takeover_gate.py.
+  // ⚠ לא לסמוך על decided_by='marketing_manager': השרת רושם אותו גם ב**דחייה**
+  //   (status→closed, recommendation_kind נשאר), אז דחיית-הצעה הייתה מציגה כוזב "אושר/עלה לאוויר".
+  const approved = tk.some((a) => ["approved", "active"].includes(a.status));
   return { proposals, approved };
 }
 
