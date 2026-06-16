@@ -7,9 +7,10 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { getApprovalsInbox, getArtifacts, getFolder, getBudgetAllocations, decideAllocation, submitRequest, requestGoLive, getTakeoverPlan } from "../api.js";
+import { getApprovalsInbox, getArtifacts, getFolder, getBudgetAllocations, decideAllocation, submitRequest, requestGoLive, getTakeoverPlan, getCourseReadiness, generateScreenshots } from "../api.js";
 import { EmptyState, ErrorBanner, SkeletonCard, StatusChip } from "../components/ui.jsx";
 import RejectDialog from "../components/RejectDialog.jsx";
+import TakeoverReadiness from "../components/TakeoverReadiness.jsx";
 import {
   artifactThumb, canonPlanKey as canon, courseFolders, deploymentStructure, fullDate,
   matchPlanCourseKey as matchCourseKey, opensReview, requiredOfYou,
@@ -156,6 +157,10 @@ export default function CoursePage() {
   const [goLiveBusy, setGoLiveBusy] = useState(false);
   const [goLiveMsg, setGoLiveMsg] = useState(null);
   const [takeover, setTakeover] = useState(null);
+  const [readiness, setReadiness] = useState(null);     // חבילת-המוכנות (§7)
+  const [shotBusy, setShotBusy] = useState(false);      // הפקת/רענון צילומי-מסך
+  const [approveDateFor, setApproveDateFor] = useState(null);  // הקצאה שמראה בורר-תאריך
+  const [approveDate, setApproveDate] = useState("");          // תאריך-override שנבחר
   const [error, setError] = useState(null);
 
   const course = useMemo(() => {
@@ -188,6 +193,12 @@ export default function CoursePage() {
       .catch(() => setInboxItems([]));
     // הנחיית-האסטרטג לקורס מתוך תוכנית-ההשתלטות (best-effort; חסר ⇒ פשוט לא מוצג)
     getTakeoverPlan().then(setTakeover).catch(() => setTakeover(null));
+    // חבילת-המוכנות (§7): תקציב + קהלים✓ + קראייטיב + טופס + שער-צילומים (פר-תיקייה-ראשית)
+    if (course.latest?.id) {
+      getCourseReadiness(course.latest.id).then(setReadiness).catch(() => setReadiness(null));
+    } else {
+      setReadiness(null);
+    }
     // טבלת-התקציב הייעודית: ההקצאות של כל תיקיות-הקורס
     Promise.all(course.folders.map((f) =>
       getBudgetAllocations(f.id).catch(() => [])))
@@ -246,11 +257,25 @@ export default function CoursePage() {
   const plannedBudgetParts = useMemo(
     () => factsPlannedParts(courseGuidance?.c?.facts), [courseGuidance]);
 
-  const approveAlloc = (id) => {
+  // אישור-תקציב = אישור-השתלטות לקורס (מחווט לאוויר דרך השרת). goLiveDate אופציונלי
+  // (§7 override): תאריך-עתידי → "מאושר אבל בתאריך Y" (הקמפיין יעלה ביום Y, לא מיד).
+  const approveAlloc = (id, goLiveDate = null) => {
     setBudgetBusy((b) => ({ ...b, [id]: true }));
-    decideAllocation(id, "approved")
-      .then(load).catch((e) => setError(e.message))
+    decideAllocation(id, "approved", null, goLiveDate)
+      .then(() => { setApproveDateFor(null); setApproveDate(""); load(); })
+      .catch((e) => setError(e.message))
       .finally(() => setBudgetBusy((b) => ({ ...b, [id]: false })));
+  };
+
+  // הפקת/רענון שער-צילומי-המסך לקורס (§5 · #26) — אז המנהלת רואה איך זה ייראה.
+  const genShots = () => {
+    const folderId = course?.latest?.id;
+    if (!folderId) { setError("אין תיקייה לקורס"); return; }
+    setShotBusy(true); setError(null);
+    generateScreenshots(folderId)
+      .then(() => getCourseReadiness(folderId)).then(setReadiness)
+      .catch((e) => setError(e.message))
+      .finally(() => setShotBusy(false));
   };
   // דחיית-תקציב מחייבת סיבה — דרך RejectDialog (אותו מודאל נגיש כמו ApprovalsPage),
   // לא window.prompt (fix #3). פותחים את הדיאלוג עם הקצאה כ-item; ההכרעה ב-confirmRejectAlloc.
@@ -525,18 +550,40 @@ export default function CoursePage() {
                       <td><span className={`mi-chip ${st.cls}`}>{st.he}</span></td>
                       <td>
                         {a.status === "recommended" ? (
-                          <span style={{ display: "flex", gap: 6 }}>
-                            <button className="mi-btn mi-btn-secondary" disabled={!!budgetBusy[a.id]}
-                                    style={{ minBlockSize: 34, padding: "4px 12px" }}
-                                    onClick={() => approveAlloc(a.id)}>
-                              {budgetBusy[a.id] ? "…" : "אשרי"}
-                            </button>
-                            <button className="mi-btn mi-btn-ghost" disabled={!!budgetBusy[a.id]}
-                                    style={{ minBlockSize: 34, padding: "4px 10px" }}
-                                    onClick={() => rejectAlloc(a)}>
-                              דחייה
-                            </button>
-                          </span>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              <button className="mi-btn mi-btn-secondary" disabled={!!budgetBusy[a.id]}
+                                      style={{ minBlockSize: 34, padding: "4px 12px" }}
+                                      onClick={() => approveAlloc(a.id)}>
+                                {budgetBusy[a.id] ? "…" : "אשרי"}
+                              </button>
+                              <button className="mi-btn mi-btn-ghost" disabled={!!budgetBusy[a.id]}
+                                      style={{ minBlockSize: 34, padding: "4px 10px" }}
+                                      onClick={() => rejectAlloc(a)}>
+                                דחייה
+                              </button>
+                              {/* §7 override: "מאושר אבל בתאריך Y" */}
+                              <button className="mi-btn mi-btn-ghost" disabled={!!budgetBusy[a.id]}
+                                      style={{ minBlockSize: 34, padding: "4px 10px" }}
+                                      onClick={() => { setApproveDateFor(approveDateFor === a.id ? null : a.id); setApproveDate(""); }}>
+                                לתאריך…
+                              </button>
+                            </span>
+                            {approveDateFor === a.id && (
+                              <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                                <input type="date" className="mi-input" value={approveDate}
+                                       min={new Date().toISOString().slice(0, 10)}
+                                       onChange={(e) => setApproveDate(e.target.value)}
+                                       style={{ minBlockSize: 34 }} />
+                                <button className="mi-btn mi-btn-secondary"
+                                        disabled={!approveDate || !!budgetBusy[a.id]}
+                                        style={{ minBlockSize: 34, padding: "4px 10px" }}
+                                        onClick={() => approveAlloc(a.id, approveDate)}>
+                                  אשרי לתאריך זה
+                                </button>
+                              </span>
+                            )}
+                          </div>
                         ) : <span className="mi-meta">—</span>}
                       </td>
                     </tr>
@@ -547,6 +594,10 @@ export default function CoursePage() {
           </div>
         )}
       </section>
+
+      {/* §7 — מוכנות-להשתלטות: קהלים✓ + קראייטיב + עיצוב + טופס + צילומי-מסך, במקום-אחד.
+          זה מה שמשלים את "לראות הכל לפני אישור" (התקציב מאושר בטבלה שלמעלה). */}
+      <TakeoverReadiness readiness={readiness} onGenerateScreenshots={genShots} shotBusy={shotBusy} />
 
       <div className="mi-tabs" role="tablist" aria-label="תצוגות הקורס"
            style={{ marginBlockEnd: 16 }}>
