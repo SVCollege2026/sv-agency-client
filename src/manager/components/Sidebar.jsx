@@ -57,7 +57,6 @@ export default function Sidebar({ courses = [], coursesError, pendingCount = nul
 
             <hr className="mi-sidebar-divider" />
 
-            <SideLink to="/media/takeover-plan" icon="spark" label="תוכנית השתלטות" onNavigate={onClose} />
             <SideLink to="/media/social" icon="users" label="קידומי סושיאל" onNavigate={onClose} />
             <SideLink to="/media/plans" icon="chart" label="פריסות מדיה ותקציב" onNavigate={onClose} />
 
@@ -94,11 +93,6 @@ export default function Sidebar({ courses = [], coursesError, pendingCount = nul
                   onClick={() => { onClose?.(); navigate("/media/approvals"); }}>
             <Icon name="gallery" size={17} />
           </button>
-          <span style={{ flex: 1 }} />
-          <span className="mi-rail-btn" title="הגדרות — בשלב הבא" aria-disabled="true"
-                style={{ opacity: .45, cursor: "default" }}>
-            <Icon name="sliders" size={17} />
-          </span>
         </div>
       </aside>
     </>

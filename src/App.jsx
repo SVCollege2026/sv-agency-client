@@ -14,7 +14,6 @@ import { ToastProvider } from "./components/campaign/Toast.jsx";
 import ManagerLayout from "./manager/ManagerLayout.jsx";
 import OverviewPage from "./manager/pages/OverviewPage.jsx";
 import ApprovalsPage from "./manager/pages/ApprovalsPage.jsx";
-import TakeoverPlanPage from "./manager/pages/TakeoverPlanPage.jsx";
 import CoursesPage from "./manager/pages/CoursesPage.jsx";
 import CoursePage from "./manager/pages/CoursePage.jsx";
 import ItemPage from "./manager/pages/ItemPage.jsx";
@@ -36,7 +35,8 @@ export default function App() {
         <Route path="items/:artifactId" element={<ItemPage />} />
         <Route path="items/:artifactId/review" element={<ReviewPage />} />
         <Route path="approvals" element={<ApprovalsPage />} />
-        <Route path="takeover-plan" element={<TakeoverPlanPage />} />
+        {/* תוכנית-ההשתלטות קופלה לתוך סביבת-הקורס (מתג-אישור) — קישור ישן → /media */}
+        <Route path="takeover-plan" element={<Navigate to="/media" replace />} />
         <Route path="activity" element={<ActivityPage />} />
         <Route path="social" element={<SocialPage />} />
         <Route path="plans" element={<PlansBudgetPage />} />

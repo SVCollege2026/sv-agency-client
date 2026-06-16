@@ -357,8 +357,8 @@ export function cyclesForCourse(cycles = [], courseKey = "") {
 
 /* ── מפתח-קורס של תוכנית-ההשתלטות (course_key) — מקור-אמת אחד ──
    האסטרטג כותב course_keys כמו 'ai_architect'/'marketing_b2b'; CoursePage
-   ו-TakeoverPlanPage צריכים למפות שם-קורס חופשי לאותו מפתח. עד היום כל עמוד
-   שיכפל את המפה (sweep #6) — כאן מאחדים. הספציפי לפני הכללי (ai_architect
+   צריך למפות שם-קורס חופשי לאותו מפתח (מאוחד כאן במקום שכפול פר-עמוד).
+   הספציפי לפני הכללי (ai_architect
    לפני ai, marketing_b2b לפני marketing). קונסולידציה: וריאנטים של אותו קורס
    מתאחדים למפתח קנוני אחד דרך PLAN_KEY_CANON (כרטיס אחד פר-קורס). */
 const PLAN_KEY_CANON = { marketing_social_ai: "marketing" };
@@ -440,20 +440,22 @@ export function transitionWhen(iso, now = new Date()) {
   return "today";
 }
 
-/** שם-המבנה ה**מתוכנן** מתוך facts.cbo (CBO/Adset), או null אם לא ידוע. */
+/** שם-המבנה ה**מתוכנן** בעברית-עסקית (בלי ז'רגון CBO/Adset), או null אם לא ידוע.
+    CBO = המערכת מחלקת תקציב אוטומטית למודעות-המנצחות → "תקציב חכם".
+    ABO/Adset = תקציב קבוע ידני פר-קבוצת-מודעות → "תקציב פר-קבוצה". */
 export function structureName(cbo) {
-  if (cbo === true) return "CBO";
-  if (cbo === false) return "Adset";
+  if (cbo === true) return "תקציב חכם";
+  if (cbo === false) return "תקציב פר-קבוצה";
   return null;
 }
 
 /**
  * הצגה כנה של מבנה-הקמפיין: המבנה-המתוכנן + מתי, ביחס להיום. מחזיר
  * { structure, when, label } — label הוא המחרוזת המוצגת ("—" אם אין מבנה).
- *   • מעבר עתידי  → "CBO — מתוכנן ל-DD.MM.YYYY" (לא "כבר CBO")
- *   • מעבר שעבר   → "CBO — מעבר תוכנן ל-DD.MM.YYYY (עבר)"
- *   • מעבר היום   → "CBO — מעבר מתוכנן להיום (DD.MM.YYYY)"
- *   • בלי תאריך   → המבנה בלבד ("CBO"/"Adset"), בלי טענת-מעבר.
+ *   • מעבר עתידי  → "תקציב חכם — מתוכנן ל-DD.MM.YYYY" (לא "כבר עברנו")
+ *   • מעבר שעבר   → "תקציב חכם — מעבר תוכנן ל-DD.MM.YYYY (עבר)"
+ *   • מעבר היום   → "תקציב חכם — מעבר מתוכנן להיום (DD.MM.YYYY)"
+ *   • בלי תאריך   → המבנה בלבד ("תקציב חכם"/"תקציב פר-קבוצה"), בלי טענת-מעבר.
  * אף פעם לא ממציא: אין מבנה → label "—".
  */
 export function deploymentStructure(facts, now = new Date()) {
@@ -470,6 +472,35 @@ export function deploymentStructure(facts, now = new Date()) {
     : when === "past" ? `${structure} — מעבר תוכנן ל-${d} (עבר)`
     : `${structure} — מעבר מתוכנן להיום (${d})`;
   return { structure, when, label };
+}
+
+/* ── מצב שער-ההשתלטות (מראה את agents/workflow/takeover_gate.py — מקור-האמת) ──
+   ⚠ השער **גלובלי לחשבון**, לא פר-קורס: ברגע שהקצאת-השתלטות אחת
+   (metadata.recommendation_kind=takeover_redeploy) מגיעה ל-status
+   approved/active — ניהול-החשבון האוטומטי כולו נדלק (שרשרת-הבוקר, סנכרון-
+   הקהלים, ההמלצות). כאן מחושב המצב ל**תצוגה בלבד**; הגידור האמיתי בשרת,
+   fail-closed. שינוי הפילטר בשרת ⇒ לעדכן גם כאן. */
+const _isTakeoverAlloc = (a) =>
+  ((a?.metadata || {}).recommendation_kind || (a?.metadata || {}).decision_kind) === "takeover_redeploy";
+
+/** האם ניהול-החשבון כבר נדלק — קיימת הקצאת-השתלטות מאושרת/פעילה כלשהי (גלובלי).
+    מקבל את **כל** ההקצאות (לא פר-קורס). מראה את takeover_gate.takeover_approved(). */
+export function takeoverGloballyApproved(allAllocations) {
+  return (allAllocations || []).some(
+    (a) => _isTakeoverAlloc(a) && ["approved", "active"].includes(a.status));
+}
+
+/** מצב-ההשתלטות של קורס בודד מתוך הקצאותיו:
+ *  { proposals, approved } — proposals=הצעות-השתלטות שממתינות לאישורה;
+ *  approved=הקורס כבר עלה (הקצאת-השתלטות מאושרת/פעילה לקורס). */
+export function courseTakeoverState(courseAllocations) {
+  const tk = (courseAllocations || []).filter(_isTakeoverAlloc);
+  const proposals = tk.filter((a) => a.status === "recommended");
+  // approved = סטטוס-ההקצאה בלבד — זהה ל-takeoverGloballyApproved ול-takeover_gate.py.
+  // ⚠ לא לסמוך על decided_by='marketing_manager': השרת רושם אותו גם ב**דחייה**
+  //   (status→closed, recommendation_kind נשאר), אז דחיית-הצעה הייתה מציגה כוזב "אושר/עלה לאוויר".
+  const approved = tk.some((a) => ["approved", "active"].includes(a.status));
+  return { proposals, approved };
 }
 
 /** קישור-צפייה של Drive → קישור-תמונה שנטען ב-<img> (אותו קובץ, אותו Drive) */
