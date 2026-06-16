@@ -7,21 +7,21 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { getApprovalsInbox, getArtifacts, getFolder, getBudgetAllocations, decideAllocation, submitRequest, requestGoLive, getTakeoverPlan, getCourseReadiness, generateScreenshots } from "../api.js";
-import { EmptyState, ErrorBanner, SkeletonCard, StatusChip } from "../components/ui.jsx";
+import { getApprovalsInbox, getArtifacts, getFolder, getBudgetAllocations, decideAllocation, submitRequest, requestGoLive, getTakeoverPlan, getCourseReadiness, generateScreenshots, generateTakeoverPlan, generateTakeoverBudget } from "../api.js";
+import { EmptyState, ErrorBanner, SkeletonCard, StatCard, StatusChip } from "../components/ui.jsx";
 import RejectDialog from "../components/RejectDialog.jsx";
 import TakeoverReadiness from "../components/TakeoverReadiness.jsx";
+import TakeoverSwitch from "../components/TakeoverSwitch.jsx";
 import {
-  artifactThumb, canonPlanKey as canon, courseFolders, deploymentStructure, fullDate,
-  matchPlanCourseKey as matchCourseKey, opensReview, requiredOfYou,
-  shortDate, stripInternalSteps, typeHe, workStatus,
+  artifactThumb, canonPlanKey as canon, courseFolders, courseTakeoverState,
+  deploymentStructure, fullDate, matchPlanCourseKey as matchCourseKey, opensReview,
+  requiredOfYou, shortDate, stripInternalSteps, takeoverGloballyApproved, typeHe, workStatus,
 } from "../lib.js";
 
 const TABS = [["table", "טבלה"], ["timeline", "ציר זמן"],
               ["active", "פעילים"], ["approvals", "אישורים"]];
 
-/* התאמת שם-קורס ל-course_key של תוכנית-ההשתלטות — מקור-אמת אחד (lib.js),
-   משותף ל-TakeoverPlanPage (sweep #6). היה משוכפל פה. */
+/* התאמת שם-קורס ל-course_key של תוכנית-ההשתלטות — מקור-אמת אחד (lib.js). */
 
 /* טבלת-התקציב הייעודית של הקורס (אפיון נירית: כל קורס נפתח עם התקציב שלו) */
 const fmtIls = (n) => (n != null && !isNaN(Number(n))) ? `₪${Math.round(Number(n)).toLocaleString()}` : "—";
@@ -106,8 +106,8 @@ function Chip({ pair }) {
 }
 
 // fix #4: הנחיית-האסטרטג מוצגת כ**פריסת-מדיה מובנית** (מבנה / תקציב / תאריכים),
-// לא כפסקאות-פרוזה. הנתונים מ-courseGuidance.c.facts (אותו מבנה כמו FactsPanel
-// ב-TakeoverPlanPage) + verdict + platform_emphasis — כולם כבר נשלפו מהתוכנית.
+// לא כפסקאות-פרוזה. הנתונים מ-courseGuidance.c.facts (מבנה-ה-facts של התוכנית)
+// + verdict + platform_emphasis — כולם כבר נשלפו מהתוכנית.
 const VERDICT_HE = { keep: "להשאיר", adjust: "לתקן" };
 const verdictPair = (v) =>
   v ? [VERDICT_HE[v] || v, v === "keep" ? "mi-chip-success" : "mi-chip-warning"] : null;
@@ -150,8 +150,9 @@ export default function CoursePage() {
   const [briefs, setBriefs] = useState([]);
   const [inboxItems, setInboxItems] = useState(null);
   const [allocations, setAllocations] = useState(null);
-  const [budgetBusy, setBudgetBusy] = useState({});
-  const [rejectingAlloc, setRejectingAlloc] = useState(null);  // ההקצאה שנדחית (RejectDialog)
+  const [rejectingTakeover, setRejectingTakeover] = useState(false);  // דחיית-השתלטות דרך RejectDialog
+  const [gateAllocations, setGateAllocations] = useState(null);       // כל ההקצאות — למצב-השער הגלובלי
+  const [takeoverBusy, setTakeoverBusy] = useState({});               // {approving, preparing}
   const [starting, setStarting] = useState(false);
   const [startedMsg, setStartedMsg] = useState(null);  // הודעת "התחלנו" לקורס חסר-תיקייה
   const [goLiveBusy, setGoLiveBusy] = useState(false);
@@ -159,8 +160,6 @@ export default function CoursePage() {
   const [takeover, setTakeover] = useState(null);
   const [readiness, setReadiness] = useState(null);     // חבילת-המוכנות (§7)
   const [shotBusy, setShotBusy] = useState(false);      // הפקת/רענון צילומי-מסך
-  const [approveDateFor, setApproveDateFor] = useState(null);  // הקצאה שמראה בורר-תאריך
-  const [approveDate, setApproveDate] = useState("");          // תאריך-override שנבחר
   const [error, setError] = useState(null);
 
   const course = useMemo(() => {
@@ -204,6 +203,11 @@ export default function CoursePage() {
       getBudgetAllocations(f.id).catch(() => [])))
       .then((lists) => setAllocations(lists.flat()))
       .catch(() => setAllocations([]));
+    // מצב-השער הגלובלי: כל ההקצאות (לא פר-תיקייה) — לזהות אם ניהול-החשבון כבר נדלק.
+    // כשל-שליפה ⇒ נשאר null = "לא ידוע" (לא [] = "כבוי"), כדי לא לטעון "אישור-ראשון" בטעות.
+    getBudgetAllocations()
+      .then((rows) => setGateAllocations(Array.isArray(rows) ? rows : []))
+      .catch(() => setGateAllocations(null));
   }, [course, folderIds]);
   useEffect(load, [load]);
 
@@ -228,6 +232,13 @@ export default function CoursePage() {
     }
     return out;
   }, [allocations]);
+
+  // מצב-ההשתלטות: ההצעות-לאישור של הקורס + האם ניהול-החשבון כבר נדלק (גלובלי).
+  const courseTk = useMemo(() => courseTakeoverState(allocations || []), [allocations]);
+  const accountOn = useMemo(() => takeoverGloballyApproved(gateAllocations || []), [gateAllocations]);
+  // עלייה-לאוויר נגזרת מסטטוס-התיקייה (live/active) — לא מאישור-ההקצאה (שעלול להיות מתוזמן).
+  const courseLive = useMemo(
+    () => (course?.folders || []).some((f) => ["live", "active"].includes(f.status)), [course]);
 
   // הנחיית-האסטרטג לקורס הזה מתוך תוכנית-ההשתלטות — מותאם לפי course_key.
   // fix #4: ה-facts הם המקור לפריסה המובנית (CBO/תקציב/תאריכים); ה-prs מספקים
@@ -257,14 +268,42 @@ export default function CoursePage() {
   const plannedBudgetParts = useMemo(
     () => factsPlannedParts(courseGuidance?.c?.facts), [courseGuidance]);
 
-  // אישור-תקציב = אישור-השתלטות לקורס (מחווט לאוויר דרך השרת). goLiveDate אופציונלי
-  // (§7 override): תאריך-עתידי → "מאושר אבל בתאריך Y" (הקמפיין יעלה ביום Y, לא מיד).
-  const approveAlloc = (id, goLiveDate = null) => {
-    setBudgetBusy((b) => ({ ...b, [id]: true }));
-    decideAllocation(id, "approved", null, goLiveDate)
-      .then(() => { setApproveDateFor(null); setApproveDate(""); load(); })
+  // אישור-ההשתלטות (המתג) = אישור הקצאות-ההשתלטות (takeover_redeploy) של הקורס דרך
+  // decideAllocation('approved'), מחווט בשרת ל-request_go_live. אישור-ההשתלטות הראשון
+  // מדליק את שער-החשבון הגלובלי. goLiveDate אופציונלי (§7 override): תאריך-עתידי → הקורס
+  // יעלה ביום Y, לא מיד. החלטה-אחת על תוכנית-הקורס (≠ אישור-קבוצתי של תוצרים נפרדים).
+  const approveTakeover = (goLiveDate = null) => {
+    const ids = courseTk.proposals.map((p) => p.id);
+    if (!ids.length) return;
+    setTakeoverBusy((b) => ({ ...b, approving: true }));
+    setError(null);
+    Promise.all(ids.map((id) => decideAllocation(id, "approved", null, goLiveDate)))
+      .then(() => load())
       .catch((e) => setError(e.message))
-      .finally(() => setBudgetBusy((b) => ({ ...b, [id]: false })));
+      .finally(() => setTakeoverBusy((b) => ({ ...b, approving: false })));
+  };
+
+  // "הכן תוכנית השתלטות" — האסטרטג מפיק תוכנית, ומנוע-התקציב הדטרמיניסטי יוצר
+  // הצעות-השתלטות (status=recommended) שחוזרות לאישורה. אין עדכון-תקציב אוטומטי.
+  const prepareTakeover = () => {
+    setTakeoverBusy((b) => ({ ...b, preparing: true }));
+    setError(null);
+    generateTakeoverPlan()
+      .then(() => generateTakeoverBudget())
+      .then(() => { getTakeoverPlan().then(setTakeover).catch(() => {}); load(); })
+      .catch((e) => setError(e.message))
+      .finally(() => setTakeoverBusy((b) => ({ ...b, preparing: false })));
+  };
+
+  // דחיית-השתלטות (החזרה לאסטרטג) — סיבה חובה דרך RejectDialog; דוחה את כל הצעות-הקורס.
+  const confirmRejectTakeover = (reason) => {
+    const ids = courseTk.proposals.map((p) => p.id);
+    if (!ids.length) { setRejectingTakeover(false); return; }
+    setTakeoverBusy((b) => ({ ...b, approving: true }));
+    Promise.all(ids.map((id) => decideAllocation(id, "rejected", reason)))
+      .then(() => { setRejectingTakeover(false); load(); })
+      .catch((e) => setError(e.message))
+      .finally(() => setTakeoverBusy((b) => ({ ...b, approving: false })));
   };
 
   // הפקת/רענון שער-צילומי-המסך לקורס (§5 · #26) — אז המנהלת רואה איך זה ייראה.
@@ -276,21 +315,6 @@ export default function CoursePage() {
       .then(() => getCourseReadiness(folderId)).then(setReadiness)
       .catch((e) => setError(e.message))
       .finally(() => setShotBusy(false));
-  };
-  // דחיית-תקציב מחייבת סיבה — דרך RejectDialog (אותו מודאל נגיש כמו ApprovalsPage),
-  // לא window.prompt (fix #3). פותחים את הדיאלוג עם הקצאה כ-item; ההכרעה ב-confirmRejectAlloc.
-  const rejectAlloc = (a) => setRejectingAlloc({
-    id: a.id,
-    title: `${platformHe(a.platform)} · ${fmtIls(a.amount_ils)}`,
-  });
-  const confirmRejectAlloc = (reason) => {
-    const id = rejectingAlloc?.id;
-    if (!id) return;
-    setBudgetBusy((b) => ({ ...b, [id]: true }));
-    decideAllocation(id, "rejected", reason)
-      .then(() => { setRejectingAlloc(null); load(); })
-      .catch((e) => setError(e.message))
-      .finally(() => setBudgetBusy((b) => ({ ...b, [id]: false })));
   };
 
   // "התחל עבודה על הקורס" — משגר בקשת new_course למשרד שמפיק תוכנית-מדיה + קראייטיב
@@ -457,6 +481,16 @@ export default function CoursePage() {
         </button>
       </header>
 
+      {/* שורת-מונים פר-קורס (מוקאפ מסך-1) — נגזרת בצד-לקוח מהפריטים שכבר נשלפו */}
+      <section aria-label="מונים" className="mi-kpis" style={{ marginBlockEnd: 16 }}>
+        <StatCard value={inboxItems?.length ?? 0} label="מחכה לאישורך" icon="✋"
+                  tone="primary" onClick={() => setTab("approvals")} />
+        <StatCard value={activeRows.length} label="פריטים פעילים" icon="🚀" tone="success" />
+        <StatCard value={rows.filter((r) => r.state === "done").length} label="הושלם"
+                  icon="✓" tone="info" />
+        <StatCard value={course?.folders?.length ?? 0} label="תיקיות עבודה" icon="🗂" tone="accent" />
+      </section>
+
       {goLiveMsg && (
         <div className="mi-card" role="status" aria-live="polite"
              style={{ marginBlockEnd: 14, padding: "10px 16px", borderColor: "transparent",
@@ -549,42 +583,12 @@ export default function CoursePage() {
                       </td>
                       <td><span className={`mi-chip ${st.cls}`}>{st.he}</span></td>
                       <td>
-                        {a.status === "recommended" ? (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                            <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                              <button className="mi-btn mi-btn-secondary" disabled={!!budgetBusy[a.id]}
-                                      style={{ minBlockSize: 34, padding: "4px 12px" }}
-                                      onClick={() => approveAlloc(a.id)}>
-                                {budgetBusy[a.id] ? "…" : "אשרי"}
-                              </button>
-                              <button className="mi-btn mi-btn-ghost" disabled={!!budgetBusy[a.id]}
-                                      style={{ minBlockSize: 34, padding: "4px 10px" }}
-                                      onClick={() => rejectAlloc(a)}>
-                                דחייה
-                              </button>
-                              {/* §7 override: "מאושר אבל בתאריך Y" */}
-                              <button className="mi-btn mi-btn-ghost" disabled={!!budgetBusy[a.id]}
-                                      style={{ minBlockSize: 34, padding: "4px 10px" }}
-                                      onClick={() => { setApproveDateFor(approveDateFor === a.id ? null : a.id); setApproveDate(""); }}>
-                                לתאריך…
-                              </button>
+                        {/* הצעת-השתלטות — האישור מרוכז במתג הבולט שמתחת לטבלה (לא כפתור קבור) */}
+                        {a.status === "recommended"
+                          ? <span className="mi-chip mi-chip-primary" style={{ whiteSpace: "nowrap" }}>
+                              ממתין לאישור בהשתלטות ↓
                             </span>
-                            {approveDateFor === a.id && (
-                              <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                                <input type="date" className="mi-input" value={approveDate}
-                                       min={new Date().toISOString().slice(0, 10)}
-                                       onChange={(e) => setApproveDate(e.target.value)}
-                                       style={{ minBlockSize: 34 }} />
-                                <button className="mi-btn mi-btn-secondary"
-                                        disabled={!approveDate || !!budgetBusy[a.id]}
-                                        style={{ minBlockSize: 34, padding: "4px 10px" }}
-                                        onClick={() => approveAlloc(a.id, approveDate)}>
-                                  אשרי לתאריך זה
-                                </button>
-                              </span>
-                            )}
-                          </div>
-                        ) : <span className="mi-meta">—</span>}
+                          : <span className="mi-meta">—</span>}
                       </td>
                     </tr>
                   );
@@ -598,6 +602,23 @@ export default function CoursePage() {
       {/* §7 — מוכנות-להשתלטות: קהלים✓ + קראייטיב + עיצוב + טופס + צילומי-מסך, במקום-אחד.
           זה מה שמשלים את "לראות הכל לפני אישור" (התקציב מאושר בטבלה שלמעלה). */}
       <TakeoverReadiness readiness={readiness} onGenerateScreenshots={genShots} shotBusy={shotBusy} />
+
+      {/* מתג-אישור-ההשתלטות הבולט — אחרי שראתה את הכל (§7). השער **גלובלי**: אישור-
+          ראשון מדליק את ניהול-החשבון כולו; המתג מתאר זאת מפורשות (לא רומז על שער פר-קורס). */}
+      {allocations != null && (
+        <TakeoverSwitch
+          courseName={course?.name}
+          state={courseTk}
+          accountOn={accountOn}
+          accountKnown={gateAllocations != null}
+          courseLive={courseLive}
+          plannedGoLiveDate={course?.latest?.planned_go_live_date || null}
+          readiness={readiness}
+          busy={takeoverBusy}
+          onApprove={approveTakeover}
+          onReject={() => setRejectingTakeover(true)}
+          onPrepare={prepareTakeover} />
+      )}
 
       <div className="mi-tabs" role="tablist" aria-label="תצוגות הקורס"
            style={{ marginBlockEnd: 16 }}>
@@ -773,11 +794,13 @@ export default function CoursePage() {
         )
       )}
 
-      {/* fix #3: דחיית-תקציב דרך RejectDialog (סיבה חובה), במקום window.prompt */}
-      {rejectingAlloc && (
-        <RejectDialog item={rejectingAlloc} busy={!!budgetBusy[rejectingAlloc.id]}
-                      onClose={() => setRejectingAlloc(null)}
-                      onConfirm={confirmRejectAlloc} />
+      {/* דחיית-השתלטות (החזרה לאסטרטג) — סיבה חובה דרך RejectDialog */}
+      {rejectingTakeover && (
+        <RejectDialog
+          item={{ id: "takeover", title: `החזרת תוכנית-ההשתלטות של ${course?.name || "הקורס"} לאסטרטג` }}
+          busy={!!takeoverBusy.approving}
+          onClose={() => setRejectingTakeover(false)}
+          onConfirm={confirmRejectTakeover} />
       )}
     </div>
   );

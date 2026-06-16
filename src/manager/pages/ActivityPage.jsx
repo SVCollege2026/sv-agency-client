@@ -10,7 +10,6 @@ import { activityIcon, filterActivityForManager, fullDate } from "../lib.js";
 export default function ActivityPage() {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
-  const [showAll, setShowAll] = useState(false);
 
   const load = useCallback(() => {
     setError(null);
@@ -18,20 +17,14 @@ export default function ActivityPage() {
   }, []);
   useEffect(load, [load]);
 
-  const visible = rows == null ? null
-    : showAll ? rows : filterActivityForManager(rows);
+  // תמיד מסונן למה שרלוונטי למנהלת (החלטות-שלה + בוצע/טופל) — בלי מתג "רעש-מערכת".
+  const visible = rows == null ? null : filterActivityForManager(rows);
 
   return (
     <div className="mi-page">
       <header style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
                        marginBlockEnd: 16 }}>
         <h1 className="mi-h1" style={{ fontSize: 22 }}>פעילות</h1>
-        <span style={{ flex: 1 }} />
-        <label className="mi-meta" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <input type="checkbox" checked={showAll}
-                 onChange={(e) => setShowAll(e.target.checked)} />
-          הצגת כל פעילות-המערכת (כולל רעש פנימי)
-        </label>
       </header>
 
       {error && <ErrorBanner errors={[{ source: error }]} onRetry={load} />}
