@@ -1,7 +1,8 @@
 # ARCHITECTURE — ממשק מנהלת השיווק (/media)
 
-**עודכן:** 11/06/2026 · branch `feature/media-mockup-fidelity`
+**עודכן:** 16/06/2026 · branch `fix/finish-takeover-chain-ui`
 **משימה:** MEDIA-INTERFACE-MOCKUP-FIDELITY — המסכים של נירית מהמוקאפ, אחד-לאחד.
+**עדכון אחרון:** הצגת תוצר `media_deployment` (פריסת-מדיה מלאה משינוי-תקציב) בתיק-הפריט.
 
 ## עקרון-העל
 
@@ -20,7 +21,7 @@
 | `src/manager/pages/OverviewPage.jsx` | מסך-הבית: ברכה, 4 מונים, "מה מחכה לך עכשיו" (פסי-צבע), "פעילות אחרונה" (מסונן), "בקצרה" מול יעד עסקי |
 | `src/manager/pages/CoursesPage.jsx` | "כל הקורסים" — כרטיס לכל קורס-קנוני |
 | `src/manager/pages/CoursePage.jsx` | מסך 1: לוח-קורס, טאבים טבלה/ציר-זמן/פעילים/אישורים, 3 עמודות-סטטוס נפרדות |
-| `src/manager/pages/ItemPage.jsx` | מסך 2: פרטי-פריט, קבצים-וגרסאות, סיכום בדיקות-מערכת (qa_history), פעילות (decision_log) |
+| `src/manager/pages/ItemPage.jsx` | מסך 2: פרטי-פריט, קבצים-וגרסאות, סיכום בדיקות-מערכת (qa_history), פעילות (decision_log). + **טבלת פריסת-מדיה** (`MediaDeploymentPanel`) ל-`media_deployment` + פעולת-החלטה (אישור/בקשת-שינויים) לתוצר-לא-קראייטיב הממתין |
 | `src/manager/pages/ReviewPage.jsx` | מסך 3: Review צמוד-גרסה, Feed/Story/Reel, קופי/עיצוב/פרטים/הערות, אישור-למרות-ההערות (snapshot), בקשת-שינויים (סיבה חובה) |
 | `src/manager/pages/ApprovalsPage.jsx` | מסך 4: גלריה עם thumbnails, "מחכה לאישור שלי"/"אישורים שניתנו" |
 | `src/manager/pages/ActivityPage.jsx` | יומן-פעילות מלא (עם מתג "כל פעילות-המערכת") |
@@ -46,6 +47,12 @@
 - **שלוש עמודות-סטטוס נפרדות**: `workStatus` ≠ `approvalStatus` ≠ `requiredOfYou`.
 - **נכסי Drive** (`displayableAssetUrl`): קישור-צפייה → thumbnail endpoint;
   כשהקובץ לא נגיש אנונימית — fallback כן עם קישור ל-Drive (לא תצוגה מזויפת).
+- **ניתוב תוצר: Review או תיק-פריט** (`opensReview`): מקור-אמת אחד —
+  קראייטיב/קופי → מסך-Review (מודעה כפי שהגולש רואה); מדיה/תקציב/פריסה/מחקר →
+  תיק-פריט (תוכן אמיתי, לא "אין נכס ויזואלי"). בשימוש ApprovalsPage + CoursePage.
+- **פריסת-מדיה לטבלה** (`mediaDeploymentRows` + `isMediaDeployment` + `monthLabelHe`):
+  טרנספורם דטרמיניסטי של payload `media_deployment` (deltas/months/period) לטבלת
+  בסיס→חדש פר-קורס. אפס המצאת-מספר. נבדק ב-`lib.deployment.test.mjs`.
 
 ## Endpoints בשימוש (כולם קיימים — אפס backend חדש)
 

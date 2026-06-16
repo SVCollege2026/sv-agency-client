@@ -6,11 +6,15 @@
  */
 import React, { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { getArtifact, getArtifacts, getDecisionsFor } from "../api.js";
+import {
+  approveArtifact, getArtifact, getArtifacts, getDecisionsFor,
+  requestArtifactRevision,
+} from "../api.js";
 import { ErrorBanner, SkeletonCard, StatusChip, timeAgoHe } from "../components/ui.jsx";
 import {
   PENDING_STATUSES, activityIcon, artifactThumb, canonicalCourseOf, fullDate,
-  shortDate, typeHe,
+  isMediaDeployment, mediaDeploymentRows, monthLabelHe,
+  opensReview, shortDate, typeHe,
 } from "../lib.js";
 
 /* קישור-הקורס הקנוני — מתוך שם התיקייה של התוצר (טבלת פנימי↔פרסום) */
@@ -19,14 +23,103 @@ function courseLink(artifact) {
   return key ? `/media/courses/${encodeURIComponent(key)}` : "/media/courses";
 }
 
-/* מסך ה-Review הוא לתוצרי-קראייטיב/קופי (מודעה כפי שהגולש רואה). תוצר-תקציב/מדיה/מחקר
-   אינו "נכס ויזואלי" — אסור שכפתור "צפייה ובדיקה" יוביל אותו למסך-הקראייטיב ("אין נכס ויזואלי"). */
-function isReviewable(artifact) {
-  const t = (artifact?.artifact_type || "").toLowerCase();
-  const d = (artifact?.producing_department || "").toLowerCase();
-  if (d === "creative" || d === "copy") return true;
-  if (/media|budget|deploy|plan|scenario|allocation|forecast|research|redeploy/.test(t)) return false;
-  return /creative|visual|design|ad_copy|copy|concept|render/.test(t);
+function fmtIls(n) {
+  return typeof n === "number" ? `₪${Math.round(n).toLocaleString()}` : "—";
+}
+
+/* פאנל פריסת-המדיה המלאה (תוצר media_deployment משינוי-תקציב): טבלת בסיס→חדש
+   פר-קורס, סך-תקופתי, והוצאה-עד-כה — כך שהמנהלת רואה את החלוקה-המחדש שהיא
+   מאשרת, לא רק שורת-הקצאה בודדת. הכל נגזר מה-payload (deltas/months) — אפס המצאה. */
+function MediaDeploymentPanel({ payload }) {
+  const data = mediaDeploymentRows(payload);
+  if (!data) {
+    return (
+      <p className="mi-meta">פירוט הפריסה עוד לא צורף לתוצר הזה</p>
+    );
+  }
+  const { months, currentMonthIndex, period, rationale, courses } = data;
+  const periodLabel = period
+    ? `${period.budget_period_start ? fullDate(period.budget_period_start) : "—"} – ${period.period_end ? fullDate(period.period_end) : "—"}`
+    : null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <p className="mi-body" style={{ margin: 0 }}>
+        שינוי-התקציב פורס מחדש את כל התקופה. לכל קורס: כמה הוקצב לפי הבסיס, מה כבר
+        הוצא, ומה הפריסה המעודכנת קדימה — הסך-התקופתי נשמר (לא מנופח).
+      </p>
+      {periodLabel && (
+        <p className="mi-meta mi-ltr" style={{ margin: 0 }}>תקופה: {periodLabel}</p>
+      )}
+
+      <div className="mi-table-wrap">
+        <table className="mi-table">
+          <thead>
+            <tr>
+              <th>קורס</th>
+              <th>הוצא עד כה</th>
+              <th>סך בסיס</th>
+              <th>סך מעודכן</th>
+            </tr>
+          </thead>
+          <tbody>
+            {courses.map((c) => (
+              <tr key={c.courseKey}>
+                <td style={{ fontWeight: 600, color: "var(--mi-ink)" }}>{c.label}</td>
+                <td className="mi-ltr">{fmtIls(c.spend)}</td>
+                <td className="mi-ltr">{fmtIls(c.baselineTotal)}</td>
+                <td className="mi-ltr" style={{ fontWeight: 600 }}>{fmtIls(c.newTotal)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* פריסה חודשית מעודכנת פר-קורס — החודש-הנוכחי מסומן */}
+      {months.length > 0 && (
+        <details>
+          <summary className="mi-meta" style={{ cursor: "pointer", color: "var(--mi-primary)" }}>
+            פריסה חודשית מעודכנת (₪ לכל חודש)
+          </summary>
+          <div className="mi-table-wrap" style={{ marginBlockStart: 8 }}>
+            <table className="mi-table">
+              <thead>
+                <tr>
+                  <th>קורס</th>
+                  {months.map((m, i) => (
+                    <th key={m} className="mi-ltr"
+                        style={i === currentMonthIndex
+                          ? { color: "var(--mi-primary)", fontWeight: 700 } : undefined}>
+                      {monthLabelHe(m)}{i === currentMonthIndex ? " ●" : ""}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {courses.map((c) => (
+                  <tr key={c.courseKey}>
+                    <td style={{ fontWeight: 600, color: "var(--mi-ink)" }}>{c.label}</td>
+                    {months.map((m, i) => {
+                      const v = c.newMonthly[i];
+                      return (
+                        <td key={m} className="mi-ltr"
+                            style={i === currentMonthIndex ? { fontWeight: 600 } : undefined}>
+                          {typeof v === "number" ? fmtIls(v) : "—"}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
+
+      {rationale && (
+        <p className="mi-meta" style={{ margin: 0, whiteSpace: "pre-wrap" }}>{rationale}</p>
+      )}
+    </div>
+  );
 }
 
 function Panel({ title, children }) {
@@ -62,6 +155,10 @@ export default function ItemPage() {
   const [versions, setVersions] = useState(null);
   const [trace, setTrace] = useState(null);
   const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState(null);
+  const [revising, setRevising] = useState(false);
+  const [revisionNote, setRevisionNote] = useState("");
 
   const load = useCallback(() => {
     setError(null);
@@ -80,6 +177,41 @@ export default function ItemPage() {
     getDecisionsFor(artifactId).then(setTrace).catch(() => setTrace([]));
   }, [artifactId]);
   useEffect(load, [load]);
+
+  // החלטה על תוצר-לא-קראייטיב (פריסת-מדיה/תקציב) — נעשית כאן, לא במסך-הקראייטיב.
+  // אותן דלתות גנריות של ReviewPage (approve / request-revision), צמודות-גרסה.
+  const doApprove = async () => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      await approveArtifact(artifactId, null);
+      setNotice({ kind: "ok", text: "הפריסה אושרה ✓ — המשרד מתחיל לפעול לפיה" });
+      load();
+    } catch (e) {
+      setNotice({ kind: "err", text: `האישור נכשל: ${e.message}` });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doRevision = async () => {
+    if (!revisionNote.trim()) {
+      setNotice({ kind: "err", text: "בקשת שינויים חייבת סיבה — כתבי מה לתקן" });
+      return;
+    }
+    setBusy(true);
+    setNotice(null);
+    try {
+      await requestArtifactRevision(artifactId, revisionNote.trim());
+      setNotice({ kind: "ok", text: "בקשת השינויים נשלחה למשרד — פריסה מעודכנת תחזור לאישור" });
+      setRevising(false);
+      load();
+    } catch (e) {
+      setNotice({ kind: "err", text: `השליחה נכשלה: ${e.message}` });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (error) {
     return <div className="mi-page"><ErrorBanner errors={[{ source: error }]} onRetry={load} /></div>;
@@ -100,6 +232,11 @@ export default function ItemPage() {
   const qa = artifact.qa_history || [];
   const driveUrl = payload.drive_url || payload.drive_folder_url || payload.attached_file?.access_url;
   const pending = PENDING_STATUSES.includes(artifact.status);
+  const reviewable = opensReview(artifact);
+  const isDeployment = isMediaDeployment(artifact);
+  // החלטה מוצגת בתיק-הפריט עבור תוצר-לא-קראייטיב שממתין לאישורה (פריסת-מדיה/תקציב).
+  // קראייטיב/קופי מוכרעים במסך ה-Review; שם לא כופלים פעולות-החלטה.
+  const showDecision = pending && !reviewable;
 
   // sweep: תוצרי-מדיה (media_plan/market_research/budget_recommendation) לא נושאים
   // goal/usages/due_date, ולכן הפאנל היה כמעט-ריק. מרחיבים לשדות שהם **כן** נושאים
@@ -144,13 +281,72 @@ export default function ItemPage() {
           <span className="mi-chip mi-chip-info mi-ltr">V{artifact.version_number}</span>
         )}
         <span style={{ flex: 1 }} />
-        {isReviewable(artifact) && (
+        {reviewable && (
           <button className="mi-btn mi-btn-primary"
                   onClick={() => navigate(`/media/items/${artifact.id}/review`)}>
             {pending ? "צפייה ובדיקה" : "פתח Review"}
           </button>
         )}
       </header>
+
+      {notice && (
+        <div className="mi-card" role="status" aria-live="polite"
+             style={{ marginBlockEnd: 14, padding: "10px 16px",
+                      background: notice.kind === "ok" ? "var(--mi-success-bg)" : "var(--mi-danger-bg)",
+                      color: notice.kind === "ok" ? "var(--mi-success)" : "var(--mi-danger)",
+                      borderColor: "transparent" }}>
+          {notice.text}
+          {notice.kind === "ok" && artifact.folder_id && (
+            <Link to={courseLink(artifact)}
+                  style={{ marginInlineStart: 10, color: "inherit", fontWeight: 700 }}>
+              חזרה ללוח הקורס
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* פריסת-מדיה מלאה — טבלת החלוקה-המחדש (בסיס→חדש), כך שיש מה לאשר על בסיסו */}
+      {isDeployment && (
+        <Panel title="פריסת המדיה המעודכנת">
+          <MediaDeploymentPanel payload={payload} />
+        </Panel>
+      )}
+
+      {/* פעולת-ההחלטה לתוצר-לא-קראייטיב הממתין לאישור (פריסת-מדיה/תקציב) */}
+      {showDecision && (
+        <Panel title="ההחלטה שלך">
+          {!revising ? (
+            <div className="mi-actionbar" style={{ paddingInline: 0, position: "static", border: "none" }}>
+              <button className="mi-btn mi-btn-primary" disabled={busy} onClick={doApprove}
+                      style={{ flex: 1, justifyContent: "center" }}>
+                ✓ אישור
+              </button>
+              <button className="mi-btn mi-btn-secondary" disabled={busy}
+                      onClick={() => setRevising(true)}
+                      style={{ flex: 1, justifyContent: "center" }}>
+                ✎ שליחת בקשת שינויים
+              </button>
+            </div>
+          ) : (
+            <div>
+              <label className="mi-field-label" htmlFor="it-rv-note">מה לתקן? (חובה)</label>
+              <textarea id="it-rv-note" className="mi-textarea" value={revisionNote} autoFocus
+                        onChange={(e) => setRevisionNote(e.target.value)}
+                        placeholder="תיאור השינויים המבוקשים בפריסה…" />
+              <div className="mi-actionbar" style={{ paddingInline: 0, position: "static", border: "none" }}>
+                <button className="mi-btn mi-btn-primary" disabled={busy} onClick={doRevision}
+                        style={{ flex: 1, justifyContent: "center" }}>
+                  שליחה למשרד
+                </button>
+                <button className="mi-btn mi-btn-ghost" disabled={busy}
+                        onClick={() => setRevising(false)}>
+                  ביטול
+                </button>
+              </div>
+            </div>
+          )}
+        </Panel>
+      )}
 
       <div className="mi-cards-grid" style={{ alignItems: "start" }}>
         <Panel title="פרטי הפריט">

@@ -14,14 +14,17 @@ import {
 import { StatusChip, EmptyState, ErrorBanner, SkeletonCard, timeAgoHe } from "../components/ui.jsx";
 import RejectDialog from "../components/RejectDialog.jsx";
 import {
-  artifactThumb, filterInboxItems, isVideoAsset, stripInternalSteps,
-  testFolderIdSet, typeHe,
+  artifactThumb, filterInboxItems, isVideoAsset, opensReview,
+  stripInternalSteps, testFolderIdSet, typeHe,
 } from "../lib.js";
 
 const KIND_ICON = { budget_allocation: "💰", recommendation: "💡", artifact: "🖼" };
 
-function GalleryCard({ item, thumb, busy, onOpenReview, onApprove, onReject }) {
+function GalleryCard({ item, thumb, busy, onOpen, onApprove, onReject }) {
   const isArtifact = item.kind === "artifact";
+  // תוצר-קראייטיב/קופי נפתח למסך-Review (מודעה כפי שהגולש רואה); תוצר-מדיה/תקציב
+  // (כמו פריסת-מדיה מלאה) נפתח לתיק-הפריט, שם מוצג תוכנו האמיתי + פעולת-ההחלטה.
+  const review = isArtifact && opensReview({ artifact_type: item.item_type, producing_department: item.producing_department });
   const [thumbFailed, setThumbFailed] = React.useState(false);
   const showThumb = thumb && !thumbFailed;
   return (
@@ -77,8 +80,8 @@ function GalleryCard({ item, thumb, busy, onOpenReview, onApprove, onReject }) {
 
       {isArtifact ? (
         <button className="mi-btn mi-btn-secondary" style={{ justifyContent: "center" }}
-                onClick={() => onOpenReview(item)}>
-          פתח Review
+                onClick={() => onOpen(item, review)}>
+          {review ? "פתח Review" : "פתחי לצפייה ואישור"}
         </button>
       ) : (
         <div className="mi-actionbar" style={{ padding: 0, border: "none", position: "static" }}>
@@ -233,7 +236,8 @@ export default function ApprovalsPage() {
                 <GalleryCard key={`${item.kind}-${item.id}`} item={enriched}
                              thumb={item.kind === "artifact" ? thumbs[item.id] : null}
                              busy={busyId === item.id}
-                             onOpenReview={(it) => navigate(`/media/items/${it.id}/review`)}
+                             onOpen={(it, toReview) => navigate(
+                               toReview ? `/media/items/${it.id}/review` : `/media/items/${it.id}`)}
                              onApprove={doApprove}
                              onReject={setRejecting} />
               );

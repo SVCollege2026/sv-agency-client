@@ -527,3 +527,61 @@ export function copyFields(payload = {}) {
   push("lead_form_intro", "פתיח טופס לידים", src.lead_form_intro);
   return out;
 }
+
+/* ── ניתוב-תוצר: Review (קראייטיב/קופי) או תיק-הפריט (מדיה/תקציב/מחקר) ──
+   מסך ה-Review מציג את "המודעה כפי שהגולש רואה אותה" (קונספט+קופי+ויזואל),
+   ולכן מתאים רק לתוצרי-קראייטיב/קופי. תוצר-תקציב/פריסת-מדיה/מחקר אינו "נכס
+   ויזואלי" — הוא נפתח בתיק-הפריט (ItemPage), שם מוצג תוכנו האמיתי (למשל טבלת
+   פריסת-המדיה). מקור-אמת אחד לכל הממשק (היה משוכפל ב-ItemPage כ-isReviewable
+   וב-CoursePage כ-_opensReview). */
+export function opensReview(artifact) {
+  const t = (artifact?.artifact_type || "").toLowerCase();
+  const d = (artifact?.producing_department || "").toLowerCase();
+  if (d === "creative" || d === "copy") return true;
+  if (/media|budget|deploy|plan|scenario|allocation|forecast|research|redeploy/.test(t)) return false;
+  return /creative|visual|design|ad_copy|copy|concept|render|video|art_direction/.test(t);
+}
+
+/** האם התוצר הוא פריסת-מדיה מלאה (מ-takeover_redeploy) — שמצריך טבלת-פריסה ייעודית. */
+export function isMediaDeployment(artifact) {
+  return (artifact?.artifact_type || "").toLowerCase() === "media_deployment";
+}
+
+/* תווית-חודש קצרה מ-"YYYY-MM" (לכותרות-עמודות של טבלת-הפריסה). חודש לא-תקין → המחרוזת כמות-שהיא. */
+export function monthLabelHe(ym) {
+  const m = String(ym || "").match(/^(\d{4})-(\d{2})/);
+  if (!m) return String(ym || "");
+  const idx = Number(m[2]) - 1;
+  return MONTH_HE[idx] ? `${MONTH_HE[idx]} ${m[1]}` : String(ym);
+}
+
+/**
+ * טרנספורם דטרמיניסטי של payload של תוצר media_deployment לטבלה הניתנת-לרינדור.
+ * אפס המצאת-מספר: רק נגזרות מ-deltas/months/new_per_course שכבר נכתבו בשרת.
+ * מחזיר { months, currentMonthIndex, period, rationale, courses[] } או null אם אין נתון.
+ *   courses[]: { courseKey, label, spend, baselineTotal, newTotal, baselineMonthly[], newMonthly[] }
+ */
+export function mediaDeploymentRows(payload = {}) {
+  const deltas = Array.isArray(payload.deltas) ? payload.deltas : [];
+  const months = Array.isArray(payload.months) ? payload.months.map(String) : [];
+  if (!deltas.length) return null;
+  const courses = deltas.map((d) => {
+    const key = d.deployment_key || d.course_key || "";
+    return {
+      courseKey: key,
+      label: planCourseLabel(matchPlanCourseKey(key)) || key,
+      spend: typeof d.spend_to_date_ils === "number" ? d.spend_to_date_ils : null,
+      baselineTotal: typeof d.baseline_period_total === "number" ? d.baseline_period_total : null,
+      newTotal: typeof d.new_period_total === "number" ? d.new_period_total : null,
+      baselineMonthly: Array.isArray(d.baseline_meta_monthly) ? d.baseline_meta_monthly : [],
+      newMonthly: Array.isArray(d.new_meta_monthly) ? d.new_meta_monthly : [],
+    };
+  });
+  return {
+    months,
+    currentMonthIndex: typeof payload.current_month_index === "number" ? payload.current_month_index : null,
+    period: payload.period || null,
+    rationale: payload.pacing_rationale || null,
+    courses,
+  };
+}
