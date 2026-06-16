@@ -204,8 +204,13 @@ export default function CoursePage() {
   // לא מסתירים אותה ולא מתייגים אותה כאישור-שלה. ה-hack שדילג על גוגל הוסר.
   const allocKind = (a) => (a.metadata || {}).recommendation_kind || (a.metadata || {}).decision_kind || "";
   const budgetRows = useMemo(() => {
+    // Root B-2 fix: ALSO surface the budget already RUNNING in the account (status==='active').
+    // gaming/marketing have live meta budget that was filtered out entirely, so the page implied
+    // "not funded yet — approve this" while money was already live. It renders honestly under the
+    // existing "קיים בחשבון (לא אישור שלך)" category (allocStatusHe), never as "approve me".
     const relevant = (allocations || []).filter((a) =>
-      allocKind(a) === "takeover_redeploy" || a.decided_by === "marketing_manager");
+      allocKind(a) === "takeover_redeploy" || a.decided_by === "marketing_manager"
+      || a.status === "active");
     const seen = new Set(); const out = [];
     for (const a of relevant.sort((x, y) => new Date(y.created_at || 0) - new Date(x.created_at || 0))) {
       const grp = a.status === "recommended"
