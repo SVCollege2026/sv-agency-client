@@ -6,6 +6,13 @@
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
+/** נתיב-נכס יחסי (כמו /api/campaigns/files/…) → URL מלא מול שרת-ה-API, ל-<img src>.
+    URL מלא (http/https, כולל Drive) מוחזר כמות-שהוא. */
+export function apiAssetUrl(path) {
+  if (!path) return null;
+  return /^https?:\/\//.test(path) ? path : `${BASE}${path}`;
+}
+
 async function request(method, path, body = null, isFormData = false) {
   const options = {
     method,
@@ -81,6 +88,20 @@ export function prepareTakeoverDirectives() {
  */
 export function generateTakeoverBudget() {
   return request("POST", "/api/media/takeover-redeploy/run?apply=true&triggered_by=marketing_manager");
+}
+
+/* ── מסך-ההשתלטות פר-קורס (§7): חבילת-המוכנות + שער-צילומי-המסך ── */
+
+/** חבילת-המוכנות פר-קורס: תקציב + קהלים✓ + קראייטיב (קופי+עיצוב) + טופס + שער-צילומים + תקציר. */
+export function getCourseReadiness(folderId) {
+  return request("GET", `/api/media/takeover/course-readiness?folder_id=${folderId}`);
+}
+
+/** מפיק/מרענן את שער-צילומי-המסך לקורס (§5 · #26) — קראייטיב + תצוגת-מטא-חיה + QA-לסימון-חשד. */
+export function generateScreenshots(folderId, adIds = null) {
+  const params = new URLSearchParams({ folder_id: folderId, triggered_by: "marketing_manager" });
+  for (const id of adIds || []) params.append("ad_ids", id);
+  return request("POST", `/api/media/takeover/screenshots/generate?${params}`);
 }
 
 export function getDecisionsFor(subjectId, limit = 50) {
@@ -223,9 +244,11 @@ export function requestArtifactRevision(artifactId, revisionNote) {
   });
 }
 
-export function decideAllocation(allocationId, decision, reason = null) {
+export function decideAllocation(allocationId, decision, reason = null, goLiveDate = null) {
   const params = new URLSearchParams({ decision, decided_by: "marketing_manager" });
   if (reason) params.set("reason", reason);
+  // override פר-קמפיין (§7): "מאושר אבל בתאריך Y" — תאריך-עתידי דוחה את העלייה-לאוויר ליום Y.
+  if (goLiveDate) params.set("go_live_date", goLiveDate);
   return request(
     "PATCH",
     `/api/settings/budgets/allocations/${allocationId}/decide?${params}`,
