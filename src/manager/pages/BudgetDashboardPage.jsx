@@ -10,6 +10,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { getBudgetOverview } from "../api.js";
 import { EmptyState, ErrorBanner, SkeletonCard, StatCard, timeAgoHe } from "../components/ui.jsx";
+import { fullDate } from "../lib.js";
 
 const REFRESH_MS = 45000; // הרמה הפר-קורסית מתעדכנת מעצמה מהנתון החי
 
@@ -50,7 +51,9 @@ export default function BudgetDashboardPage() {
     return () => clearInterval(t);
   }, [load]);
 
-  if (error) {
+  // כשל-שליפה מלא רק כשאין עדיין דאטה; כשל-רענון-רקע (יש דאטה קודמת) → באנר-inline,
+  // לא מוחקים את הדשבורד הטעון (fail-safe — לא מהבהבים לשגיאה על תקלת-poll חולפת).
+  if (error && !data) {
     return <div className="mi-page"><ErrorBanner errors={[{ source: error }]} onRetry={load} /></div>;
   }
   if (!data) {
@@ -68,6 +71,7 @@ export default function BudgetDashboardPage() {
   const courseTotal = courses.reduce((s, c) => s + (Number(c.planned_ils) || 0), 0);
   const recent = (over_time || []).slice(-6);
   const overMax = Math.max(1, ...recent.map((m) => Number(m.spend_total) || 0));
+  const lastMonth = (over_time || []).slice(-1)[0]?.month_ym;
 
   return (
     <div className="mi-page">
@@ -80,21 +84,27 @@ export default function BudgetDashboardPage() {
         <button className="mi-btn mi-btn-ghost" onClick={load} style={{ minBlockSize: 36 }}>↻ רענון</button>
       </header>
 
+      {/* כשל-רענון-רקע כשכבר יש דאטה — באנר-inline שלא מוחק את הדשבורד */}
+      {error && data && (
+        <ErrorBanner errors={[{ source: `רענון נכשל — מוצגים הנתונים האחרונים: ${error}` }]} onRetry={load} />
+      )}
       {!data.available && (
         <ErrorBanner errors={[{ source: `נתוני-התקציב חלקית לא זמינים — ${data.blocking_reason || ""}` }]}
                      onRetry={load} />
       )}
 
-      {/* ── מונים ראשיים (מספרים אמיתיים מהמקור הנקי, לא דמה) ── */}
+      {/* ── מונים ראשיים (מספרים אמיתיים מהמקור הנקי, לא דמה) — אותו חלון בקלפים שמתחברים:
+          שנתי 1.44M − הוצאה-מתחילת-השנה = נותר-מהשנתי. המעטפת-התקופתית היא ממד נפרד. ── */}
       <section aria-label="מונים" className="mi-kpis" style={{ marginBlockEnd: 8 }}>
         <StatCard value={ils(annual_reference_ils)} label="תקציב שנתי (ייחוס)" icon="🎯" tone="accent" />
         <StatCard value={ils(period?.envelope_ils)} label="מעטפת מאושרת לתקופה" icon="📦" tone="primary" />
-        <StatCard value={ils(spent?.ytd_ils)} label="הוצאה בפועל (2026)" icon="💸" tone="info" />
-        <StatCard value={ils(remaining?.period_envelope_ils)} label="נותר מהמעטפת" icon="✓" tone="success" />
+        <StatCard value={ils(spent?.ytd_ils)} label="הוצאה בפועל מתחילת השנה" icon="💸" tone="info" />
+        <StatCard value={ils(remaining?.annual_reference_ils)} label="נותר מהתקציב השנתי" icon="✓" tone="success" />
       </section>
       <p className="mi-meta" style={{ marginBlockEnd: 16 }}>
-        תקופת-הפריסה: <span className="mi-ltr">{period?.start} – {period?.end}</span> ·
-        הוצאה בתוך-התקופה עד כה: <span className="mi-ltr">{ils(spent?.period_ils)}</span>
+        תקופת-הפריסה: <span className="mi-ltr">{fullDate(period?.start)} – {fullDate(period?.end)}</span>
+        {lastMonth && <> · הוצאה מצטברת עד חודש <span className="mi-ltr">{lastMonth}</span></>} ·
+        הוצאה בתוך-התקופה המאושרת עד כה: <span className="mi-ltr">{ils(spent?.period_ils)}</span>
       </p>
 
       {/* ── מתג שתי-הרמות ── */}
@@ -117,7 +127,8 @@ export default function BudgetDashboardPage() {
               </thead>
               <tbody>
                 {courses.map((c) => {
-                  const pct = courseTotal > 0 ? Math.round((c.planned_ils / courseTotal) * 100) : 0;
+                  const planned = Number(c.planned_ils) || 0;
+                  const pct = courseTotal > 0 ? Math.round((planned / courseTotal) * 100) : 0;
                   const isCourse = c.scope === "course";
                   return (
                     <tr key={c.course_key}>
@@ -125,10 +136,10 @@ export default function BudgetDashboardPage() {
                         {courseLabel(c)}
                         {!isCourse && <span className="mi-meta" style={{ marginInlineStart: 6 }}>(כלל-מערכתי)</span>}
                       </td>
-                      <td className="mi-ltr" style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{ils(c.planned_ils)}</td>
+                      <td className="mi-ltr" style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{ils(planned)}</td>
                       <td className="mi-ltr" style={{ whiteSpace: "nowrap" }}>{pct}%</td>
                       <td style={{ minInlineSize: 140 }}>
-                        <Bar value={c.planned_ils} max={courseTotal} tone={isCourse ? "primary" : "accent"} />
+                        <Bar value={planned} max={courseTotal} tone={isCourse ? "primary" : "accent"} />
                       </td>
                     </tr>
                   );
