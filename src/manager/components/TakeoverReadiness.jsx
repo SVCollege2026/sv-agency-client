@@ -67,9 +67,87 @@ function ImgCard({ url, caption, verdict, flags }) {
   );
 }
 
+// ─── החלטות-מדיה להשתלטות (ABO ad-cut) + נימוק ───────────────────────────────
+const _RULE_HE = {
+  rule_a_zero_lead_waste: "כלל A · בזבזן — 0 לידים על פני החלון (מטא + פיירברי בקונצנזוס)",
+  rule_b_high_cpl_quality: "כלל B · CPL גבוה ואיכות נמוכה (לידים בשלים, 0 איכות/רישום)",
+};
+const _boLevel = (lvl) => (lvl === "ad" ? "ABO" : lvl === "campaign" ? "CBO" : (lvl || "—"));
+function _evidenceText(ev) {
+  if (!ev || typeof ev !== "object") return null;
+  return Object.entries(ev)
+    .map(([k, v]) => `${k}: ${typeof v === "number" ? Math.round(v).toLocaleString() : v}`)
+    .join("  ·  ");
+}
+
+function AdCutCard({ item, kind }) {
+  const isStop = kind === "stop";
+  return (
+    <div style={{ border: "1px solid var(--mi-border)", borderRadius: 8, padding: "10px 12px",
+                  marginBlockEnd: 8, background: "var(--mi-soft, #f6f7f9)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBlockEnd: 4 }}>
+        <span className={`mi-chip ${isStop ? "mi-chip-warning" : "mi-chip-success"}`}>
+          {isStop ? "⏹ לעצור" : "➕ להוסיף קראייטיב"}
+        </span>
+        <span className="mi-chip">{_boLevel(item.budget_owner_level)}</span>
+        <strong className="mi-body">{item.ad_name || item.campaign_name || "מודעה"}</strong>
+      </div>
+      {item.ad_name && item.campaign_name && (
+        <div className="mi-meta">קמפיין: {item.campaign_name}</div>
+      )}
+      {item.rule && <div className="mi-meta">{_RULE_HE[item.rule] || item.rule}</div>}
+      {_evidenceText(item.evidence) && (
+        <div className="mi-meta mi-ltr" style={{ marginBlockStart: 2 }}>{_evidenceText(item.evidence)}</div>
+      )}
+      {item.explanation && (
+        <div className="mi-body" style={{ marginBlockStart: 6, whiteSpace: "pre-wrap" }}>{item.explanation}</div>
+      )}
+      {item.expected_impact && (
+        <div className="mi-meta" style={{ marginBlockStart: 4 }}>צפי: {item.expected_impact}</div>
+      )}
+    </div>
+  );
+}
+
+function AdCutDecisions({ data }) {
+  const stop = data?.stop_ads || [];
+  const add = data?.add_creative || [];
+  return (
+    <div style={{ marginBlockEnd: 12 }}>
+      <h3 className="mi-h2" style={{ fontSize: 15, marginBlockEnd: 6 }}>
+        החלטות-מדיה להשתלטות{" "}
+        <span className="mi-meta" style={{ fontWeight: 400 }}>— אילו מודעות לעצור ולמה (ממתין לאישורך)</span>
+      </h3>
+      {!data?.has_decisions ? (
+        <p className="mi-meta">
+          טרם חושבו החלטות-עצירה לקורס הזה — המערכת לא מצאה מודעות-בזבזניות בחלון הנוכחי, או שהסריקה
+          עוד לא רצה. ריק כאן = אין מה לעצור כרגע, לא תקלה.
+        </p>
+      ) : (
+        <>
+          {stop.length > 0 && (
+            <>
+              <div className="mi-meta" style={{ marginBlockEnd: 4 }}>לעצור — בזבוז ({stop.length})</div>
+              {stop.map((it) => <AdCutCard key={it.id} item={it} kind="stop" />)}
+            </>
+          )}
+          {add.length > 0 && (
+            <>
+              <div className="mi-meta" style={{ marginBlockEnd: 4, marginBlockStart: stop.length ? 8 : 0 }}>
+                CBO — להוסיף קראייטיב, לא לעצור ({add.length})
+              </div>
+              {add.map((it) => <AdCutCard key={it.id} item={it} kind="add" />)}
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function TakeoverReadiness({ readiness, onGenerateScreenshots, shotBusy }) {
   if (!readiness) return null;
-  const { audiences, creative, screenshot_gate: gate, readiness: r } = readiness;
+  const { audiences, creative, screenshot_gate: gate, readiness: r, ad_cut_decisions: adCuts } = readiness;
   const checklist = r?.checklist || {};
 
   return (
@@ -103,6 +181,9 @@ export default function TakeoverReadiness({ readiness, onGenerateScreenshots, sh
           </div>
         </div>
       )}
+
+      {/* החלטות-מדיה (ABO ad-cut) + נימוק — ה'שכל' שנירית ביקשה לראות פר-החלטה */}
+      <AdCutDecisions data={adCuts} />
 
       {/* קהלים ✓ */}
       {audiences && (
