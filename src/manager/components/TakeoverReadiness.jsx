@@ -148,6 +148,14 @@ function AdCutDecisions({ data, previews }) {
           הקמפיין עובר ל-CBO, ומאז לא עוצרים מודעות בודדות (מטא מנתבת את התקציב).
         </div>
       )}
+      {!data?.cbo_switch_date && stop.length > 0 && (
+        <div className="mi-meta" style={{ marginBlockEnd: 6, padding: "5px 9px",
+             background: "var(--mi-warning-bg, #fff4e0)", color: "var(--mi-warning, #9a6700)",
+             borderRadius: 6 }}>
+          ⚠ הקמפיין מוגדר <strong>ABO קבוע</strong> (אין מעבר ל-CBO מתוכנן) — החלטה כזו דורשת
+          נימוק מנומק למה זו הבחירה הנכונה. בלי נימוק = החלטת-ברירת-מחדל שצריך לבדוק, לא להשאיר בשקט.
+        </div>
+      )}
       {!data?.has_decisions ? (
         <p className="mi-meta">
           טרם חושבו החלטות-עצירה לקורס הזה — המערכת לא מצאה מודעות-בזבזניות בחלון הנוכחי, או שהסריקה
