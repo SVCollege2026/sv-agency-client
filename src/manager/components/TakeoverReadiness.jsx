@@ -80,8 +80,12 @@ function _evidenceText(ev) {
     .join("  ·  ");
 }
 
-function AdCutCard({ item, kind }) {
+function AdCutCard({ item, kind, previews }) {
   const isStop = kind === "stop";
+  const shot = (previews || []).find((p) => String(p.ad_id) === String(item.ad_id));
+  const metaUrl = item.ad_id
+    ? `https://www.facebook.com/adsmanager/manage/ads?selected_ad_ids=${item.ad_id}`
+    : null;
   return (
     <div style={{ border: "1px solid var(--mi-border)", borderRadius: 8, padding: "10px 12px",
                   marginBlockEnd: 8, background: "var(--mi-soft, #f6f7f9)" }}>
@@ -92,9 +96,22 @@ function AdCutCard({ item, kind }) {
         <span className="mi-chip">{_boLevel(item.budget_owner_level)}</span>
         <strong className="mi-body">{item.ad_name || item.campaign_name || "מודעה"}</strong>
       </div>
-      {item.ad_name && item.campaign_name && (
-        <div className="mi-meta">קמפיין: {item.campaign_name}</div>
-      )}
+      {/* זיהוי-המודעה: צילום-המודעה כפי שמטא מציגה (אם הופק), מזהה, וקישור ל-Ads Manager */}
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBlockEnd: 4, flexWrap: "wrap" }}>
+        {shot?.image_url && (
+          <img src={imgSrc(shot.image_url)} alt="תצוגת המודעה" loading="lazy"
+               style={{ inlineSize: 120, border: "1px solid var(--mi-border)", borderRadius: 6, background: "#fff" }} />
+        )}
+        <div style={{ flex: 1, minInlineSize: 160 }}>
+          {item.campaign_name && <div className="mi-meta">קמפיין: {item.campaign_name}</div>}
+          {item.ad_id && (
+            <div className="mi-meta mi-ltr">
+              מזהה: {item.ad_id}
+              {metaUrl && <> · <a href={metaUrl} target="_blank" rel="noreferrer">לצפייה במטא ↗</a></>}
+            </div>
+          )}
+        </div>
+      </div>
       {item.rule && <div className="mi-meta">{_RULE_HE[item.rule] || item.rule}</div>}
       {_evidenceText(item.evidence) && (
         <div className="mi-meta mi-ltr" style={{ marginBlockStart: 2 }}>{_evidenceText(item.evidence)}</div>
@@ -109,7 +126,7 @@ function AdCutCard({ item, kind }) {
   );
 }
 
-function AdCutDecisions({ data }) {
+function AdCutDecisions({ data, previews }) {
   const stop = data?.stop_ads || [];
   const add = data?.add_creative || [];
   return (
@@ -128,7 +145,7 @@ function AdCutDecisions({ data }) {
           {stop.length > 0 && (
             <>
               <div className="mi-meta" style={{ marginBlockEnd: 4 }}>לעצור — בזבוז ({stop.length})</div>
-              {stop.map((it) => <AdCutCard key={it.id} item={it} kind="stop" />)}
+              {stop.map((it) => <AdCutCard key={it.id} item={it} kind="stop" previews={previews} />)}
             </>
           )}
           {add.length > 0 && (
@@ -136,7 +153,7 @@ function AdCutDecisions({ data }) {
               <div className="mi-meta" style={{ marginBlockEnd: 4, marginBlockStart: stop.length ? 8 : 0 }}>
                 CBO — להוסיף קראייטיב, לא לעצור ({add.length})
               </div>
-              {add.map((it) => <AdCutCard key={it.id} item={it} kind="add" />)}
+              {add.map((it) => <AdCutCard key={it.id} item={it} kind="add" previews={previews} />)}
             </>
           )}
         </>
@@ -183,7 +200,7 @@ export default function TakeoverReadiness({ readiness, onGenerateScreenshots, sh
       )}
 
       {/* החלטות-מדיה (ABO ad-cut) + נימוק — ה'שכל' שנירית ביקשה לראות פר-החלטה */}
-      <AdCutDecisions data={adCuts} />
+      <AdCutDecisions data={adCuts} previews={gate?.live_previews} />
 
       {/* קהלים ✓ */}
       {audiences && (
