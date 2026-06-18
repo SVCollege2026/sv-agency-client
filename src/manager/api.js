@@ -183,6 +183,12 @@ export function getBudgetSources() {
   return request("GET", "/api/settings/budgets/sources");
 }
 
+// דשבורד-תקציב נקי (נירית 18/06): נותר מול הבסיס-השנתי, סושיאל ₪60K, AI/שיווק/ARCHITECT בנפרד,
+// הוצאה מ-media.daily_reports (לא budget_allocations הרקוב).
+export function getBudgetOverview() {
+  return request("GET", "/api/campaigns/budget-overview");
+}
+
 /* ── הערות — חוזה-ההערות האחוד (sql/091) ── */
 
 export function getComments(objectType, objectId, { version = null, status = null } = {}) {
