@@ -126,6 +126,12 @@ function AdCutCard({ item, kind, previews }) {
   );
 }
 
+function _fmtDate(iso) {
+  if (!iso) return iso;
+  const [y, m, d] = String(iso).split("-");
+  return d && m && y ? `${d}/${m}/${y}` : iso;
+}
+
 function AdCutDecisions({ data, previews }) {
   const stop = data?.stop_ads || [];
   const add = data?.add_creative || [];
@@ -135,6 +141,13 @@ function AdCutDecisions({ data, previews }) {
         החלטות-מדיה להשתלטות{" "}
         <span className="mi-meta" style={{ fontWeight: 400 }}>— אילו מודעות לעצור ולמה (ממתין לאישורך)</span>
       </h3>
+      {data?.cbo_switch_date && data?.has_decisions && (
+        <div className="mi-meta" style={{ marginBlockEnd: 6, padding: "5px 9px",
+             background: "var(--mi-soft, #f6f7f9)", borderRadius: 6 }}>
+          ℹ החלטות-העצירה (ABO) תקפות עד <strong>{_fmtDate(data.cbo_switch_date)}</strong> — בתאריך הזה
+          הקמפיין עובר ל-CBO, ומאז לא עוצרים מודעות בודדות (מטא מנתבת את התקציב).
+        </div>
+      )}
       {!data?.has_decisions ? (
         <p className="mi-meta">
           טרם חושבו החלטות-עצירה לקורס הזה — המערכת לא מצאה מודעות-בזבזניות בחלון הנוכחי, או שהסריקה
