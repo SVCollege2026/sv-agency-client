@@ -11,49 +11,18 @@ import CampaignManagementPage from "./pages/CampaignManagementPage.jsx";
 import ForecastingPage from "./pages/ForecastingPage.jsx";
 import GoalsPage from "./pages/GoalsPage.jsx";
 import { ToastProvider } from "./components/campaign/Toast.jsx";
-import ManagerLayout from "./manager/ManagerLayout.jsx";
-import OverviewPage from "./manager/pages/OverviewPage.jsx";
-import ApprovalsPage from "./manager/pages/ApprovalsPage.jsx";
-import CoursesPage from "./manager/pages/CoursesPage.jsx";
-import CoursePage from "./manager/pages/CoursePage.jsx";
-import ItemPage from "./manager/pages/ItemPage.jsx";
-import ReviewPage from "./manager/pages/ReviewPage.jsx";
-import ActivityPage from "./manager/pages/ActivityPage.jsx";
-import SocialPage from "./manager/pages/SocialPage.jsx";
-import PlansBudgetPage from "./manager/pages/PlansBudgetPage.jsx";
 
 export default function App() {
   return (
     <ToastProvider>
     <Routes>
-      {/* ממשק ניהול המדיה — המסכים מהמוקאפ של נירית, אחד-לאחד.
-          סרגל-צד תיקיות = הניווט הראשי; שרשרת: תיקייה → טבלה → פריט → Review. */}
-      <Route path="/media" element={<ManagerLayout />}>
-        <Route index element={<OverviewPage />} />
-        <Route path="courses" element={<CoursesPage />} />
-        <Route path="courses/:courseKey" element={<CoursePage />} />
-        <Route path="items/:artifactId" element={<ItemPage />} />
-        <Route path="items/:artifactId/review" element={<ReviewPage />} />
-        <Route path="approvals" element={<ApprovalsPage />} />
-        {/* תוכנית-ההשתלטות קופלה לתוך סביבת-הקורס (מתג-אישור) — קישור ישן → /media */}
-        <Route path="takeover-plan" element={<Navigate to="/media" replace />} />
-        <Route path="activity" element={<ActivityPage />} />
-        <Route path="social" element={<SocialPage />} />
-        <Route path="plans" element={<PlansBudgetPage />} />
-      </Route>
-
-      {/* הנתיב הישן /manager → /media — שלא יישברו קישורים */}
-      <Route path="/manager"           element={<Navigate to="/media" replace />} />
-      <Route path="/manager/approvals" element={<Navigate to="/media/approvals" replace />} />
-
       {/* All routes share the global Layout (fixed top bar + bug button) */}
       <Route element={<Layout />}>
 
         {/* Portal home — department selector */}
         <Route index element={<PortalHome />} />
 
-        {/* Analytics department — current scope: dashboard, executive, saved reports.
-            ניתוח שלב 0 / ניתוח נקודתי / יעדים הוסרו (ראה AnalyticsLayout.jsx + README). */}
+        {/* Analytics department — current scope: dashboard, executive, saved reports. */}
         <Route path="/analytics" element={<AnalyticsLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard"  element={<Dashboard />} />
@@ -61,8 +30,7 @@ export default function App() {
           <Route path="reports"    element={<ReportsPage />} />
         </Route>
 
-        {/* Campaign Management — canonical (Spec 03 §2.2). The page was renamed
-            from MediaReportsPage to CampaignManagementPage. Old URL kept as alias. */}
+        {/* Campaign Management — canonical (Spec 03 §2.2). */}
         <Route path="/campaign-management"  element={<CampaignManagementPage />} />
         <Route path="/media-reports"        element={<CampaignManagementPage />} />
 
@@ -73,13 +41,15 @@ export default function App() {
           <Route path="goals"       element={<GoalsPage />} />
         </Route>
 
-        {/* Legacy redirects — old bookmarks → לעמודים הקיימים */}
-        <Route path="/forecasting"         element={<Navigate to="/strategy/forecasting" replace />} />
-        <Route path="/dashboard"           element={<Navigate to="/analytics/dashboard" replace />} />
-        <Route path="/reports"             element={<Navigate to="/analytics/reports"   replace />} />
-        <Route path="/analysis"            element={<Navigate to="/analytics/dashboard" replace />} />
-        <Route path="/goals"               element={<Navigate to="/analytics/dashboard" replace />} />
-        <Route path="/analytics/goals"       element={<Navigate to="/analytics/dashboard" replace />} />
+        {/* Legacy redirects */}
+        <Route path="/forecasting"     element={<Navigate to="/strategy/forecasting" replace />} />
+        <Route path="/dashboard"       element={<Navigate to="/analytics/dashboard" replace />} />
+        <Route path="/reports"         element={<Navigate to="/analytics/reports"   replace />} />
+        <Route path="/analysis"        element={<Navigate to="/analytics/dashboard" replace />} />
+        <Route path="/goals"           element={<Navigate to="/analytics/dashboard" replace />} />
+        <Route path="/analytics/goals" element={<Navigate to="/analytics/dashboard" replace />} />
+        <Route path="/media"           element={<Navigate to="/" replace />} />
+        <Route path="/manager"         element={<Navigate to="/" replace />} />
 
       </Route>
     </Routes>
