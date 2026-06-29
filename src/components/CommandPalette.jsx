@@ -15,20 +15,11 @@ import { useNavigate } from "react-router-dom";
 
 const COMMANDS = [
   { icon: "🏠", label: "פורטל מחלקות",            keywords: "portal home דף הבית",      path: "/" },
-  // Marketing / Campaign Management
-  { icon: "🎯", label: "פעילות שיווקית",          keywords: "marketing campaigns",       path: "/campaign-management?tab=marketing" },
-  { icon: "🗂", label: "לוח קמפיינים",            keywords: "board kanban folders",      path: "/campaign-management?tab=marketing&sub=board" },
-  { icon: "📝", label: "בריף חדש",                keywords: "brief intake new",          path: "/campaign-management?tab=marketing&sub=intake" },
-  { icon: "✋", label: "תוצרים לאישור",           keywords: "artifacts approve deliverables", path: "/campaign-management?tab=marketing&sub=approvals" },
-  { icon: "✅", label: "דורש פעולה",              keywords: "blockers tasks todo",       path: "/campaign-management?tab=marketing&sub=tasks" },
-  { icon: "💰", label: "תקציב בית-ספרי",          keywords: "budget school",             path: "/campaign-management?tab=marketing&sub=budget" },
-  { icon: "🔌", label: "MAKE — אינטגרציות",       keywords: "make scenarios integrations", path: "/campaign-management?tab=marketing&sub=make" },
-  { icon: "⚙",  label: "הגדרות מערכת",            keywords: "settings config",           path: "/campaign-management?tab=marketing&sub=settings" },
-  // Media reports
-  { icon: "📊", label: "דוחות יומיים",            keywords: "daily reports media",       path: "/campaign-management?tab=daily" },
-  { icon: "📈", label: "דוחות שבועיים",           keywords: "weekly",                    path: "/campaign-management?tab=weekly" },
-  { icon: "📉", label: "Y-o-Y חודשי",              keywords: "monthly yoy",               path: "/campaign-management?tab=monthly" },
-  { icon: "📋", label: "ריצות אחרונות",            keywords: "runs history",              path: "/campaign-management?tab=runs" },
+  // Managers dashboard — media reports (read-only)
+  { icon: "📊", label: "דוחות יומיים",            keywords: "daily reports media",       path: "/media-reports?tab=daily" },
+  { icon: "📈", label: "דוחות שבועיים",           keywords: "weekly",                    path: "/media-reports?tab=weekly" },
+  { icon: "📉", label: "Y-o-Y חודשי",              keywords: "monthly yoy",               path: "/media-reports?tab=monthly" },
+  { icon: "📋", label: "רישום לקורסים",            keywords: "registration courses רישום", path: "/media-reports?tab=registration" },
   // Analytics
   { icon: "📊", label: "דאשבורד אנליטיקה",        keywords: "analytics dashboard",       path: "/analytics/dashboard" },
   { icon: "🌐", label: "מערכת אקו-סיסטם",         keywords: "ecosystem",                 path: "/analytics/ecosystem" },

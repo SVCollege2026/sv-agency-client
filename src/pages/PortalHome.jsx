@@ -8,7 +8,7 @@ import { submitBugReport } from "../api.js";
 
 // ─── Departments ─────────────────────────────────────────────────────────────
 
-// שורה ראשונה: אסטרטגיה · דשבורד מנהלים · ניהול מדיה. שורה שנייה: אנליזה ואילך.
+// שורה ראשונה: אסטרטגיה · דשבורד מנהלים. שורה שנייה: אנליזה ואילך.
 const DEPARTMENTS = [
   {
     id:     "strategy",
@@ -22,16 +22,8 @@ const DEPARTMENTS = [
     id:     "managers_dashboard",
     icon:   "📣",
     label:  "דשבורד מנהלים",
-    desc:   "דוחות · חקירות · תהליך פרסום · שאלות פתוחות",
+    desc:   "סטטוס מדיה (יומי/שבועי/חודשי) · רישום לקורסים",
     path:   "/media-reports",
-    active: true,
-  },
-  {
-    id:     "media_management",
-    icon:   "🎛️",
-    label:  "ניהול מדיה",
-    desc:   "הסקירה שלי · אישורים · בקשות חדשות",
-    path:   "/media",
     active: true,
   },
   {

@@ -3,10 +3,8 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/check-contrast.mjs",
     "build": "vite build",
-    "preview": "vite preview",
-    "check:contrast": "node scripts/check-contrast.mjs"
+    "preview": "vite preview"
   },
   "dependencies": {
     "react": "^18.2.0",

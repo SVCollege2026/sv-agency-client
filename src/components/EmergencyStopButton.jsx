@@ -13,7 +13,7 @@
  * מפעיל אנושי מזוהה (סוכנים אסורים בקוד).
  */
 import React, { useState } from "react";
-import { emergencyStopPause, emergencyStopResume } from "../../api.js";
+import { emergencyStopPause, emergencyStopResume } from "../api.js";
 
 const OPERATOR = "marketing_manager";
 
