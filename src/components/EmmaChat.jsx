@@ -4,7 +4,7 @@
  * סינכרוני: POST /api/emma/ask מחזיר reply + actions ישירות.
  */
 import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
-import { color, radius, shadow, space, fontFamily, transition } from "./campaign/_tokens.js";
+import { color, radius, shadow, space, fontFamily, transition } from "./_tokens.js";
 import { askEmma, askMedia, recordApproval, executeEmmaAction, uploadCampaignFile } from "../api.js";
 
 const STORAGE_KEY = "sv:chat:emma";

@@ -62,7 +62,7 @@ export default function UserAvatar() {
             <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{USER.role}</div>
           </div>
 
-          <MenuItem icon="⚙" label="הגדרות מערכת" onClick={() => { ref("/campaign-management?tab=marketing"); setOpen(false); }} />
+          <MenuItem icon="📣" label="דשבורד מנהלים" onClick={() => { ref("/media-reports"); setOpen(false); }} />
           <MenuItem icon="❓" label="איך זה עובד?" onClick={() => {
             window.dispatchEvent(new CustomEvent("sv:open-help"));
             setOpen(false);

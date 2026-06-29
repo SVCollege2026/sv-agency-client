@@ -10,7 +10,7 @@ import EcosystemPage from "./pages/EcosystemPage.jsx";
 import CampaignManagementPage from "./pages/CampaignManagementPage.jsx";
 import ForecastingPage from "./pages/ForecastingPage.jsx";
 import GoalsPage from "./pages/GoalsPage.jsx";
-import { ToastProvider } from "./components/campaign/Toast.jsx";
+import { ToastProvider } from "./components/Toast.jsx";
 
 export default function App() {
   return (
@@ -30,9 +30,12 @@ export default function App() {
           <Route path="reports"    element={<ReportsPage />} />
         </Route>
 
-        {/* Campaign Management — canonical (Spec 03 §2.2). */}
-        <Route path="/campaign-management"  element={<CampaignManagementPage />} />
+        {/* Managers dashboard — read-only media reports + course registration.
+            Served at /media-reports (portal card) and the legacy
+            /campaign-management path. The old campaign-management machinery
+            (folders/approvals/briefs) was removed. */}
         <Route path="/media-reports"        element={<CampaignManagementPage />} />
+        <Route path="/campaign-management"  element={<CampaignManagementPage />} />
 
         {/* Strategy department — חיזוי + יעדים פעילים */}
         <Route path="/strategy" element={<StrategyLayout />}>
